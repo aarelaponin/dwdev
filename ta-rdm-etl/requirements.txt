@@ -1,0 +1,15 @@
+# TA-RDM ETL Requirements
+# Production ETL pipeline dependencies
+
+# Database Connectivity
+mysql-connector-python>=8.2.0
+clickhouse-connect>=0.7.0
+
+# Environment Management
+python-dotenv>=1.0.0
+
+# CLI and Logging
+colorama>=0.4.6
+
+# Note: This package does NOT include test data generation dependencies
+# For test data generation, see ta-rdm-testdata package

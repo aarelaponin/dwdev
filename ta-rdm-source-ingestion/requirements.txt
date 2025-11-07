@@ -1,0 +1,78 @@
+# TA-RDM Source Ingestion Requirements
+# Metadata-driven ETL pipeline for Source → L2 canonical data ingestion
+
+# ==============================================================================
+# Database Connectivity
+# ==============================================================================
+# MySQL for L2 canonical and configuration database
+mysql-connector-python>=8.2.0
+
+# SQL Server for RAMIS source system
+pymssql>=2.2.11
+
+# Alternative SQL Server driver (optional, more robust but requires FreeTDS)
+# pyodbc>=5.0.1
+
+# ==============================================================================
+# Data Processing
+# ==============================================================================
+# Data transformation and manipulation
+pandas>=2.1.0
+numpy>=1.24.0
+
+# ==============================================================================
+# Configuration Management
+# ==============================================================================
+# Environment variables
+python-dotenv>=1.0.0
+
+# YAML configuration parsing
+PyYAML>=6.0.1
+
+# ==============================================================================
+# CLI and Logging
+# ==============================================================================
+# Colored console output
+colorama>=0.4.6
+
+# Rich text formatting and progress bars
+rich>=13.7.0
+
+# ==============================================================================
+# Data Quality and Validation
+# ==============================================================================
+# Schema validation
+jsonschema>=4.20.0
+
+# Date/time handling
+python-dateutil>=2.8.2
+
+# ==============================================================================
+# Optional: Advanced Features
+# ==============================================================================
+# Great Expectations for advanced data quality (optional)
+# great-expectations>=0.18.0
+
+# SQL query builder (optional alternative to raw SQL)
+# pypika>=0.48.9
+
+# Connection pooling for high-performance scenarios (optional)
+# sqlalchemy>=2.0.23
+
+# ==============================================================================
+# Development and Testing (optional - separate requirements-dev.txt)
+# ==============================================================================
+# pytest>=7.4.0
+# pytest-cov>=4.1.0
+# pytest-mock>=3.12.0
+# black>=23.12.0
+# flake8>=6.1.0
+# mypy>=1.7.0
+
+# ==============================================================================
+# Notes
+# ==============================================================================
+# - For SQL Server connectivity, pymssql is lighter weight
+# - If you need Windows Authentication, use pyodbc instead
+# - Great Expectations adds ~150MB of dependencies - enable if needed
+# - Consider creating requirements-dev.txt for development dependencies

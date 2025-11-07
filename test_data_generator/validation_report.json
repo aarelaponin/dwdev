@@ -1,0 +1,345 @@
+{
+  "validation_timestamp": "2025-11-06 12:16:43.189235",
+  "table_filter": null,
+  "validators": {
+    "row_count": [
+      {
+        "check_name": "Row Count: dim_party",
+        "status": "PASS",
+        "details": {
+          "table": "dim_party",
+          "l2_source_count": 5,
+          "l3_target_count": 5,
+          "expected_count": 5,
+          "difference": 0,
+          "ratio": 1.0,
+          "description": "Party dimension with individuals and enterprises"
+        },
+        "timestamp": "2025-11-06 12:16:43.214404"
+      },
+      {
+        "check_name": "Row Count: dim_tax_type",
+        "status": "PASS",
+        "details": {
+          "table": "dim_tax_type",
+          "l2_source_count": 5,
+          "l3_target_count": 5,
+          "expected_count": 5,
+          "difference": 0,
+          "ratio": 1.0,
+          "description": "Tax type dimension (VAT, CIT, PIT, etc.)"
+        },
+        "timestamp": "2025-11-06 12:16:43.218400"
+      },
+      {
+        "check_name": "Row Count: dim_time",
+        "status": "PASS",
+        "details": {
+          "table": "dim_time",
+          "l2_source_count": 1096,
+          "l3_target_count": 1096,
+          "expected_count": 1096,
+          "difference": 0,
+          "ratio": 1.0,
+          "description": "Time dimension (daily grain, 2023-2025)"
+        },
+        "timestamp": "2025-11-06 12:16:43.222913"
+      },
+      {
+        "check_name": "Row Count: fact_registration",
+        "status": "PASS",
+        "details": {
+          "table": "fact_registration",
+          "l2_source_count": 10,
+          "l3_target_count": 10,
+          "expected_count": 10,
+          "difference": 0,
+          "ratio": 1.0,
+          "description": "Tax account registration facts"
+        },
+        "timestamp": "2025-11-06 12:16:43.226520"
+      }
+    ],
+    "integrity": [
+      {
+        "check_name": "FK Integrity: fact_registration.dim_party_key \u2192 dim_party",
+        "status": "PASS",
+        "details": {
+          "fact_table": "fact_registration",
+          "dimension_table": "dim_party",
+          "fk_column": "dim_party_key",
+          "orphan_records": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.232824"
+      },
+      {
+        "check_name": "FK Integrity: fact_registration.dim_tax_type_key \u2192 dim_tax_type",
+        "status": "PASS",
+        "details": {
+          "fact_table": "fact_registration",
+          "dimension_table": "dim_tax_type",
+          "fk_column": "dim_tax_type_key",
+          "orphan_records": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.239711"
+      },
+      {
+        "check_name": "FK Integrity: fact_registration.dim_date_key \u2192 dim_time",
+        "status": "PASS",
+        "details": {
+          "fact_table": "fact_registration",
+          "dimension_table": "dim_time",
+          "fk_column": "dim_date_key",
+          "orphan_records": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.243912"
+      },
+      {
+        "check_name": "Natural Key Uniqueness: dim_party.party_id",
+        "status": "PASS",
+        "details": {
+          "table": "dim_party",
+          "natural_key": "party_id",
+          "duplicate_keys": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.248609"
+      },
+      {
+        "check_name": "Natural Key Uniqueness: dim_tax_type.tax_type_code",
+        "status": "PASS",
+        "details": {
+          "table": "dim_tax_type",
+          "natural_key": "tax_type_code",
+          "duplicate_keys": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.251968"
+      },
+      {
+        "check_name": "Natural Key Uniqueness: dim_time.date_key",
+        "status": "PASS",
+        "details": {
+          "table": "dim_time",
+          "natural_key": "date_key",
+          "duplicate_keys": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.255427"
+      }
+    ],
+    "quality": [
+      {
+        "check_name": "Mandatory Field: dim_party.party_id",
+        "status": "PASS",
+        "details": {
+          "table": "dim_party",
+          "field": "party_id",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.260843"
+      },
+      {
+        "check_name": "Mandatory Field: dim_party.tin",
+        "status": "PASS",
+        "details": {
+          "table": "dim_party",
+          "field": "tin",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.266090"
+      },
+      {
+        "check_name": "Mandatory Field: dim_party.party_name",
+        "status": "PASS",
+        "details": {
+          "table": "dim_party",
+          "field": "party_name",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.269956"
+      },
+      {
+        "check_name": "Mandatory Field: dim_party.party_type",
+        "status": "PASS",
+        "details": {
+          "table": "dim_party",
+          "field": "party_type",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.272853"
+      },
+      {
+        "check_name": "Mandatory Field: dim_tax_type.tax_type_code",
+        "status": "PASS",
+        "details": {
+          "table": "dim_tax_type",
+          "field": "tax_type_code",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.275299"
+      },
+      {
+        "check_name": "Mandatory Field: dim_tax_type.tax_type_name",
+        "status": "PASS",
+        "details": {
+          "table": "dim_tax_type",
+          "field": "tax_type_name",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.277589"
+      },
+      {
+        "check_name": "Mandatory Field: dim_tax_type.tax_category",
+        "status": "PASS",
+        "details": {
+          "table": "dim_tax_type",
+          "field": "tax_category",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.279913"
+      },
+      {
+        "check_name": "Mandatory Field: dim_time.date_key",
+        "status": "PASS",
+        "details": {
+          "table": "dim_time",
+          "field": "date_key",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.282112"
+      },
+      {
+        "check_name": "Mandatory Field: dim_time.full_date",
+        "status": "PASS",
+        "details": {
+          "table": "dim_time",
+          "field": "full_date",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.284216"
+      },
+      {
+        "check_name": "Mandatory Field: dim_time.year",
+        "status": "PASS",
+        "details": {
+          "table": "dim_time",
+          "field": "year",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.286434"
+      },
+      {
+        "check_name": "Mandatory Field: dim_time.month",
+        "status": "PASS",
+        "details": {
+          "table": "dim_time",
+          "field": "month",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.288168"
+      },
+      {
+        "check_name": "Mandatory Field: dim_time.day_of_month",
+        "status": "PASS",
+        "details": {
+          "table": "dim_time",
+          "field": "day_of_month",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.290583"
+      },
+      {
+        "check_name": "Mandatory Field: fact_registration.tax_account_id",
+        "status": "PASS",
+        "details": {
+          "table": "fact_registration",
+          "field": "tax_account_id",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.293063"
+      },
+      {
+        "check_name": "Mandatory Field: fact_registration.dim_party_key",
+        "status": "PASS",
+        "details": {
+          "table": "fact_registration",
+          "field": "dim_party_key",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.295128"
+      },
+      {
+        "check_name": "Mandatory Field: fact_registration.dim_tax_type_key",
+        "status": "PASS",
+        "details": {
+          "table": "fact_registration",
+          "field": "dim_tax_type_key",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.297197"
+      },
+      {
+        "check_name": "Mandatory Field: fact_registration.dim_date_key",
+        "status": "PASS",
+        "details": {
+          "table": "fact_registration",
+          "field": "dim_date_key",
+          "null_or_empty_count": 0
+        },
+        "timestamp": "2025-11-06 12:16:43.299498"
+      },
+      {
+        "check_name": "Data Quality: Party TIN Format",
+        "status": "PASS",
+        "details": {
+          "invalid_tin_count": 0,
+          "rule": "TIN must be 9, 10, or 12 characters"
+        },
+        "timestamp": "2025-11-06 12:16:43.302003"
+      },
+      {
+        "check_name": "Data Quality: Risk Score Range",
+        "status": "PASS",
+        "details": {
+          "invalid_score_count": 0,
+          "rule": "Risk score must be between 0 and 100"
+        },
+        "timestamp": "2025-11-06 12:16:43.304312"
+      }
+    ],
+    "business": [
+      {
+        "check_name": "SCD Type 2: is_current=1 \u2192 valid_to IS NULL",
+        "status": "PASS",
+        "details": {
+          "violation_count": 0,
+          "rule": "Current records must have NULL valid_to"
+        },
+        "timestamp": "2025-11-06 12:16:43.306463"
+      },
+      {
+        "check_name": "SCD Type 2: is_current=0 \u2192 valid_to IS NOT NULL",
+        "status": "PASS",
+        "details": {
+          "violation_count": 0,
+          "rule": "Historical records must have valid_to date"
+        },
+        "timestamp": "2025-11-06 12:16:43.308574"
+      },
+      {
+        "check_name": "Business Rule: Registration Dates in dim_time Range",
+        "status": "PASS",
+        "details": {
+          "invalid_date_count": 0,
+          "rule": "All registration dates must exist in dim_time"
+        },
+        "timestamp": "2025-11-06 12:16:43.311225"
+      }
+    ]
+  },
+  "summary": {
+    "total_checks": 31,
+    "passed": 31,
+    "failed": 0,
+    "warnings": 0,
+    "pass_rate": 100.0
+  }
+}

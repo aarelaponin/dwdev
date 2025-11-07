@@ -1,0 +1,153 @@
+# TA-RDM Source Ingestion - Git Ignore
+
+# ==============================================================================
+# Environment and Credentials
+# ==============================================================================
+.env
+.env.local
+.env.*.local
+
+# ==============================================================================
+# Python
+# ==============================================================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# ==============================================================================
+# IDEs and Editors
+# ==============================================================================
+# PyCharm
+.idea/
+*.iml
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# ==============================================================================
+# Logs and Databases
+# ==============================================================================
+logs/
+*.log
+
+# SQLite databases (if used for testing)
+*.db
+*.sqlite
+*.sqlite3
+
+# ==============================================================================
+# OS Files
+# ==============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ==============================================================================
+# Project-Specific
+# ==============================================================================
+# Test data output
+test_output/
+data/
+*.csv
+*.xlsx
+*.parquet
+
+# Temporary files
+tmp/
+temp/
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# ==============================================================================
+# Package Management
+# ==============================================================================
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Poetry
+poetry.lock
+
+# ==============================================================================
+# Security
+# ==============================================================================
+# Never commit secrets, keys, or credentials
+*secret*
+*credentials*
+*.pem
+*.key
+*.cert

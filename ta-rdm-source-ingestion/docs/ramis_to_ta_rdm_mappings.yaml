@@ -1,0 +1,573 @@
+# =====================================================================
+# RAMIS to TA-RDM Mapping Configuration
+# =====================================================================
+# This file defines declarative mappings from RAMIS source tables
+# to TA-RDM canonical model (Layer 2).
+#
+# Usage:
+#   python scripts/import_mappings.py --config metadata/mappings/ramis_to_ta_rdm.yaml
+# =====================================================================
+
+# Source system configuration
+source_system:
+  source_code: "RAMIS_SL"
+  source_name: "Sri Lanka RAMIS"
+  source_type: "SQL_SERVER"
+  connection:
+    host: "${RAMIS_HOST}"
+    port: 1433
+    database: "RAMIS"
+    schema: "dbo"
+  extraction:
+    method: "JDBC"  # or AIRBYTE
+    batch_size: 10000
+    incremental_column: "ModifiedDate"
+
+# =====================================================================
+# TABLE MAPPINGS
+# =====================================================================
+table_mappings:
+
+  # -------------------------------------------------------------------
+  # Priority 1: Foundation - Party Data
+  # -------------------------------------------------------------------
+  
+  - mapping_code: "RAMIS_TAXPAYER_TO_PARTY"
+    mapping_name: "RAMIS Taxpayer to TA-RDM Party"
+    
+    source:
+      table: "T_BT_TAXPAYER"
+      key_columns: ["TIN"]
+      filter: "STATUS != 'DELETED'"
+      description: "Main taxpayer registration table in RAMIS"
+      
+    target:
+      schema: "party"
+      table: "party"
+      key_columns: ["tax_identification_number"]
+      
+    load_config:
+      priority: 10
+      strategy: "FULL"  # FULL, INCREMENTAL, CDC
+      merge: "UPSERT"   # INSERT, UPDATE, UPSERT
+      
+    column_mappings:
+      # Key field - TIN
+      - source: "TIN"
+        target: "tax_identification_number"
+        transformation:
+          type: "EXPRESSION"
+          sql: "UPPER(TRIM({source_column}))"
+        validation:
+          - type: "NOT_NULL"
+          - type: "UNIQUE"
+          - type: "PATTERN"
+            pattern: "^[0-9]{9}[VX]?$"
+        is_key: true
+        
+      # Party name
+      - source: "TAXPAYER_NAME"
+        target: "party_name"
+        transformation:
+          type: "EXPRESSION"
+          sql: "TRIM({source_column})"
+        validation:
+          - type: "NOT_NULL"
+          - type: "MAX_LENGTH"
+            max: 500
+            
+      # Party type code
+      - source: "TAXPAYER_TYPE"
+        target: "party_type_code"
+        transformation:
+          type: "LOOKUP"
+          mapping:
+            "I": "INDIVIDUAL"
+            "C": "ENTERPRISE"
+            "P": "PARTNERSHIP"
+            "G": "GOVERNMENT"
+          default: "UNKNOWN"
+        validation:
+          - type: "NOT_NULL"
+          - type: "REFERENTIAL"
+            reference_table: "reference.ref_party_type"
+            reference_column: "party_type_code"
+            
+      # Status
+      - source: "STATUS"
+        target: "party_status_code"
+        transformation:
+          type: "LOOKUP"
+          mapping:
+            "A": "ACTIVE"
+            "I": "INACTIVE"
+            "D": "DEREGISTERED"
+            "S": "SUSPENDED"
+          default: "UNKNOWN"
+          
+      # Registration date
+      - source: "REGISTRATION_DATE"
+        target: "registration_date"
+        transformation:
+          type: "EXPRESSION"
+          sql: "CAST({source_column} AS DATE)"
+        validation:
+          - type: "DATE_RANGE"
+            min_date: "1980-01-01"
+            max_date: "CURRENT_DATE"
+            
+      # Contact information
+      - source: "EMAIL"
+        target: "contact_email"
+        transformation:
+          type: "EXPRESSION"
+          sql: "LOWER(TRIM({source_column}))"
+        validation:
+          - type: "PATTERN"
+            pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+            severity: "WARNING"
+            
+      - source: "PHONE"
+        target: "contact_phone"
+        transformation:
+          type: "EXPRESSION"
+          sql: "TRIM({source_column})"
+          
+      # Address fields
+      - source: "ADDRESS_LINE1"
+        target: "address_line1"
+        
+      - source: "CITY"
+        target: "locality_code"
+        transformation:
+          type: "LOOKUP_TABLE"
+          lookup_table: "reference.ref_locality"
+          lookup_key: "locality_name"
+          lookup_value: "locality_code"
+          
+      # Audit fields
+      - source: "CREATED_DATE"
+        target: "created_date"
+      - source: "MODIFIED_DATE"
+        target: "modified_date"
+      - source: "CREATED_BY"
+        target: "created_by"
+        transformation:
+          type: "EXPRESSION"
+          sql: "COALESCE({source_column}, 'RAMIS_MIGRATION')"
+        
+    data_quality_rules:
+      - rule_code: "DQ_PARTY_001"
+        rule_name: "TIN must be unique"
+        rule_type: "UNIQUE"
+        scope: "TABLE"
+        definition:
+          columns: ["tax_identification_number"]
+        severity: "ERROR"
+        action: "REJECT"
+        
+      - rule_code: "DQ_PARTY_002"
+        rule_name: "Mandatory party fields"
+        rule_type: "NOT_NULL"
+        scope: "COLUMN"
+        definition:
+          columns: ["tax_identification_number", "party_name", "party_type_code"]
+        severity: "ERROR"
+        action: "REJECT"
+        
+      - rule_code: "DQ_PARTY_003"
+        rule_name: "Valid email format"
+        rule_type: "PATTERN"
+        scope: "COLUMN"
+        definition:
+          column: "contact_email"
+          pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        severity: "WARNING"
+        action: "LOG"
+
+  # -------------------------------------------------------------------
+  
+  - mapping_code: "RAMIS_INDIVIDUAL_TO_INDIVIDUAL"
+    mapping_name: "RAMIS Individual Taxpayer Details"
+    
+    source:
+      table: "T_BT_TAXPAYER_INDIVIDUAL"
+      key_columns: ["TIN"]
+      
+    target:
+      schema: "party"
+      table: "individual"
+      key_columns: ["party_id"]
+      
+    load_config:
+      priority: 11
+      strategy: "FULL"
+      merge: "UPSERT"
+      
+    dependencies:
+      - "RAMIS_TAXPAYER_TO_PARTY"  # Must load party first
+      
+    column_mappings:
+      # Foreign key to party
+      - source: "TIN"
+        target: "party_id"
+        transformation:
+          type: "LOOKUP_QUERY"
+          sql: |
+            SELECT party_id 
+            FROM party.party 
+            WHERE tax_identification_number = {source_column}
+        validation:
+          - type: "REFERENTIAL"
+            reference_table: "party.party"
+            reference_column: "party_id"
+        is_key: true
+        
+      # Personal details
+      - source: "FIRST_NAME"
+        target: "first_name"
+      - source: "MIDDLE_NAME"
+        target: "middle_name"
+      - source: "LAST_NAME"
+        target: "last_name"
+        
+      - source: "DATE_OF_BIRTH"
+        target: "date_of_birth"
+        transformation:
+          type: "EXPRESSION"
+          sql: "CAST({source_column} AS DATE)"
+        validation:
+          - type: "DATE_RANGE"
+            min_date: "1900-01-01"
+            max_date: "CURRENT_DATE - INTERVAL 18 YEAR"
+            
+      - source: "GENDER"
+        target: "gender_code"
+        transformation:
+          type: "LOOKUP"
+          mapping:
+            "M": "MALE"
+            "F": "FEMALE"
+            "O": "OTHER"
+          default: "NOT_SPECIFIED"
+          
+      - source: "NATIONAL_ID"
+        target: "national_id_number"
+        transformation:
+          type: "EXPRESSION"
+          sql: "UPPER(TRIM({source_column}))"
+
+  # -------------------------------------------------------------------
+  # Priority 2: Registration - Tax Accounts
+  # -------------------------------------------------------------------
+  
+  - mapping_code: "RAMIS_TAX_ACCOUNT_TO_TAX_ACCOUNT"
+    mapping_name: "RAMIS Tax Account to TA-RDM Tax Account"
+    
+    source:
+      table: "T_BT_TAX_ACCOUNT"
+      key_columns: ["TAX_ACCOUNT_ID"]
+      filter: "STATUS != 'DELETED'"
+      
+    target:
+      schema: "registration"
+      table: "tax_account"
+      key_columns: ["tax_account_id"]
+      
+    load_config:
+      priority: 20
+      strategy: "FULL"
+      merge: "UPSERT"
+      
+    dependencies:
+      - "RAMIS_TAXPAYER_TO_PARTY"
+      
+    column_mappings:
+      # Account ID
+      - source: "TAX_ACCOUNT_ID"
+        target: "tax_account_id"
+        transformation:
+          type: "EXPRESSION"
+          sql: "'RAMIS_' || CAST({source_column} AS CHAR)"
+        is_key: true
+        
+      # Party reference (TIN to party_id lookup)
+      - source: "TIN"
+        target: "party_id"
+        transformation:
+          type: "LOOKUP_QUERY"
+          sql: |
+            SELECT party_id 
+            FROM party.party 
+            WHERE tax_identification_number = {source_column}
+        validation:
+          - type: "NOT_NULL"
+          - type: "REFERENTIAL"
+            reference_table: "party.party"
+            reference_column: "party_id"
+            
+      # Tax type reference
+      - source: "TAX_TYPE_CODE"
+        target: "tax_type_id"
+        transformation:
+          type: "LOOKUP_QUERY"
+          sql: |
+            SELECT tax_type_id 
+            FROM tax_framework.tax_type 
+            WHERE tax_type_code = {source_column}
+        validation:
+          - type: "NOT_NULL"
+          - type: "REFERENTIAL"
+            reference_table: "tax_framework.tax_type"
+            reference_column: "tax_type_id"
+            
+      # Account status
+      - source: "STATUS"
+        target: "account_status_code"
+        transformation:
+          type: "LOOKUP"
+          mapping:
+            "A": "ACTIVE"
+            "I": "INACTIVE"
+            "C": "CLOSED"
+            "S": "SUSPENDED"
+            
+      # Registration date
+      - source: "REGISTRATION_DATE"
+        target: "registration_date"
+        transformation:
+          type: "EXPRESSION"
+          sql: "CAST({source_column} AS DATE)"
+          
+      # Deregistration date
+      - source: "DEREGISTRATION_DATE"
+        target: "deregistration_date"
+        transformation:
+          type: "EXPRESSION"
+          sql: "CAST({source_column} AS DATE)"
+        nullable: true
+
+  # -------------------------------------------------------------------
+  # Priority 3: Filing & Assessment - Tax Returns
+  # -------------------------------------------------------------------
+  
+  - mapping_code: "RAMIS_VAT_RETURN_HEADER_TO_TAX_RETURN"
+    mapping_name: "RAMIS VAT Return to TA-RDM Tax Return"
+    
+    source:
+      table: "T_BT_ASMT_SVAT_05_HEADER"
+      key_columns: ["RETURN_ID"]
+      filter: "STATUS != 'DELETED'"
+      description: "VAT Return Form 05 header table"
+      
+    target:
+      schema: "filing_assessment"
+      table: "tax_return"
+      key_columns: ["return_id"]
+      
+    load_config:
+      priority: 30
+      strategy: "INCREMENTAL"
+      incremental_column: "MODIFIED_DATE"
+      merge: "UPSERT"
+      
+    dependencies:
+      - "RAMIS_TAX_ACCOUNT_TO_TAX_ACCOUNT"
+      
+    column_mappings:
+      # Return ID
+      - source: "RETURN_ID"
+        target: "return_id"
+        transformation:
+          type: "EXPRESSION"
+          sql: "'RAMIS_VAT_' || CAST({source_column} AS CHAR)"
+        is_key: true
+        
+      # Tax account reference
+      - source: "TIN"
+        target: "tax_account_id"
+        transformation:
+          type: "LOOKUP_QUERY"
+          sql: |
+            SELECT ta.tax_account_id 
+            FROM registration.tax_account ta
+            JOIN party.party p ON ta.party_id = p.party_id
+            WHERE p.tax_identification_number = {source_column}
+              AND ta.tax_type_code = 'VAT'
+        validation:
+          - type: "NOT_NULL"
+            
+      # Tax period reference
+      - source: "TAX_PERIOD"
+        target: "tax_period_id"
+        transformation:
+          type: "LOOKUP_QUERY"
+          sql: |
+            SELECT tax_period_id 
+            FROM tax_framework.tax_period 
+            WHERE period_code = TO_CHAR({source_column}, 'YYYYMM')
+              AND tax_type_code = 'VAT'
+              
+      # Return filing details
+      - source: "FILING_DATE"
+        target: "filing_date"
+        transformation:
+          type: "EXPRESSION"
+          sql: "CAST({source_column} AS DATE)"
+          
+      - source: "FILING_METHOD"
+        target: "filing_method_code"
+        transformation:
+          type: "LOOKUP"
+          mapping:
+            "E": "ELECTRONIC"
+            "P": "PAPER"
+            "A": "AGENT"
+          default: "UNKNOWN"
+          
+      # Return status
+      - source: "STATUS"
+        target: "return_status_code"
+        transformation:
+          type: "LOOKUP"
+          mapping:
+            "D": "DRAFT"
+            "F": "FILED"
+            "A": "ASSESSED"
+            "R": "REJECTED"
+            
+      # Tax amounts
+      - source: "TOTAL_OUTPUT_TAX"
+        target: "declared_tax_amount"
+        transformation:
+          type: "EXPRESSION"
+          sql: "COALESCE({source_column}, 0)"
+          
+      - source: "TOTAL_INPUT_TAX"
+        target: "claimed_credit_amount"
+        transformation:
+          type: "EXPRESSION"
+          sql: "COALESCE({source_column}, 0)"
+          
+      - source: "NET_TAX_PAYABLE"
+        target: "net_tax_amount"
+        transformation:
+          type: "EXPRESSION"
+          sql: "COALESCE({source_column}, 0)"
+          
+    data_quality_rules:
+      - rule_code: "DQ_RETURN_001"
+        rule_name: "Return amounts must balance"
+        rule_type: "CUSTOM"
+        scope: "TABLE"
+        definition:
+          sql: |
+            SELECT return_id 
+            FROM staging.stg_tax_return
+            WHERE ABS(declared_tax_amount - claimed_credit_amount - net_tax_amount) > 0.01
+        severity: "WARNING"
+        action: "LOG"
+        error_message: "Tax amounts do not balance: Output - Input != Net"
+
+  # -------------------------------------------------------------------
+  # Priority 4: Payment - Payments
+  # -------------------------------------------------------------------
+  
+  - mapping_code: "RAMIS_PAYMENT_TO_PAYMENT"
+    mapping_name: "RAMIS Payment to TA-RDM Payment"
+    
+    source:
+      table: "T_BT_PAYMENT"
+      key_columns: ["PAYMENT_ID"]
+      filter: "STATUS != 'CANCELLED'"
+      
+    target:
+      schema: "payment_refund"
+      table: "payment"
+      key_columns: ["payment_id"]
+      
+    load_config:
+      priority: 40
+      strategy: "INCREMENTAL"
+      incremental_column: "PAYMENT_DATE"
+      merge: "UPSERT"
+      
+    dependencies:
+      - "RAMIS_TAX_ACCOUNT_TO_TAX_ACCOUNT"
+      
+    column_mappings:
+      - source: "PAYMENT_ID"
+        target: "payment_id"
+        transformation:
+          type: "EXPRESSION"
+          sql: "'RAMIS_PMT_' || CAST({source_column} AS CHAR)"
+        is_key: true
+        
+      - source: "TIN"
+        target: "party_id"
+        transformation:
+          type: "LOOKUP_QUERY"
+          sql: |
+            SELECT party_id 
+            FROM party.party 
+            WHERE tax_identification_number = {source_column}
+            
+      - source: "PAYMENT_DATE"
+        target: "payment_date"
+        transformation:
+          type: "EXPRESSION"
+          sql: "CAST({source_column} AS DATE)"
+        validation:
+          - type: "NOT_NULL"
+          - type: "DATE_RANGE"
+            min_date: "2000-01-01"
+            max_date: "CURRENT_DATE + INTERVAL 1 DAY"
+            
+      - source: "PAYMENT_AMOUNT"
+        target: "payment_amount"
+        transformation:
+          type: "EXPRESSION"
+          sql: "COALESCE({source_column}, 0)"
+        validation:
+          - type: "RANGE"
+            min_value: 0
+            max_value: 999999999999.99
+            
+      - source: "PAYMENT_METHOD"
+        target: "payment_method_code"
+        transformation:
+          type: "LOOKUP"
+          mapping:
+            "CASH": "CASH"
+            "CHECK": "CHEQUE"
+            "BANK": "BANK_TRANSFER"
+            "CARD": "CREDIT_CARD"
+            "ONLINE": "ONLINE_PAYMENT"
+          default: "OTHER"
+          
+      - source: "REFERENCE_NUMBER"
+        target: "payment_reference"
+
+# =====================================================================
+# GLOBAL CONFIGURATION
+# =====================================================================
+global_config:
+  
+  # Data quality settings
+  data_quality:
+    reject_on_error: true
+    log_warnings: true
+    max_error_percentage: 5  # Fail if >5% rows have errors
+    
+  # Performance settings
+  performance:
+    batch_size: 10000
+    parallel_mappings: false  # Execute in sequence
+    commit_frequency: 1000    # Commit every N rows
+    
+  # Logging settings
+  logging:
+    level: "INFO"
+    log_sql: false
+    log_rejected_rows: true
+    max_rejected_rows_logged: 100

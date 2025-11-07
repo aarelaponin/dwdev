@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ETL Validation Report - 2025-11-06 12:16:43</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; }
+        .summary { background-color: #f0f0f0; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .pass { color: green; }
+        .fail { color: red; }
+        .warning { color: orange; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        .validator-section { margin: 30px 0; }
+    </style>
+</head>
+<body>
+    <h1>ETL Validation Report</h1>
+    <p>Generated: 2025-11-06 12:16:43</p>
+
+    <div class="summary">
+        <h2>Summary</h2>
+        <p>Total Checks: 31</p>
+        <p class="pass">Passed: 31 (100.0%)</p>
+        <p class="fail">Failed: 0</p>
+        <p class="warning">Warnings: 0</p>
+        <h3 class="green">PASS</h3>
+    </div>
+<div class="validator-section"><h2>Row Count</h2><table><tr><th>Check</th><th>Status</th><th>Details</th></tr>
+                <tr>
+                    <td>Row Count: dim_party</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_party<br>l2_source_count: 5<br>l3_target_count: 5<br>expected_count: 5<br>difference: 0<br>ratio: 1.0<br>description: Party dimension with individuals and enterprises</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Row Count: dim_tax_type</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_tax_type<br>l2_source_count: 5<br>l3_target_count: 5<br>expected_count: 5<br>difference: 0<br>ratio: 1.0<br>description: Tax type dimension (VAT, CIT, PIT, etc.)</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Row Count: dim_time</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_time<br>l2_source_count: 1096<br>l3_target_count: 1096<br>expected_count: 1096<br>difference: 0<br>ratio: 1.0<br>description: Time dimension (daily grain, 2023-2025)</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Row Count: fact_registration</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: fact_registration<br>l2_source_count: 10<br>l3_target_count: 10<br>expected_count: 10<br>difference: 0<br>ratio: 1.0<br>description: Tax account registration facts</small></td>
+                </tr>
+            </table></div><div class="validator-section"><h2>Integrity</h2><table><tr><th>Check</th><th>Status</th><th>Details</th></tr>
+                <tr>
+                    <td>FK Integrity: fact_registration.dim_party_key → dim_party</td>
+                    <td class="pass">PASS</td>
+                    <td><small>fact_table: fact_registration<br>dimension_table: dim_party<br>fk_column: dim_party_key<br>orphan_records: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>FK Integrity: fact_registration.dim_tax_type_key → dim_tax_type</td>
+                    <td class="pass">PASS</td>
+                    <td><small>fact_table: fact_registration<br>dimension_table: dim_tax_type<br>fk_column: dim_tax_type_key<br>orphan_records: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>FK Integrity: fact_registration.dim_date_key → dim_time</td>
+                    <td class="pass">PASS</td>
+                    <td><small>fact_table: fact_registration<br>dimension_table: dim_time<br>fk_column: dim_date_key<br>orphan_records: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Natural Key Uniqueness: dim_party.party_id</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_party<br>natural_key: party_id<br>duplicate_keys: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Natural Key Uniqueness: dim_tax_type.tax_type_code</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_tax_type<br>natural_key: tax_type_code<br>duplicate_keys: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Natural Key Uniqueness: dim_time.date_key</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_time<br>natural_key: date_key<br>duplicate_keys: 0</small></td>
+                </tr>
+            </table></div><div class="validator-section"><h2>Quality</h2><table><tr><th>Check</th><th>Status</th><th>Details</th></tr>
+                <tr>
+                    <td>Mandatory Field: dim_party.party_id</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_party<br>field: party_id<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_party.tin</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_party<br>field: tin<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_party.party_name</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_party<br>field: party_name<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_party.party_type</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_party<br>field: party_type<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_tax_type.tax_type_code</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_tax_type<br>field: tax_type_code<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_tax_type.tax_type_name</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_tax_type<br>field: tax_type_name<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_tax_type.tax_category</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_tax_type<br>field: tax_category<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_time.date_key</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_time<br>field: date_key<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_time.full_date</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_time<br>field: full_date<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_time.year</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_time<br>field: year<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_time.month</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_time<br>field: month<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: dim_time.day_of_month</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: dim_time<br>field: day_of_month<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: fact_registration.tax_account_id</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: fact_registration<br>field: tax_account_id<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: fact_registration.dim_party_key</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: fact_registration<br>field: dim_party_key<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: fact_registration.dim_tax_type_key</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: fact_registration<br>field: dim_tax_type_key<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Mandatory Field: fact_registration.dim_date_key</td>
+                    <td class="pass">PASS</td>
+                    <td><small>table: fact_registration<br>field: dim_date_key<br>null_or_empty_count: 0</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Data Quality: Party TIN Format</td>
+                    <td class="pass">PASS</td>
+                    <td><small>invalid_tin_count: 0<br>rule: TIN must be 9, 10, or 12 characters</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Data Quality: Risk Score Range</td>
+                    <td class="pass">PASS</td>
+                    <td><small>invalid_score_count: 0<br>rule: Risk score must be between 0 and 100</small></td>
+                </tr>
+            </table></div><div class="validator-section"><h2>Business</h2><table><tr><th>Check</th><th>Status</th><th>Details</th></tr>
+                <tr>
+                    <td>SCD Type 2: is_current=1 → valid_to IS NULL</td>
+                    <td class="pass">PASS</td>
+                    <td><small>violation_count: 0<br>rule: Current records must have NULL valid_to</small></td>
+                </tr>
+            
+                <tr>
+                    <td>SCD Type 2: is_current=0 → valid_to IS NOT NULL</td>
+                    <td class="pass">PASS</td>
+                    <td><small>violation_count: 0<br>rule: Historical records must have valid_to date</small></td>
+                </tr>
+            
+                <tr>
+                    <td>Business Rule: Registration Dates in dim_time Range</td>
+                    <td class="pass">PASS</td>
+                    <td><small>invalid_date_count: 0<br>rule: All registration dates must exist in dim_time</small></td>
+                </tr>
+            </table></div></body></html>

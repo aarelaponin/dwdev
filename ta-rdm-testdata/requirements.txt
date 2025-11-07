@@ -1,0 +1,17 @@
+# TA-RDM Test Data Generation Requirements
+# Internal tool for generating test data
+
+# Database Connectivity
+mysql-connector-python>=8.2.0
+
+# Fake Data Generation
+Faker>=20.1.0
+
+# Environment Management
+python-dotenv>=1.0.0
+
+# CLI and Logging
+colorama>=0.4.6
+
+# Note: This is an internal tool for test data generation
+# For production ETL, use ta-rdm-etl package

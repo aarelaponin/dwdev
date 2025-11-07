@@ -1,0 +1,19 @@
+# Test Data Generator for TA-RDM
+# Phase A: Foundation Validation
+# Python 3.11+
+
+# Database connectivity
+mysql-connector-python>=8.2.0
+clickhouse-connect>=0.7.0
+
+# Fake data generation
+Faker>=20.1.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# YAML configuration (for future extensibility)
+PyYAML>=6.0.1
+
+# Logging and CLI
+colorama>=0.4.6
