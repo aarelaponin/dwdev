@@ -1,0 +1,3807 @@
+# ============================================================================
+# MTCA Forms - Priority 3A: Individual Income Tax Returns
+# Forms: e-Return, TA22, TA23, TA24, PT1, AF, AF1
+# Version: 1.0
+# Date: 2025-12-06
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # e-Return: Individual Income Tax Return
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "e-Return"
+        form_name_en: "Individual Income Tax Return"
+        form_name_mt: "Dikjarazzjoni tat-Taxxa fuq l-Introjtu Individwali"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "ITMA Cap. 372"
+          - "S.L.123.128 - Income Tax Act (Electronic Communications) Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax"
+        taxpayer_category: "Individual"
+        filing_frequency: "Annual"
+        filing_deadline: "June 30 following year of assessment (online); April 30 (paper)"
+        submission_method: "Both"
+        electronic_portal: "myTax Portal"
+        source_url: "https://cfr.gov.mt/en/individuals/Pages/Annual-Income-Tax-Return.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Annual individual tax return for Malta residents and non-residents with Malta-source income.
+          E-ID authentication required for online submission via myTax portal. Covers all income
+          categories: employment, self-employment, rental, investment, capital gains. Pre-populated
+          with FS3 employment data. Deadline extended to June 30 for online filing.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Taxpayer Identification
+        # ----------------------------------------------------------------------
+        - section_id: "TAXPAYER_ID"
+          section_name: "Taxpayer Identification"
+          section_description: "Personal identification and contact details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "taxpayer_tin"
+              field_code: "Box 1"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Maltese ID card number (7 digits + letter) or 9-digit TIN for non-Maltese"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Maltese ID or 9-digit TIN"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+                - rule_id: "ERET_002"
+                  rule_type: "lookup"
+                  rule_description: "TIN must exist in taxpayer register"
+                  rule_expression: "EXISTS(taxpayer_register.tin)"
+                  error_message_en: "TIN not found in register"
+                  error_message_mt: "TIN ma nstabx fir-reÄ¡istru"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "taxpayer"
+                column: "taxpayer_tin"
+              ors_mapping:
+                table: "mtca_ors.individual_taxpayer"
+                column: "taxpayer_tin"
+                data_type: "String"
+
+            - field_id: "taxpayer_surname"
+              field_code: "Box 2"
+              field_name_en: "Surname"
+              field_name_mt: "Kunjom"
+              field_description: "Taxpayer's legal surname"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "taxpayer"
+                column: "surname"
+              ors_mapping:
+                table: "mtca_ors.individual_taxpayer"
+                column: "surname"
+                data_type: "String"
+
+            - field_id: "taxpayer_first_name"
+              field_code: "Box 3"
+              field_name_en: "First Name"
+              field_name_mt: "Isem"
+              field_description: "Taxpayer's legal first name"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "taxpayer"
+                column: "first_name"
+              ors_mapping:
+                table: "mtca_ors.individual_taxpayer"
+                column: "first_name"
+                data_type: "String"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 4"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Calendar year for which return is filed"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_003"
+                  rule_type: "range"
+                  rule_description: "Must be valid year of assessment"
+                  rule_expression: "year_of_assessment >= 2000 AND year_of_assessment <= CURRENT_YEAR"
+                  error_message_en: "Invalid year of assessment"
+                  error_message_mt: "Sena ta' stima mhux valida"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "tax_return"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.individual_return"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+            - field_id: "marital_status"
+              field_code: "Box 5"
+              field_name_en: "Marital Status"
+              field_name_mt: "Stat ÄŠivili"
+              field_description: "Taxpayer's civil status at December 31 of year of assessment"
+              data_type: "CODE"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "S"
+                  description_en: "Single"
+                  description_mt: "Single"
+                - code: "M"
+                  description_en: "Married"
+                  description_mt: "MiÅ¼Å¼ewweÄ¡/MiÅ¼Å¼ewÄ¡a"
+                - code: "W"
+                  description_en: "Widowed"
+                  description_mt: "Armel/Armla"
+                - code: "D"
+                  description_en: "Divorced/Separated"
+                  description_mt: "Divorzjat/a jew Separat/a"
+              reference_table: "marital_status_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "taxpayer"
+                column: "marital_status"
+              ors_mapping:
+                table: "mtca_ors.individual_taxpayer"
+                column: "marital_status"
+                data_type: "FixedString(1)"
+
+            - field_id: "spouse_tin"
+              field_code: "Box 5a"
+              field_name_en: "Spouse TIN"
+              field_name_mt: "TIN tal-Konjugi"
+              field_description: "Spouse's Tax Identification Number"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: false
+              required_condition: "marital_status = 'M'"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_004"
+                  rule_type: "conditional"
+                  rule_description: "Required if married and joint computation elected"
+                  rule_expression: "IF marital_status = 'M' AND joint_computation = true THEN spouse_tin IS NOT NULL"
+                  error_message_en: "Spouse TIN required for joint computation"
+                  error_message_mt: "TIN tal-konjugi meÄ§tieÄ¡ gÄ§al kalkolu konÄ¡unt"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "taxpayer"
+                column: "spouse_tin"
+              ors_mapping:
+                table: "mtca_ors.individual_taxpayer"
+                column: "spouse_tin"
+                data_type: "Nullable(String)"
+
+            - field_id: "resident_status"
+              field_code: "Box 6"
+              field_name_en: "Residence Status"
+              field_name_mt: "Status ta' Residenza"
+              field_description: "Tax residence status for the year of assessment"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "RES"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "RES"
+                  description_en: "Ordinary Resident"
+                  description_mt: "Residenti Ordinarju"
+                - code: "NRD"
+                  description_en: "Non-Resident Domiciled"
+                  description_mt: "Mhux Residenti DomiÄ‹iljat"
+                - code: "NRN"
+                  description_en: "Non-Resident Non-Domiciled"
+                  description_mt: "Mhux Residenti Mhux DomiÄ‹iljat"
+              reference_table: "residence_status_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "taxpayer"
+                column: "residence_status"
+              ors_mapping:
+                table: "mtca_ors.individual_taxpayer"
+                column: "residence_status"
+                data_type: "FixedString(3)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Employment Income
+        # ----------------------------------------------------------------------
+        - section_id: "EMPLOYMENT_INCOME"
+          section_name: "Employment Income"
+          section_description: "Gross emoluments and tax deducted under FSS"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "employer_tin"
+              field_code: "Box 10"
+              field_name_en: "Employer TIN"
+              field_name_mt: "TIN tal-Employer"
+              field_description: "Employer's Tax Identification Number"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Has employment income"
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_010"
+                  rule_type: "lookup"
+                  rule_description: "Employer TIN must exist and be active"
+                  rule_expression: "EXISTS(employer_register.tin) AND employer_register.status = 'ACTIVE'"
+                  error_message_en: "Invalid or inactive employer TIN"
+                  error_message_mt: "TIN tal-employer mhux validu jew mhux attiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "employer_register"
+              cross_form_reference: "FS3.employer_tin"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "employment_income"
+                column: "employer_tin"
+              ors_mapping:
+                table: "mtca_ors.individual_employment_income"
+                column: "employer_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "gross_emoluments"
+              field_code: "Box 11"
+              field_name_en: "Gross Emoluments"
+              field_name_mt: "Emolumenti Gross"
+              field_description: "Total gross salary, wages, bonuses before deductions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_011"
+                  rule_type: "range"
+                  rule_description: "Must be non-negative"
+                  rule_expression: "gross_emoluments >= 0"
+                  error_message_en: "Gross emoluments cannot be negative"
+                  error_message_mt: "Emolumenti gross ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+                - rule_id: "ERET_012"
+                  rule_type: "cross-reference"
+                  rule_description: "Must match FS3 gross emoluments"
+                  rule_expression: "gross_emoluments = FS3.gross_emoluments WHERE employer_tin = FS3.employer_tin"
+                  error_message_en: "Does not match employer FS3 submission"
+                  error_message_mt: "Ma jaqbilx mas-sottomissjoni FS3 tal-employer"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS3.gross_emoluments"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "employment_income"
+                column: "gross_emoluments"
+              ors_mapping:
+                table: "mtca_ors.individual_employment_income"
+                column: "gross_emoluments"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "fss_tax_deducted"
+              field_code: "Box 12"
+              field_name_en: "FSS Tax Deducted"
+              field_name_mt: "Taxxa FSS Imnaqqsa"
+              field_description: "Tax deducted at source under Final Settlement System"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_013"
+                  rule_type: "range"
+                  rule_description: "Must be non-negative"
+                  rule_expression: "fss_tax_deducted >= 0"
+                  error_message_en: "FSS tax deducted cannot be negative"
+                  error_message_mt: "Taxxa FSS ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS3.fss_tax_deducted"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "employment_income"
+                column: "fss_tax_deducted"
+              ors_mapping:
+                table: "mtca_ors.individual_employment_income"
+                column: "fss_tax_deducted"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "ssc_employee"
+              field_code: "Box 13"
+              field_name_en: "Employee SSC Deducted"
+              field_name_mt: "SSC tal-Impjegat Imnaqqas"
+              field_description: "Social Security Contributions deducted from employee (Class 1)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS3.ssc_employee"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "employment_income"
+                column: "ssc_employee"
+              ors_mapping:
+                table: "mtca_ors.individual_employment_income"
+                column: "ssc_employee"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "fringe_benefits"
+              field_code: "Box 14"
+              field_name_en: "Taxable Fringe Benefits"
+              field_name_mt: "BenefiÄ‹Ä‹ji Fringe Taxabbli"
+              field_description: "Value of taxable fringe benefits (car, housing, etc.)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: false
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FB1.total_fringe_benefits"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "employment_income"
+                column: "fringe_benefits"
+              ors_mapping:
+                table: "mtca_ors.individual_employment_income"
+                column: "fringe_benefits"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Self-Employment/Business Income
+        # ----------------------------------------------------------------------
+        - section_id: "BUSINESS_INCOME"
+          section_name: "Self-Employment/Business Income"
+          section_description: "Trading profits from self-employment or business"
+          repeatable: true
+          conditional: true
+          condition_logic: "If taxpayer has business/trade income"
+          fields:
+            - field_id: "trade_name"
+              field_code: "Box 20"
+              field_name_en: "Trade/Business Name"
+              field_name_mt: "Isem tan-Negozju"
+              field_description: "Name under which business is conducted"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Has business income"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "business_income"
+                column: "trade_name"
+              ors_mapping:
+                table: "mtca_ors.individual_business_income"
+                column: "trade_name"
+                data_type: "String"
+
+            - field_id: "business_vat_number"
+              field_code: "Box 21"
+              field_name_en: "VAT Registration Number"
+              field_name_mt: "Numru ta' ReÄ¡istrazzjoni VAT"
+              field_description: "VAT number if registered"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_020"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Malta VAT format"
+                  rule_expression: "^MT[0-9]{8}$"
+                  error_message_en: "Invalid VAT number format"
+                  error_message_mt: "Format tan-numru VAT mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "vat_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "business_income"
+                column: "vat_number"
+              ors_mapping:
+                table: "mtca_ors.individual_business_income"
+                column: "vat_number"
+                data_type: "Nullable(FixedString(10))"
+
+            - field_id: "gross_receipts"
+              field_code: "Box 22"
+              field_name_en: "Gross Business Receipts"
+              field_name_mt: "DÄ§ul Gross tan-Negozju"
+              field_description: "Total gross receipts/turnover from business"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_021"
+                  rule_type: "range"
+                  rule_description: "Must be non-negative"
+                  rule_expression: "gross_receipts >= 0"
+                  error_message_en: "Gross receipts cannot be negative"
+                  error_message_mt: "DÄ§ul gross ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "business_income"
+                column: "gross_receipts"
+              ors_mapping:
+                table: "mtca_ors.individual_business_income"
+                column: "gross_receipts"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "allowable_deductions"
+              field_code: "Box 23"
+              field_name_en: "Allowable Business Deductions"
+              field_name_mt: "Deduzzjonijiet Ammissibbli tan-Negozju"
+              field_description: "Total allowable business expenses"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_022"
+                  rule_type: "comparison"
+                  rule_description: "Cannot exceed gross receipts"
+                  rule_expression: "allowable_deductions <= gross_receipts"
+                  error_message_en: "Deductions cannot exceed gross receipts"
+                  error_message_mt: "Deduzzjonijiet ma jistgÄ§ux jaqbÅ¼u d-dÄ§ul gross"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "business_income"
+                column: "allowable_deductions"
+              ors_mapping:
+                table: "mtca_ors.individual_business_income"
+                column: "allowable_deductions"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "net_business_profit"
+              field_code: "Box 24"
+              field_name_en: "Net Business Profit/Loss"
+              field_name_mt: "QligÄ§/Telf Nett tan-Negozju"
+              field_description: "Net profit or loss from business"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "gross_receipts - allowable_deductions"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "business_income"
+                column: "net_profit"
+              ors_mapping:
+                table: "mtca_ors.individual_business_income"
+                column: "net_business_profit"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "ssc_class2_paid"
+              field_code: "Box 25"
+              field_name_en: "Class 2 SSC Paid"
+              field_name_mt: "SSC Klassi 2 ImÄ§allas"
+              field_description: "Self-employed social security contributions paid"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "business_income"
+                column: "ssc_class2"
+              ors_mapping:
+                table: "mtca_ors.individual_business_income"
+                column: "ssc_class2_paid"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Rental Income
+        # ----------------------------------------------------------------------
+        - section_id: "RENTAL_INCOME"
+          section_name: "Rental Income"
+          section_description: "Income from property letting (if not using TA24 flat rate)"
+          repeatable: true
+          conditional: true
+          condition_logic: "If taxpayer has rental income and not using TA24 flat rate"
+          fields:
+            - field_id: "property_address"
+              field_code: "Box 30"
+              field_name_en: "Property Address"
+              field_name_mt: "Indirizz tal-ProprjetÃ "
+              field_description: "Address of rented property"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "rental_income"
+                column: "property_address"
+              ors_mapping:
+                table: "mtca_ors.individual_rental_income"
+                column: "property_address"
+                data_type: "String"
+
+            - field_id: "rental_type"
+              field_code: "Box 31"
+              field_name_en: "Rental Type"
+              field_name_mt: "Tip ta' Kiri"
+              field_description: "Type of rental property"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "RES"
+                  description_en: "Residential"
+                  description_mt: "Residenzjali"
+                - code: "COM"
+                  description_en: "Commercial"
+                  description_mt: "KummerÄ‹jali"
+                - code: "SHT"
+                  description_en: "Short-Term/Tourist"
+                  description_mt: "Terminu Qasir/Turistiku"
+              reference_table: "rental_type_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "rental_income"
+                column: "rental_type"
+              ors_mapping:
+                table: "mtca_ors.individual_rental_income"
+                column: "rental_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "gross_rental_income"
+              field_code: "Box 32"
+              field_name_en: "Gross Rental Income"
+              field_name_mt: "DÄ§ul Gross mill-Kiri"
+              field_description: "Total gross rent received"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TA24.gross_rental_income"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "rental_income"
+                column: "gross_rental"
+              ors_mapping:
+                table: "mtca_ors.individual_rental_income"
+                column: "gross_rental_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "rental_expenses"
+              field_code: "Box 33"
+              field_name_en: "Allowable Rental Expenses"
+              field_name_mt: "SpejjeÅ¼ Ammissibbli tal-Kiri"
+              field_description: "Allowable expenses (maintenance, ground rent, etc.)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "rental_income"
+                column: "expenses"
+              ors_mapping:
+                table: "mtca_ors.individual_rental_income"
+                column: "rental_expenses"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "net_rental_income"
+              field_code: "Box 34"
+              field_name_en: "Net Rental Income"
+              field_name_mt: "DÄ§ul Nett mill-Kiri"
+              field_description: "Net rental income for tax computation"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "gross_rental_income - rental_expenses"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "rental_income"
+                column: "net_rental"
+              ors_mapping:
+                table: "mtca_ors.individual_rental_income"
+                column: "net_rental_income"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Investment Income
+        # ----------------------------------------------------------------------
+        - section_id: "INVESTMENT_INCOME"
+          section_name: "Investment Income"
+          section_description: "Dividends, interest, royalties and other passive income"
+          repeatable: false
+          conditional: true
+          condition_logic: "If taxpayer has investment income"
+          fields:
+            - field_id: "malta_dividends"
+              field_code: "Box 40"
+              field_name_en: "Dividends from Malta Companies"
+              field_name_mt: "Dividendi minn Kumpaniji Maltin"
+              field_description: "Gross dividends received from Malta companies (with tax credit)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "investment_income"
+                column: "malta_dividends"
+              ors_mapping:
+                table: "mtca_ors.individual_investment_income"
+                column: "malta_dividends"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "foreign_dividends"
+              field_code: "Box 41"
+              field_name_en: "Foreign Dividends"
+              field_name_mt: "Dividendi Barranin"
+              field_description: "Dividends from foreign companies"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "investment_income"
+                column: "foreign_dividends"
+              ors_mapping:
+                table: "mtca_ors.individual_investment_income"
+                column: "foreign_dividends"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "bank_interest"
+              field_code: "Box 42"
+              field_name_en: "Bank Interest"
+              field_name_mt: "ImgÄ§ax Bankarju"
+              field_description: "Interest from Malta bank accounts (15% WHT applies)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "investment_income"
+                column: "bank_interest"
+              ors_mapping:
+                table: "mtca_ors.individual_investment_income"
+                column: "bank_interest"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "other_investment_income"
+              field_code: "Box 43"
+              field_name_en: "Other Investment Income"
+              field_name_mt: "Introjtu IeÄ§or ta' Investiment"
+              field_description: "Royalties, annuities, other passive income"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "investment_income"
+                column: "other_investment"
+              ors_mapping:
+                table: "mtca_ors.individual_investment_income"
+                column: "other_investment_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_investment_income"
+              field_code: "Box 44"
+              field_name_en: "Total Investment Income"
+              field_name_mt: "Introjtu Totali ta' Investiment"
+              field_description: "Sum of all investment income"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: false
+              default_value: 0
+              calculated: true
+              calculation_formula: "malta_dividends + foreign_dividends + bank_interest + other_investment_income"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "investment_income"
+                column: "total_investment"
+              ors_mapping:
+                table: "mtca_ors.individual_investment_income"
+                column: "total_investment_income"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 6: Deductions and Allowances
+        # ----------------------------------------------------------------------
+        - section_id: "DEDUCTIONS"
+          section_name: "Deductions and Allowances"
+          section_description: "Personal deductions and tax credits"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "school_fees"
+              field_code: "Box 50"
+              field_name_en: "School Fees Deduction"
+              field_name_mt: "Deduzzjoni ta' Ä¦lasijiet tal-Iskola"
+              field_description: "Fees paid to registered schools (max â‚¬2,000 per child)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_050"
+                  rule_type: "range"
+                  rule_description: "Maximum per child limit"
+                  rule_expression: "school_fees <= (number_of_children * 2000)"
+                  error_message_en: "Exceeds maximum school fees deduction"
+                  error_message_mt: "JaqbeÅ¼ il-massimu tad-deduzzjoni ta' Ä§lasijiet tal-iskola"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "deductions"
+                column: "school_fees"
+              ors_mapping:
+                table: "mtca_ors.individual_deductions"
+                column: "school_fees"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "sports_deduction"
+              field_code: "Box 51"
+              field_name_en: "Sports Activity Deduction"
+              field_name_mt: "Deduzzjoni ta' AttivitÃ  Sportiva"
+              field_description: "Licensed sports activities (max â‚¬100 per child)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ERET_051"
+                  rule_type: "range"
+                  rule_description: "Maximum per child limit"
+                  rule_expression: "sports_deduction <= (number_of_children * 100)"
+                  error_message_en: "Exceeds maximum sports deduction"
+                  error_message_mt: "JaqbeÅ¼ il-massimu tad-deduzzjoni sportiva"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "deductions"
+                column: "sports"
+              ors_mapping:
+                table: "mtca_ors.individual_deductions"
+                column: "sports_deduction"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "home_loan_interest"
+              field_code: "Box 52"
+              field_name_en: "Home Loan Interest Deduction"
+              field_name_mt: "Deduzzjoni ta' ImgÄ§ax ta' Self tad-Dar"
+              field_description: "Interest on loan for first-time buyer residence"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "deductions"
+                column: "home_loan_interest"
+              ors_mapping:
+                table: "mtca_ors.individual_deductions"
+                column: "home_loan_interest"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "alimony_paid"
+              field_code: "Box 53"
+              field_name_en: "Alimony/Maintenance Paid"
+              field_name_mt: "Alimenti/Manteniment ImÄ§allas"
+              field_description: "Court-ordered alimony payments"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "deductions"
+                column: "alimony"
+              ors_mapping:
+                table: "mtca_ors.individual_deductions"
+                column: "alimony_paid"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_deductions"
+              field_code: "Box 59"
+              field_name_en: "Total Deductions"
+              field_name_mt: "Deduzzjonijiet Totali"
+              field_description: "Sum of all personal deductions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: false
+              default_value: 0
+              calculated: true
+              calculation_formula: "school_fees + sports_deduction + home_loan_interest + alimony_paid"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "deductions"
+                column: "total_deductions"
+              ors_mapping:
+                table: "mtca_ors.individual_deductions"
+                column: "total_deductions"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 7: Tax Computation
+        # ----------------------------------------------------------------------
+        - section_id: "TAX_COMPUTATION"
+          section_name: "Tax Computation"
+          section_description: "Final tax calculation and balance due/refund"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_chargeable_income"
+              field_code: "Box 60"
+              field_name_en: "Total Chargeable Income"
+              field_name_mt: "Introjtu Totali Taxabbli"
+              field_description: "Total income after deductions for tax computation"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(all_income_sections) - total_deductions"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "tax_computation"
+                column: "chargeable_income"
+              ors_mapping:
+                table: "mtca_ors.individual_tax_computation"
+                column: "total_chargeable_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_rate_applicable"
+              field_code: "Box 61"
+              field_name_en: "Tax Rate Category"
+              field_name_mt: "Kategorija tar-Rata tat-Taxxa"
+              field_description: "Applicable tax rate schedule"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "SIN"
+                  description_en: "Single Rates"
+                  description_mt: "Rati gÄ§al Single"
+                - code: "MAR"
+                  description_en: "Married Rates"
+                  description_mt: "Rati gÄ§al MiÅ¼Å¼ewÄ¡in"
+                - code: "PAR"
+                  description_en: "Parent Rates"
+                  description_mt: "Rati gÄ§al Ä enituri"
+              reference_table: "tax_rate_categories"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "tax_computation"
+                column: "rate_category"
+              ors_mapping:
+                table: "mtca_ors.individual_tax_computation"
+                column: "tax_rate_category"
+                data_type: "FixedString(3)"
+
+            - field_id: "tax_on_income"
+              field_code: "Box 62"
+              field_name_en: "Tax on Chargeable Income"
+              field_name_mt: "Taxxa fuq l-Introjtu Taxabbli"
+              field_description: "Tax calculated using applicable rates"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "ApplyTaxRates(total_chargeable_income, tax_rate_applicable)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "tax_computation"
+                column: "tax_on_income"
+              ors_mapping:
+                table: "mtca_ors.individual_tax_computation"
+                column: "tax_on_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_credits_claimed"
+              field_code: "Box 63"
+              field_name_en: "Total Tax Credits Claimed"
+              field_name_mt: "Krediti tat-Taxxa Totali Mitluba"
+              field_description: "Sum of all RA form tax credits"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: false
+              default_value: 0
+              calculated: true
+              calculation_formula: "SUM(all_ra_form_credits)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "RA_forms"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "tax_computation"
+                column: "tax_credits"
+              ors_mapping:
+                table: "mtca_ors.individual_tax_computation"
+                column: "tax_credits_claimed"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "net_tax_due"
+              field_code: "Box 64"
+              field_name_en: "Net Tax Due"
+              field_name_mt: "Taxxa Netta Dovuta"
+              field_description: "Tax after credits"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MAX(0, tax_on_income - tax_credits_claimed)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "tax_computation"
+                column: "net_tax_due"
+              ors_mapping:
+                table: "mtca_ors.individual_tax_computation"
+                column: "net_tax_due"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "fss_total_deducted"
+              field_code: "Box 65"
+              field_name_en: "Total FSS Tax Deducted"
+              field_name_mt: "Taxxa FSS Totali Mnaqqsa"
+              field_description: "Total tax withheld at source from all employers"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(fss_tax_deducted)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS3"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "tax_computation"
+                column: "fss_deducted"
+              ors_mapping:
+                table: "mtca_ors.individual_tax_computation"
+                column: "fss_total_deducted"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "provisional_tax_paid"
+              field_code: "Box 66"
+              field_name_en: "Provisional Tax Paid"
+              field_name_mt: "Taxxa ProviÅ¼orja ImÄ§allsa"
+              field_description: "PT1 payments made during year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "PT1"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "tax_computation"
+                column: "provisional_tax"
+              ors_mapping:
+                table: "mtca_ors.individual_tax_computation"
+                column: "provisional_tax_paid"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "balance_tax_due"
+              field_code: "Box 67"
+              field_name_en: "Balance Tax Due/(Refund)"
+              field_name_mt: "BilanÄ‹ tat-Taxxa Dovut/(RifuÅ¼joni)"
+              field_description: "Final tax balance payable or refundable"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "net_tax_due - fss_total_deducted - provisional_tax_paid"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "tax_computation"
+                column: "balance_due"
+              ors_mapping:
+                table: "mtca_ors.individual_tax_computation"
+                column: "balance_tax_due"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "FS3_STATEMENTS"
+          attachment_name: "FS3 Payee Statements"
+          required: true
+          required_condition: "Has employment income"
+          max_file_size_mb: 10
+          allowed_formats:
+            - "PDF"
+            - "PNG"
+            - "JPG"
+
+        - attachment_code: "RA_FORMS"
+          attachment_name: "Tax Credit RA Forms"
+          required: false
+          required_condition: "If claiming tax credits"
+          max_file_size_mb: 10
+          allowed_formats:
+            - "PDF"
+
+        - attachment_code: "SUPPORTING_DOCS"
+          attachment_name: "Supporting Documentation"
+          required: false
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+            - "PNG"
+            - "JPG"
+            - "XLSX"
+
+      related_forms:
+        - form_code: "FS3"
+          relationship_type: "input"
+          relationship_description: "Employment income data pre-populated from FS3"
+        - form_code: "TA24"
+          relationship_type: "alternative"
+          relationship_description: "Alternative flat rate for rental income"
+        - form_code: "PT1"
+          relationship_type: "input"
+          relationship_description: "Provisional tax payments credited"
+        - form_code: "RA_series"
+          relationship_type: "attachment"
+          relationship_description: "Tax credit forms attached if claiming"
+
+      submission_workflow:
+        authentication_required: "e-ID Level 2 (myTax portal)"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Submission reference number and receipt"
+
+  # ==========================================================================
+  # TA22: Part-Time Self-Employment Declaration
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TA22"
+        form_name_en: "Part-Time Self-Employment Declaration"
+        form_name_mt: "Dikjarazzjoni ta' Impjieg Indipendenti Part-Time"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "Article 4A of ITA"
+          - "S.L.123.147 - Part-Time Self-Employment Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Final Withholding"
+        taxpayer_category: "Individual (Part-Time Self-Employed)"
+        filing_frequency: "Annual"
+        filing_deadline: "April 30 following year of assessment"
+        submission_method: "Both"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/individuals/Pages/Part-Time-Self-Employment.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Final withholding tax regime for part-time self-employed individuals.
+          15% flat rate on net profit up to â‚¬12,000 threshold. Must have employment
+          or pension as main source of income. Not available if gross receipts
+          exceed â‚¬35,000. Alternative to normal progressive rates.
+
+      sections:
+        - section_id: "TAXPAYER_ID"
+          section_name: "Taxpayer Identification"
+          section_description: "Personal details of part-time self-employed"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "taxpayer_tin"
+              field_code: "Box 1"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Maltese ID or TIN"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TA22_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid TIN format"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "taxpayer_tin"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "taxpayer_tin"
+                data_type: "String"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Calendar year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        - section_id: "ELIGIBILITY"
+          section_name: "Eligibility Declaration"
+          section_description: "Confirmation of eligibility conditions"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "has_main_employment"
+              field_code: "Box 5"
+              field_name_en: "Main Employment/Pension Confirmation"
+              field_name_mt: "Konferma ta' Impjieg/Pensjoni PrinÄ‹ipali"
+              field_description: "Confirms employment or pension as main income source"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TA22_010"
+                  rule_type: "comparison"
+                  rule_description: "Must have main employment/pension"
+                  rule_expression: "has_main_employment = true"
+                  error_message_en: "Must have employment or pension as main income"
+                  error_message_mt: "Irid ikollok impjieg jew pensjoni bÄ§ala introjtu prinÄ‹ipali"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "main_employment_flag"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "has_main_employment"
+                data_type: "UInt8"
+
+            - field_id: "activity_description"
+              field_code: "Box 6"
+              field_name_en: "Part-Time Activity Description"
+              field_name_mt: "Deskrizzjoni tal-AttivitÃ  Part-Time"
+              field_description: "Nature of part-time self-employment activity"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "activity_description"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "activity_description"
+                data_type: "String"
+
+            - field_id: "nace_code"
+              field_code: "Box 6a"
+              field_name_en: "NACE Activity Code"
+              field_name_mt: "KodiÄ‹i tal-AttivitÃ  NACE"
+              field_description: "Statistical classification code"
+              data_type: "STRING"
+              format: "##.##"
+              max_length: 5
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "nace_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "nace_code"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "nace_code"
+                data_type: "Nullable(String)"
+
+        - section_id: "INCOME_CALCULATION"
+          section_name: "Income and Tax Calculation"
+          section_description: "Profit and loss calculation with 15% final tax"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "gross_receipts"
+              field_code: "Box 10"
+              field_name_en: "Gross Receipts"
+              field_name_mt: "DÄ§ul Gross"
+              field_description: "Total gross receipts from part-time activity"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TA22_020"
+                  rule_type: "range"
+                  rule_description: "Cannot exceed â‚¬35,000 threshold"
+                  rule_expression: "gross_receipts <= 35000"
+                  error_message_en: "Exceeds â‚¬35,000 threshold - not eligible for TA22"
+                  error_message_mt: "JaqbeÅ¼ il-limitu ta' â‚¬35,000 - mhux eliÄ¡ibbli gÄ§al TA22"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "gross_receipts"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "gross_receipts"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "allowable_expenses"
+              field_code: "Box 11"
+              field_name_en: "Allowable Expenses"
+              field_name_mt: "SpejjeÅ¼ Ammissibbli"
+              field_description: "Total allowable business expenses"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "expenses"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "allowable_expenses"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "net_profit"
+              field_code: "Box 12"
+              field_name_en: "Net Profit"
+              field_name_mt: "QligÄ§ Nett"
+              field_description: "Net profit subject to 15% final tax"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "gross_receipts - allowable_expenses"
+              validation_rules:
+                - rule_id: "TA22_021"
+                  rule_type: "range"
+                  rule_description: "Net profit cap for 15% rate"
+                  rule_expression: "net_profit <= 12000"
+                  error_message_en: "Net profit exceeds â‚¬12,000 - excess taxed at progressive rates"
+                  error_message_mt: "QligÄ§ nett jaqbeÅ¼ â‚¬12,000 - l-eÄ‹Ä‹ess intaxxat b'rati progressivi"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "net_profit"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "net_profit"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "taxable_at_15"
+              field_code: "Box 13"
+              field_name_en: "Amount Taxable at 15%"
+              field_name_mt: "Ammont Taxabbli b'15%"
+              field_description: "Profit taxable at final 15% rate (max â‚¬12,000)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MIN(net_profit, 12000)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "taxable_15"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "taxable_at_15"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_at_15"
+              field_code: "Box 14"
+              field_name_en: "Tax at 15%"
+              field_name_mt: "Taxxa b'15%"
+              field_description: "Final withholding tax at 15%"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "taxable_at_15 * 0.15"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "tax_15"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "tax_at_15"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "excess_profit"
+              field_code: "Box 15"
+              field_name_en: "Excess Profit (if any)"
+              field_name_mt: "QligÄ§ EÄ‹Ä‹essiv (jekk hemm)"
+              field_description: "Profit exceeding â‚¬12,000 to be declared in e-Return"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: false
+              default_value: 0
+              calculated: true
+              calculation_formula: "MAX(0, net_profit - 12000)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.business_income"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta22"
+                column: "excess_profit"
+              ors_mapping:
+                table: "mtca_ors.pt_self_employed"
+                column: "excess_profit"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "EXPENSE_RECEIPTS"
+          attachment_name: "Expense Receipts/Invoices"
+          required: false
+          required_condition: "If requested during verification"
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+            - "PNG"
+            - "JPG"
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "parent"
+          relationship_description: "Excess profit declared in individual return"
+        - form_code: "FS3"
+          relationship_type: "input"
+          relationship_description: "Confirms main employment income exists"
+
+      submission_workflow:
+        authentication_required: "e-ID or CFR portal login"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Payment receipt and submission confirmation"
+
+  # ==========================================================================
+  # TA23: Part-Time Employment Under-Deducted Tax
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TA23"
+        form_name_en: "Part-Time Employment Under-Deducted Tax Payment"
+        form_name_mt: "Ä¦las tat-Taxxa Mnaqqsa Nieqsa minn Impjieg Part-Time"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "Article 4B of ITA"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Final Withholding"
+        taxpayer_category: "Individual (Part-Time Employed)"
+        filing_frequency: "Annual"
+        filing_deadline: "June 30 following year of assessment"
+        submission_method: "Both"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/individuals/Pages/Part-Time-Employment.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          For part-time employees where insufficient tax was withheld.
+          15% flat rate on gross part-time income up to â‚¬10,000.
+          Must have main employment/pension. Tax reconciliation form.
+
+      sections:
+        - section_id: "TAXPAYER_ID"
+          section_name: "Taxpayer Identification"
+          section_description: "Personal identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "taxpayer_tin"
+              field_code: "Box 1"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Maltese ID or TIN"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TA23_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid TIN format"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta23"
+                column: "taxpayer_tin"
+              ors_mapping:
+                table: "mtca_ors.pt_employment"
+                column: "taxpayer_tin"
+                data_type: "String"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Calendar year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta23"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.pt_employment"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        - section_id: "PT_EMPLOYMENT"
+          section_name: "Part-Time Employment Details"
+          section_description: "Part-time employment income and tax withheld"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "pt_employer_tin"
+              field_code: "Box 10"
+              field_name_en: "Part-Time Employer TIN"
+              field_name_mt: "TIN tal-Employer Part-Time"
+              field_description: "Part-time employer's TIN"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "employer_register"
+              cross_form_reference: "FS3.employer_tin"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta23_employment"
+                column: "employer_tin"
+              ors_mapping:
+                table: "mtca_ors.pt_employment_detail"
+                column: "employer_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "gross_pt_emoluments"
+              field_code: "Box 11"
+              field_name_en: "Gross Part-Time Emoluments"
+              field_name_mt: "Emolumenti Gross Part-Time"
+              field_description: "Gross earnings from part-time employment"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TA23_010"
+                  rule_type: "range"
+                  rule_description: "PT income threshold"
+                  rule_expression: "gross_pt_emoluments <= 10000"
+                  error_message_en: "Exceeds â‚¬10,000 PT threshold"
+                  error_message_mt: "JaqbeÅ¼ il-limitu PT ta' â‚¬10,000"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS3.gross_emoluments"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta23_employment"
+                column: "gross_emoluments"
+              ors_mapping:
+                table: "mtca_ors.pt_employment_detail"
+                column: "gross_pt_emoluments"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "fss_deducted_pt"
+              field_code: "Box 12"
+              field_name_en: "FSS Tax Deducted"
+              field_name_mt: "Taxxa FSS Mnaqqsa"
+              field_description: "Tax already withheld by PT employer"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS3.fss_tax_deducted"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta23_employment"
+                column: "fss_deducted"
+              ors_mapping:
+                table: "mtca_ors.pt_employment_detail"
+                column: "fss_deducted_pt"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "TAX_CALCULATION"
+          section_name: "Tax Calculation"
+          section_description: "Under-deducted tax computation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_pt_income"
+              field_code: "Box 20"
+              field_name_en: "Total Part-Time Income"
+              field_name_mt: "Introjtu Part-Time Totali"
+              field_description: "Sum of all part-time employment income"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(gross_pt_emoluments)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta23"
+                column: "total_pt_income"
+              ors_mapping:
+                table: "mtca_ors.pt_employment"
+                column: "total_pt_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_at_15_rate"
+              field_code: "Box 21"
+              field_name_en: "Tax at 15%"
+              field_name_mt: "Taxxa b'15%"
+              field_description: "Final tax at 15% flat rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_pt_income * 0.15"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta23"
+                column: "tax_15"
+              ors_mapping:
+                table: "mtca_ors.pt_employment"
+                column: "tax_at_15_rate"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_fss_deducted"
+              field_code: "Box 22"
+              field_name_en: "Total FSS Already Deducted"
+              field_name_mt: "Taxxa FSS Totali DiÄ¡Ã  Mnaqqsa"
+              field_description: "Sum of tax withheld by all PT employers"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(fss_deducted_pt)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta23"
+                column: "total_fss"
+              ors_mapping:
+                table: "mtca_ors.pt_employment"
+                column: "total_fss_deducted"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "under_deducted_tax"
+              field_code: "Box 23"
+              field_name_en: "Under-Deducted Tax Payable"
+              field_name_mt: "Taxxa Mnaqqsa Nieqsa Pagabbli"
+              field_description: "Balance tax due"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MAX(0, tax_at_15_rate - total_fss_deducted)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta23"
+                column: "under_deducted"
+              ors_mapping:
+                table: "mtca_ors.pt_employment"
+                column: "under_deducted_tax"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "FS3_PT"
+          attachment_name: "FS3 from Part-Time Employers"
+          required: true
+          required_condition: null
+          max_file_size_mb: 10
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "FS3"
+          relationship_type: "input"
+          relationship_description: "Source of PT employment data"
+        - form_code: "e-Return"
+          relationship_type: "alternative"
+          relationship_description: "Alternative to including in main return"
+
+      submission_workflow:
+        authentication_required: "e-ID or CFR portal login"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Payment receipt"
+
+  # ==========================================================================
+  # TA24: Residential/Commercial Rental Income Declaration
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TA24"
+        form_name_en: "Residential/Commercial Rental Income Declaration"
+        form_name_mt: "Dikjarazzjoni ta' DÄ§ul mill-Kiri Residenzjali/KummerÄ‹jali"
+        version: "2024"
+        effective_from: "2014-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "Article 31E of ITA"
+          - "S.L.123.153 - Final Tax on Rental Income Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Final Withholding"
+        taxpayer_category: "Individual (Property Owner)"
+        filing_frequency: "Annual"
+        filing_deadline: "April 30 following year of assessment"
+        submission_method: "Both"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/individuals/Pages/Rental-Income.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Final withholding tax option for rental income. 15% flat rate on gross rent
+          for residential and commercial properties. Alternative to progressive rates
+          with expense deductions. Must register property with Housing Authority if
+          residential. Option irrevocable for minimum 3 years.
+
+      sections:
+        - section_id: "TAXPAYER_ID"
+          section_name: "Taxpayer Identification"
+          section_description: "Property owner identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "taxpayer_tin"
+              field_code: "Box 1"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Property owner TIN"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TA24_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid TIN format"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24"
+                column: "taxpayer_tin"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt"
+                column: "taxpayer_tin"
+                data_type: "String"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Calendar year for rental income"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        - section_id: "PROPERTY_DETAILS"
+          section_name: "Property Details"
+          section_description: "Details of each rented property"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "property_address"
+              field_code: "Box 10"
+              field_name_en: "Property Address"
+              field_name_mt: "Indirizz tal-ProprjetÃ "
+              field_description: "Full address of rented property"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24_property"
+                column: "address"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt_property"
+                column: "property_address"
+                data_type: "String"
+
+            - field_id: "property_type"
+              field_code: "Box 11"
+              field_name_en: "Property Type"
+              field_name_mt: "Tip tal-ProprjetÃ "
+              field_description: "Residential or Commercial"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "RES"
+                  description_en: "Residential"
+                  description_mt: "Residenzjali"
+                - code: "COM"
+                  description_en: "Commercial"
+                  description_mt: "KummerÄ‹jali"
+              reference_table: "property_type_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24_property"
+                column: "property_type"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt_property"
+                column: "property_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "housing_authority_ref"
+              field_code: "Box 12"
+              field_name_en: "Housing Authority Registration Number"
+              field_name_mt: "Numru ta' ReÄ¡istrazzjoni tal-AwtoritÃ  tad-Djar"
+              field_description: "Registration number for residential rentals"
+              data_type: "STRING"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: false
+              required_condition: "property_type = 'RES'"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TA24_010"
+                  rule_type: "conditional"
+                  rule_description: "Required for residential properties"
+                  rule_expression: "IF property_type = 'RES' THEN housing_authority_ref IS NOT NULL"
+                  error_message_en: "Housing Authority registration required for residential"
+                  error_message_mt: "ReÄ¡istrazzjoni tal-AwtoritÃ  tad-Djar meÄ§tieÄ¡a gÄ§al residenzjali"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24_property"
+                column: "ha_registration"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt_property"
+                column: "housing_authority_ref"
+                data_type: "Nullable(String)"
+
+            - field_id: "tenant_tin"
+              field_code: "Box 13"
+              field_name_en: "Tenant TIN"
+              field_name_mt: "TIN tal-Kerrej"
+              field_description: "Tenant's Tax Identification Number"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24_property"
+                column: "tenant_tin"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt_property"
+                column: "tenant_tin"
+                data_type: "Nullable(String)"
+
+            - field_id: "gross_rent"
+              field_code: "Box 14"
+              field_name_en: "Gross Rent Received"
+              field_name_mt: "Kiri Gross RiÄ‹evut"
+              field_description: "Total gross rent received during year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TA24_011"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "gross_rent > 0"
+                  error_message_en: "Gross rent must be positive"
+                  error_message_mt: "Kiri gross irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24_property"
+                column: "gross_rent"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt_property"
+                column: "gross_rent"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "TAX_CALCULATION"
+          section_name: "Tax Calculation"
+          section_description: "Final withholding tax at 15%"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_gross_rent"
+              field_code: "Box 20"
+              field_name_en: "Total Gross Rental Income"
+              field_name_mt: "DÄ§ul Gross Totali mill-Kiri"
+              field_description: "Sum of gross rent from all properties"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(gross_rent)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24"
+                column: "total_gross_rent"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt"
+                column: "total_gross_rent"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_rate"
+              field_code: "Box 21"
+              field_name_en: "Final Tax Rate"
+              field_name_mt: "Rata tat-Taxxa Finali"
+              field_description: "Fixed 15% final withholding rate"
+              data_type: "PERCENTAGE"
+              format: "##%"
+              max_length: null
+              precision: 5
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: 15.00
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24"
+                column: "tax_rate"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt"
+                column: "tax_rate"
+                data_type: "Decimal(5,2)"
+
+            - field_id: "tax_payable"
+              field_code: "Box 22"
+              field_name_en: "Final Tax Payable"
+              field_name_mt: "Taxxa Finali Pagabbli"
+              field_description: "15% of total gross rent"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_gross_rent * 0.15"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "ta24"
+                column: "tax_payable"
+              ors_mapping:
+                table: "mtca_ors.rental_fwt"
+                column: "tax_payable"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "RENTAL_CONTRACTS"
+          attachment_name: "Rental Contracts"
+          required: false
+          required_condition: "If requested"
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+
+        - attachment_code: "HA_REGISTRATION"
+          attachment_name: "Housing Authority Registration"
+          required: false
+          required_condition: "For residential properties"
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+            - "PNG"
+            - "JPG"
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "alternative"
+          relationship_description: "Alternative to declaring in main return at progressive rates"
+
+      submission_workflow:
+        authentication_required: "e-ID or CFR portal login"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Payment receipt and declaration confirmation"
+
+  # ==========================================================================
+  # PT1: Provisional Tax Payment Form
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "PT1"
+        form_name_en: "Provisional Tax Payment Form"
+        form_name_mt: "Formola ta' Ä¦las ta' Taxxa ProviÅ¼orja"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITMA Cap. 372"
+        subsidiary_legislation:
+          - "S.L.372.07 - Provisional Tax Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Provisional"
+        taxpayer_category: "Individual (Self-Employed)"
+        filing_frequency: "Three times yearly"
+        filing_deadline: "April 30, August 31, December 31"
+        submission_method: "Both"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/individuals/Pages/Provisional-Tax.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Provisional tax for self-employed individuals. Three installments
+          based on prior year tax liability or estimated current year.
+          CFR issues PT1 with pre-calculated amounts. Payment can be
+          adjusted if income significantly different.
+
+      sections:
+        - section_id: "TAXPAYER_ID"
+          section_name: "Taxpayer Identification"
+          section_description: "Self-employed taxpayer details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "taxpayer_tin"
+              field_code: "Box 1"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Self-employed individual TIN"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "PT1_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid TIN format"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "pt1"
+                column: "taxpayer_tin"
+              ors_mapping:
+                table: "mtca_ors.provisional_tax"
+                column: "taxpayer_tin"
+                data_type: "String"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Year for which provisional tax applies"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "pt1"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.provisional_tax"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        - section_id: "PAYMENT_SCHEDULE"
+          section_name: "Payment Schedule"
+          section_description: "Three installment payment details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "installment_number"
+              field_code: "Box 10"
+              field_name_en: "Installment Number"
+              field_name_mt: "Numru tal-Pagament"
+              field_description: "Which of three installments (1, 2, or 3)"
+              data_type: "INTEGER"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "PT1_010"
+                  rule_type: "range"
+                  rule_description: "Must be 1, 2, or 3"
+                  rule_expression: "installment_number >= 1 AND installment_number <= 3"
+                  error_message_en: "Invalid installment number"
+                  error_message_mt: "Numru tal-pagament mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "pt1"
+                column: "installment_no"
+              ors_mapping:
+                table: "mtca_ors.provisional_tax"
+                column: "installment_number"
+                data_type: "UInt8"
+
+            - field_id: "due_date"
+              field_code: "Box 11"
+              field_name_en: "Payment Due Date"
+              field_name_mt: "Data ta' Skadenza"
+              field_description: "Deadline for installment payment"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "pt1"
+                column: "due_date"
+              ors_mapping:
+                table: "mtca_ors.provisional_tax"
+                column: "due_date"
+                data_type: "Date"
+
+            - field_id: "prior_year_tax"
+              field_code: "Box 12"
+              field_name_en: "Prior Year Tax Liability"
+              field_name_mt: "Obbligazzjoni tat-Taxxa tas-Sena ta' Qabel"
+              field_description: "Total tax from previous year return"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return(Y-1).net_tax_due"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "pt1"
+                column: "prior_year_tax"
+              ors_mapping:
+                table: "mtca_ors.provisional_tax"
+                column: "prior_year_tax"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "installment_amount"
+              field_code: "Box 13"
+              field_name_en: "Installment Amount Due"
+              field_name_mt: "Ammont tal-Pagament Dovut"
+              field_description: "Calculated installment (1/3 of prior year or estimate)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "prior_year_tax / 3"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "pt1"
+                column: "installment_amount"
+              ors_mapping:
+                table: "mtca_ors.provisional_tax"
+                column: "installment_amount"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "adjusted_amount"
+              field_code: "Box 14"
+              field_name_en: "Adjusted Payment Amount"
+              field_name_mt: "Ammont ta' Ä¦las AÄ¡Ä¡ustat"
+              field_description: "Taxpayer-adjusted amount if circumstances changed"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "pt1"
+                column: "adjusted_amount"
+              ors_mapping:
+                table: "mtca_ors.provisional_tax"
+                column: "adjusted_amount"
+                data_type: "Nullable(Decimal(15,2))"
+
+            - field_id: "amount_paid"
+              field_code: "Box 15"
+              field_name_en: "Amount Paid"
+              field_name_mt: "Ammont ImÄ§allas"
+              field_description: "Actual payment made"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "PT1_011"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "amount_paid >= 0"
+                  error_message_en: "Payment amount must be non-negative"
+                  error_message_mt: "Ammont tal-Ä§las ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "pt1"
+                column: "amount_paid"
+              ors_mapping:
+                table: "mtca_ors.provisional_tax"
+                column: "amount_paid"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "payment_date"
+              field_code: "Box 16"
+              field_name_en: "Payment Date"
+              field_name_mt: "Data tal-Ä¦las"
+              field_description: "Date payment was made"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "pt1"
+                column: "payment_date"
+              ors_mapping:
+                table: "mtca_ors.provisional_tax"
+                column: "payment_date"
+                data_type: "Date"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "parent"
+          relationship_description: "PT payments credited on annual return"
+        - form_code: "TA22"
+          relationship_type: "alternative"
+          relationship_description: "May use instead of PT if PT self-employed"
+
+      submission_workflow:
+        authentication_required: "CFR portal or bank payment"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Payment receipt with reference number"
+
+  # ==========================================================================
+  # AF: Non-Filer Correction Form
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "AF"
+        form_name_en: "Non-Filer Correction Form"
+        form_name_mt: "Formola ta' Korrezzjoni gÄ§al Min Ma PpreÅ¼entax"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITMA Cap. 372"
+        subsidiary_legislation: []
+        administering_authority: "CFR"
+        tax_type: "Income Tax"
+        taxpayer_category: "Individual"
+        filing_frequency: "Event-driven"
+        filing_deadline: "Upon identification or voluntary disclosure"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/individuals/Pages/Correction-Forms.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Form for individuals who failed to file required tax returns.
+          Used to report undeclared income and regularize tax position.
+          May be subject to penalties and interest. Voluntary disclosure
+          may reduce penalties.
+
+      sections:
+        - section_id: "TAXPAYER_ID"
+          section_name: "Taxpayer Identification"
+          section_description: "Non-filer identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "taxpayer_tin"
+              field_code: "Box 1"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "TIN of non-filer"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "AF_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid TIN format"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af_correction"
+                column: "taxpayer_tin"
+              ors_mapping:
+                table: "mtca_ors.non_filer_correction"
+                column: "taxpayer_tin"
+                data_type: "String"
+
+        - section_id: "NON_FILING_DETAILS"
+          section_name: "Non-Filing Details"
+          section_description: "Years not filed and reason"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "year_not_filed"
+              field_code: "Box 10"
+              field_name_en: "Year Not Filed"
+              field_name_mt: "Sena Li Ma Ä ietx IppreÅ¼entata"
+              field_description: "Assessment year for which return was not filed"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af_years"
+                column: "year_not_filed"
+              ors_mapping:
+                table: "mtca_ors.non_filer_year"
+                column: "year_not_filed"
+                data_type: "UInt16"
+
+            - field_id: "reason_non_filing"
+              field_code: "Box 11"
+              field_name_en: "Reason for Non-Filing"
+              field_name_mt: "RaÄ¡uni gÄ§all-Ma PpreÅ¼entarx"
+              field_description: "Explanation for failure to file"
+              data_type: "STRING"
+              format: null
+              max_length: 1000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af_years"
+                column: "reason"
+              ors_mapping:
+                table: "mtca_ors.non_filer_year"
+                column: "reason_non_filing"
+                data_type: "String"
+
+            - field_id: "estimated_income"
+              field_code: "Box 12"
+              field_name_en: "Estimated Total Income"
+              field_name_mt: "Introjtu Totali Stmat"
+              field_description: "Estimated gross income for the year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af_years"
+                column: "estimated_income"
+              ors_mapping:
+                table: "mtca_ors.non_filer_year"
+                column: "estimated_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "estimated_tax_due"
+              field_code: "Box 13"
+              field_name_en: "Estimated Tax Due"
+              field_name_mt: "Taxxa Dovuta Stmata"
+              field_description: "Estimated tax liability for the year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af_years"
+                column: "estimated_tax"
+              ors_mapping:
+                table: "mtca_ors.non_filer_year"
+                column: "estimated_tax_due"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "SUPPORTING_DOCS"
+          attachment_name: "Supporting Documentation"
+          required: true
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "followup"
+          relationship_description: "Full return filing may be required after AF"
+
+      submission_workflow:
+        authentication_required: "In person at CFR offices"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Written acknowledgment from CFR"
+
+  # ==========================================================================
+  # AF1: Filed Return Adjustment Form
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "AF1"
+        form_name_en: "Filed Return Adjustment Form"
+        form_name_mt: "Formola ta' AÄ¡Ä¡ustament ta' Dikjarazzjoni IppreÅ¼entata"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITMA Cap. 372"
+        subsidiary_legislation: []
+        administering_authority: "CFR"
+        tax_type: "Income Tax"
+        taxpayer_category: "Individual"
+        filing_frequency: "Event-driven"
+        filing_deadline: "Within 4 years of original filing"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/individuals/Pages/Correction-Forms.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Form to adjust previously filed tax return. Used to correct errors,
+          omissions, or report additional income. Can result in additional
+          tax, refund, or no change. Subject to review and may trigger audit.
+
+      sections:
+        - section_id: "ORIGINAL_RETURN"
+          section_name: "Original Return Reference"
+          section_description: "Details of return being adjusted"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "taxpayer_tin"
+              field_code: "Box 1"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "TIN as filed on original return"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "AF1_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid TIN format"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_adjustment"
+                column: "taxpayer_tin"
+              ors_mapping:
+                table: "mtca_ors.return_adjustment"
+                column: "taxpayer_tin"
+                data_type: "String"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Year of original return being adjusted"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.year_of_assessment"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_adjustment"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.return_adjustment"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+            - field_id: "original_submission_date"
+              field_code: "Box 3"
+              field_name_en: "Original Submission Date"
+              field_name_mt: "Data tas-Sottomissjoni OriÄ¡inali"
+              field_description: "Date original return was filed"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_adjustment"
+                column: "original_date"
+              ors_mapping:
+                table: "mtca_ors.return_adjustment"
+                column: "original_submission_date"
+                data_type: "Date"
+
+            - field_id: "original_submission_ref"
+              field_code: "Box 4"
+              field_name_en: "Original Submission Reference"
+              field_name_mt: "Referenza tas-Sottomissjoni OriÄ¡inali"
+              field_description: "Reference number of original return"
+              data_type: "STRING"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_adjustment"
+                column: "original_ref"
+              ors_mapping:
+                table: "mtca_ors.return_adjustment"
+                column: "original_submission_ref"
+                data_type: "String"
+
+        - section_id: "ADJUSTMENTS"
+          section_name: "Adjustment Details"
+          section_description: "Specific changes being made"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "field_adjusted"
+              field_code: "Box 10"
+              field_name_en: "Field Being Adjusted"
+              field_name_mt: "Qasam li Qed JiÄ¡i AÄ¡Ä¡ustat"
+              field_description: "Specific box/field number from original return"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_items"
+                column: "field_adjusted"
+              ors_mapping:
+                table: "mtca_ors.adjustment_item"
+                column: "field_adjusted"
+                data_type: "String"
+
+            - field_id: "original_value"
+              field_code: "Box 11"
+              field_name_en: "Original Value"
+              field_name_mt: "Valur OriÄ¡inali"
+              field_description: "Amount as originally declared"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_items"
+                column: "original_value"
+              ors_mapping:
+                table: "mtca_ors.adjustment_item"
+                column: "original_value"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "corrected_value"
+              field_code: "Box 12"
+              field_name_en: "Corrected Value"
+              field_name_mt: "Valur Korrett"
+              field_description: "Correct amount that should have been declared"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_items"
+                column: "corrected_value"
+              ors_mapping:
+                table: "mtca_ors.adjustment_item"
+                column: "corrected_value"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "adjustment_difference"
+              field_code: "Box 13"
+              field_name_en: "Adjustment Difference"
+              field_name_mt: "Differenza fl-AÄ¡Ä¡ustament"
+              field_description: "Difference between corrected and original"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "corrected_value - original_value"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_items"
+                column: "difference"
+              ors_mapping:
+                table: "mtca_ors.adjustment_item"
+                column: "adjustment_difference"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "reason_for_adjustment"
+              field_code: "Box 14"
+              field_name_en: "Reason for Adjustment"
+              field_name_mt: "RaÄ¡uni gÄ§all-AÄ¡Ä¡ustament"
+              field_description: "Explanation for the correction"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_items"
+                column: "reason"
+              ors_mapping:
+                table: "mtca_ors.adjustment_item"
+                column: "reason_for_adjustment"
+                data_type: "String"
+
+        - section_id: "TAX_IMPACT"
+          section_name: "Tax Impact"
+          section_description: "Net effect on tax liability"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "original_tax_liability"
+              field_code: "Box 20"
+              field_name_en: "Original Tax Liability"
+              field_name_mt: "Obbligazzjoni tat-Taxxa OriÄ¡inali"
+              field_description: "Tax as per original return"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.net_tax_due"
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_adjustment"
+                column: "original_tax"
+              ors_mapping:
+                table: "mtca_ors.return_adjustment"
+                column: "original_tax_liability"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "revised_tax_liability"
+              field_code: "Box 21"
+              field_name_en: "Revised Tax Liability"
+              field_name_mt: "Obbligazzjoni tat-Taxxa Riveduta"
+              field_description: "Tax after adjustment"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "Recalculated based on adjustments"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_adjustment"
+                column: "revised_tax"
+              ors_mapping:
+                table: "mtca_ors.return_adjustment"
+                column: "revised_tax_liability"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "additional_tax_due"
+              field_code: "Box 22"
+              field_name_en: "Additional Tax Due/(Refund)"
+              field_name_mt: "Taxxa Addizzjonali Dovuta/(RifuÅ¼joni)"
+              field_description: "Net tax change from adjustment"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "revised_tax_liability - original_tax_liability"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "individual_tax_db"
+                table: "af1_adjustment"
+                column: "additional_tax"
+              ors_mapping:
+                table: "mtca_ors.return_adjustment"
+                column: "additional_tax_due"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "SUPPORTING_DOCS"
+          attachment_name: "Supporting Documentation"
+          required: true
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+            - "XLSX"
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "parent"
+          relationship_description: "Adjusts previously filed e-Return"
+
+      submission_workflow:
+        authentication_required: "In person at CFR offices"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Written acknowledgment and assessment"
+
+# ============================================================================
+# Reference Tables for Priority 3A Forms
+# ============================================================================
+reference_tables:
+  marital_status_codes:
+    - code: "S"
+      description_en: "Single"
+      description_mt: "Single"
+    - code: "M"
+      description_en: "Married"
+      description_mt: "MiÅ¼Å¼ewweÄ¡/MiÅ¼Å¼ewÄ¡a"
+    - code: "W"
+      description_en: "Widowed"
+      description_mt: "Armel/Armla"
+    - code: "D"
+      description_en: "Divorced/Separated"
+      description_mt: "Divorzjat/a jew Separat/a"
+
+  residence_status_codes:
+    - code: "RES"
+      description_en: "Ordinary Resident"
+      description_mt: "Residenti Ordinarju"
+    - code: "NRD"
+      description_en: "Non-Resident Domiciled"
+      description_mt: "Mhux Residenti DomiÄ‹iljat"
+    - code: "NRN"
+      description_en: "Non-Resident Non-Domiciled"
+      description_mt: "Mhux Residenti Mhux DomiÄ‹iljat"
+
+  tax_rate_categories:
+    - code: "SIN"
+      description_en: "Single Rates"
+      description_mt: "Rati gÄ§al Single"
+    - code: "MAR"
+      description_en: "Married Rates"
+      description_mt: "Rati gÄ§al MiÅ¼Å¼ewÄ¡in"
+    - code: "PAR"
+      description_en: "Parent Rates"
+      description_mt: "Rati gÄ§al Ä enituri"
+
+  rental_type_codes:
+    - code: "RES"
+      description_en: "Residential"
+      description_mt: "Residenzjali"
+    - code: "COM"
+      description_en: "Commercial"
+      description_mt: "KummerÄ‹jali"
+    - code: "SHT"
+      description_en: "Short-Term/Tourist"
+      description_mt: "Terminu Qasir/Turistiku"
+
+  property_type_codes:
+    - code: "RES"
+      description_en: "Residential"
+      description_mt: "Residenzjali"
+    - code: "COM"
+      description_en: "Commercial"
+      description_mt: "KummerÄ‹jali"
+
+# ============================================================================
+# Cross-Form Relationships Summary
+# ============================================================================
+form_relationships:
+  individual_tax_chain:
+    description: "Individual tax return filing chain"
+    flow:
+      - source: "FS3"
+        target: "e-Return"
+        relationship: "Employment income data feeds into return"
+      - source: "TA24"
+        target: "e-Return"
+        relationship: "Alternative to rental in main return"
+      - source: "TA22"
+        target: "e-Return"
+        relationship: "Excess PT self-employment declared"
+      - source: "PT1"
+        target: "e-Return"
+        relationship: "Provisional payments credited"
+      - source: "RA_forms"
+        target: "e-Return"
+        relationship: "Tax credits attached"
+      - source: "AF1"
+        target: "e-Return"
+        relationship: "Adjusts filed return"
+      - source: "AF"
+        target: "e-Return"
+        relationship: "May trigger return filing"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  individual_tax_db:
+    tables:
+      - legacy_table: "taxpayer"
+        ors_table: "mtca_ors.individual_taxpayer"
+        key_columns:
+          - legacy: "taxpayer_tin"
+            ors: "taxpayer_tin"
+      - legacy_table: "tax_return"
+        ors_table: "mtca_ors.individual_return"
+        key_columns:
+          - legacy: "taxpayer_tin"
+            ors: "taxpayer_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "employment_income"
+        ors_table: "mtca_ors.individual_employment_income"
+        key_columns:
+          - legacy: "taxpayer_tin"
+            ors: "taxpayer_tin"
+          - legacy: "employer_tin"
+            ors: "employer_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "business_income"
+        ors_table: "mtca_ors.individual_business_income"
+        key_columns:
+          - legacy: "taxpayer_tin"
+            ors: "taxpayer_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "rental_income"
+        ors_table: "mtca_ors.individual_rental_income"
+        key_columns:
+          - legacy: "taxpayer_tin"
+            ors: "taxpayer_tin"
+          - legacy: "property_id"
+            ors: "property_id"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "ta22"
+        ors_table: "mtca_ors.pt_self_employed"
+        key_columns:
+          - legacy: "taxpayer_tin"
+            ors: "taxpayer_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "ta23"
+        ors_table: "mtca_ors.pt_employment"
+        key_columns:
+          - legacy: "taxpayer_tin"
+            ors: "taxpayer_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "ta24"
+        ors_table: "mtca_ors.rental_fwt"
+        key_columns:
+          - legacy: "taxpayer_tin"
+            ors: "taxpayer_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "pt1"
+        ors_table: "mtca_ors.provisional_tax"
+        key_columns:
+          - legacy: "taxpayer_tin"
+            ors: "taxpayer_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+          - legacy: "installment_no"
+            ors: "installment_number"

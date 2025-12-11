@@ -1,0 +1,2616 @@
+# ============================================================================
+# MTCA Forms - Priority 3D: Additional Tax Credit Forms (RA Series)
+# Forms: RA6, RA9, RA10, RA21, RA26, RA29, RA30
+# Version: 1.0
+# Date: 2025-12-06
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # RA6: Research & Development Tax Credit Claim
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "RA6"
+        form_name_en: "Research & Development Tax Credit Claim"
+        form_name_mt: "Talba gÄ§al Kreditu tat-Taxxa gÄ§ar-RiÄ‹erka u l-IÅ¼vilupp"
+        version: "2024"
+        effective_from: "2019-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "S.L.123.185 - R&D Tax Credit Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Tax Credit"
+        taxpayer_category: "Companies/Individuals with R&D expenditure"
+        filing_frequency: "Annual"
+        filing_deadline: "With annual tax return"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/tax-credits/Pages/RD-Tax-Credit.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Tax credit for qualifying R&D expenditure. 200% super deduction
+          available. Must be pre-approved by Malta Enterprise. Credit
+          capped at â‚¬500,000 per year.
+
+      sections:
+        - section_id: "CLAIMANT_ID"
+          section_name: "Claimant Identification"
+          section_description: "Entity claiming R&D credit"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "claimant_tin"
+              field_code: "Box 1"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Claimant's TIN"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA6_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid TIN format"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "claimant_tin"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "claimant_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Assessjar"
+              field_description: "Tax year for which credit is claimed"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.year_of_assessment"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+            - field_id: "malta_enterprise_ref"
+              field_code: "Box 3"
+              field_name_en: "Malta Enterprise Approval Reference"
+              field_name_mt: "Referenza tal-Approvazzjoni ta' Malta Enterprise"
+              field_description: "Pre-approval reference from Malta Enterprise"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "me_approval_ref"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "malta_enterprise_ref"
+                data_type: "String"
+
+        - section_id: "RD_EXPENDITURE"
+          section_name: "R&D Expenditure Details"
+          section_description: "Qualifying research and development costs"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "staff_costs"
+              field_code: "Box 10"
+              field_name_en: "Staff Costs"
+              field_name_mt: "SpejjeÅ¼ tal-Persunal"
+              field_description: "Wages and salaries of R&D personnel"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "staff_costs"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "staff_costs"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "consumables"
+              field_code: "Box 11"
+              field_name_en: "Consumables and Materials"
+              field_name_mt: "Konsumabbli u Materjali"
+              field_description: "Materials consumed in R&D activities"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "consumables"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "consumables"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "subcontracted_rd"
+              field_code: "Box 12"
+              field_name_en: "Subcontracted R&D"
+              field_name_mt: "R&D Subappaltata"
+              field_description: "R&D contracted to third parties"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "subcontracted"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "subcontracted_rd"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "equipment_depreciation"
+              field_code: "Box 13"
+              field_name_en: "Equipment Depreciation"
+              field_name_mt: "Deprezzament tal-Apparat"
+              field_description: "Depreciation on R&D equipment"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "depreciation"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "equipment_depreciation"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_qualifying_expenditure"
+              field_code: "Box 19"
+              field_name_en: "Total Qualifying R&D Expenditure"
+              field_name_mt: "Nefqa Kwalifikanti R&D Totali"
+              field_description: "Sum of all qualifying expenditure"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "staff_costs + consumables + subcontracted_rd + equipment_depreciation"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "total_expenditure"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "total_qualifying_expenditure"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "CREDIT_CALCULATION"
+          section_name: "Tax Credit Calculation"
+          section_description: "Calculation of R&D tax credit"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "deduction_rate"
+              field_code: "Box 20"
+              field_name_en: "Deduction Rate"
+              field_name_mt: "Rata ta' Tnaqqis"
+              field_description: "Super deduction rate (150% or 200%)"
+              data_type: "PERCENTAGE"
+              format: "###%"
+              max_length: null
+              precision: 5
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: 200
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA6_020"
+                  rule_type: "allowed_values"
+                  rule_description: "Valid deduction rate"
+                  rule_expression: "deduction_rate IN (150, 200)"
+                  error_message_en: "Deduction rate must be 150% or 200%"
+                  error_message_mt: "Rata ta' tnaqqis trid tkun 150% jew 200%"
+                  severity: "error"
+              allowed_values:
+                - code: "150"
+                  description_en: "150% Standard Deduction"
+                  description_mt: "150% Tnaqqis Standard"
+                - code: "200"
+                  description_en: "200% Super Deduction"
+                  description_mt: "200% Super Tnaqqis"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "deduction_rate"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "deduction_rate"
+                data_type: "UInt16"
+
+            - field_id: "enhanced_deduction"
+              field_code: "Box 21"
+              field_name_en: "Enhanced Deduction Amount"
+              field_name_mt: "Ammont ta' Tnaqqis ImsaÄ§Ä§aÄ§"
+              field_description: "Additional deduction above 100%"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_qualifying_expenditure * (deduction_rate - 100) / 100"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "enhanced_deduction"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "enhanced_deduction"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_credit_claimed"
+              field_code: "Box 22"
+              field_name_en: "Tax Credit Claimed"
+              field_name_mt: "Kreditu tat-Taxxa Mitlub"
+              field_description: "Credit at applicable tax rate (capped at â‚¬500,000)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MIN(enhanced_deduction * 0.35, 500000)"
+              validation_rules:
+                - rule_id: "RA6_022"
+                  rule_type: "range"
+                  rule_description: "Credit capped at â‚¬500,000"
+                  rule_expression: "tax_credit_claimed <= 500000"
+                  error_message_en: "Tax credit cannot exceed â‚¬500,000"
+                  error_message_mt: "Kreditu tat-taxxa ma jistax jaqbeÅ¼ â‚¬500,000"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.tax_credits"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra6_claim"
+                column: "credit_claimed"
+              ors_mapping:
+                table: "mtca_ors.ra6_rd_credit"
+                column: "tax_credit_claimed"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "ME_APPROVAL"
+          attachment_name: "Malta Enterprise Approval Letter"
+          required: true
+          required_condition: null
+          max_file_size_mb: 10
+          allowed_formats:
+            - "PDF"
+        - attachment_code: "RD_REPORT"
+          attachment_name: "R&D Activity Report"
+          required: true
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "e-CO"
+          relationship_type: "feeds"
+          relationship_description: "Credit claimed on corporate return"
+
+      submission_workflow:
+        authentication_required: "Paper submission with corporate return"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Credit reflected in assessment"
+
+  # ==========================================================================
+  # RA9: First Time Buyer Stamp Duty Refund
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "RA9"
+        form_name_en: "First Time Buyer Stamp Duty Refund Application"
+        form_name_mt: "Applikazzjoni gÄ§al RifuÅ¼joni tad-Dazju tal-Boll gÄ§al Xerrejja gÄ§all-Ewwel Darba"
+        version: "2024"
+        effective_from: "2014-01-01"
+        effective_to: "current"
+        legislative_basis: "Duty on Documents and Transfers Act Cap. 364"
+        subsidiary_legislation:
+          - "First Time Buyers Scheme Rules"
+        administering_authority: "CFR"
+        tax_type: "Stamp Duty - Refund"
+        taxpayer_category: "First-time property buyers"
+        filing_frequency: "One-time per property"
+        filing_deadline: "Within 1 year of deed registration"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/property/Pages/First-Time-Buyer.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Refund of stamp duty (up to 5%) for first-time buyers of
+          residential property up to â‚¬200,000. Maximum refund â‚¬5,000.
+          Must be buyer's sole ordinary residence.
+
+      sections:
+        - section_id: "BUYER_ID"
+          section_name: "Buyer Identification"
+          section_description: "First-time buyer details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "buyer_tin"
+              field_code: "Box 1"
+              field_name_en: "Buyer Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa tax-Xerrej"
+              field_description: "Buyer's TIN or ID number"
+              data_type: "TIN"
+              format: "0000000X"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA9_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid individual TIN"
+                  rule_expression: "^[0-9]{7}[A-Z]$"
+                  error_message_en: "Invalid ID format"
+                  error_message_mt: "Format tal-ID mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "stamp_duty_db"
+                table: "ra9_refund"
+                column: "buyer_tin"
+              ors_mapping:
+                table: "mtca_ors.ra9_ftb_refund"
+                column: "buyer_tin"
+                data_type: "FixedString(8)"
+
+            - field_id: "buyer_name"
+              field_code: "Box 2"
+              field_name_en: "Buyer Full Name"
+              field_name_mt: "Isem SÄ§iÄ§ tax-Xerrej"
+              field_description: "Full legal name of buyer"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "stamp_duty_db"
+                table: "ra9_refund"
+                column: "buyer_name"
+              ors_mapping:
+                table: "mtca_ors.ra9_ftb_refund"
+                column: "buyer_name"
+                data_type: "String"
+
+            - field_id: "first_time_declaration"
+              field_code: "Box 5"
+              field_name_en: "First Time Buyer Declaration"
+              field_name_mt: "Dikjarazzjoni ta' Xerrej gÄ§all-Ewwel Darba"
+              field_description: "Declaration that buyer never owned immovable property"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA9_005"
+                  rule_type: "conditional"
+                  rule_description: "Must declare first-time status"
+                  rule_expression: "first_time_declaration = true"
+                  error_message_en: "Must confirm first-time buyer status"
+                  error_message_mt: "Irid tikkonferma li int xerrej gÄ§all-ewwel darba"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "stamp_duty_db"
+                table: "ra9_refund"
+                column: "ftb_declaration"
+              ors_mapping:
+                table: "mtca_ors.ra9_ftb_refund"
+                column: "first_time_declaration"
+                data_type: "UInt8"
+
+        - section_id: "PROPERTY_DETAILS"
+          section_name: "Property Details"
+          section_description: "Acquired property information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "property_address"
+              field_code: "Box 10"
+              field_name_en: "Property Address"
+              field_name_mt: "Indirizz tal-ProprjetÃ "
+              field_description: "Full address of acquired property"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "stamp_duty_db"
+                table: "ra9_refund"
+                column: "property_address"
+              ors_mapping:
+                table: "mtca_ors.ra9_ftb_refund"
+                column: "property_address"
+                data_type: "String"
+
+            - field_id: "deed_date"
+              field_code: "Box 11"
+              field_name_en: "Date of Deed"
+              field_name_mt: "Data tal-Att"
+              field_description: "Date contract was signed"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "stamp_duty_db"
+                table: "ra9_refund"
+                column: "deed_date"
+              ors_mapping:
+                table: "mtca_ors.ra9_ftb_refund"
+                column: "deed_date"
+                data_type: "Date"
+
+            - field_id: "notary_name"
+              field_code: "Box 12"
+              field_name_en: "Notary Name"
+              field_name_mt: "Isem in-Nutar"
+              field_description: "Name of notary who published deed"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "notary_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "stamp_duty_db"
+                table: "ra9_refund"
+                column: "notary_name"
+              ors_mapping:
+                table: "mtca_ors.ra9_ftb_refund"
+                column: "notary_name"
+                data_type: "String"
+
+            - field_id: "purchase_price"
+              field_code: "Box 13"
+              field_name_en: "Purchase Price"
+              field_name_mt: "Prezz tax-Xiri"
+              field_description: "Property acquisition price"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA9_013"
+                  rule_type: "range"
+                  rule_description: "Property value ceiling"
+                  rule_expression: "purchase_price <= 200000"
+                  error_message_en: "Property exceeds â‚¬200,000 threshold"
+                  error_message_mt: "ProprjetÃ  taqbeÅ¼ il-limitu ta' â‚¬200,000"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "stamp_duty_db"
+                table: "ra9_refund"
+                column: "purchase_price"
+              ors_mapping:
+                table: "mtca_ors.ra9_ftb_refund"
+                column: "purchase_price"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "REFUND_CALCULATION"
+          section_name: "Refund Calculation"
+          section_description: "Stamp duty refund computation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "stamp_duty_paid"
+              field_code: "Box 20"
+              field_name_en: "Stamp Duty Paid"
+              field_name_mt: "Dazju tal-Boll ImÄ§allas"
+              field_description: "Total stamp duty paid on acquisition"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "stamp_duty_db"
+                table: "ra9_refund"
+                column: "stamp_duty_paid"
+              ors_mapping:
+                table: "mtca_ors.ra9_ftb_refund"
+                column: "stamp_duty_paid"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "refund_claimed"
+              field_code: "Box 21"
+              field_name_en: "Refund Amount Claimed"
+              field_name_mt: "Ammont ta' RifuÅ¼joni Mitlub"
+              field_description: "Stamp duty refund claimed (max â‚¬5,000)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MIN(stamp_duty_paid, MIN(purchase_price, 200000) * 0.05, 5000)"
+              validation_rules:
+                - rule_id: "RA9_021"
+                  rule_type: "range"
+                  rule_description: "Maximum refund cap"
+                  rule_expression: "refund_claimed <= 5000"
+                  error_message_en: "Refund cannot exceed â‚¬5,000"
+                  error_message_mt: "RifuÅ¼joni ma tistax taqbeÅ¼ â‚¬5,000"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "stamp_duty_db"
+                table: "ra9_refund"
+                column: "refund_claimed"
+              ors_mapping:
+                table: "mtca_ors.ra9_ftb_refund"
+                column: "refund_claimed"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "DEED_COPY"
+          attachment_name: "Copy of Deed"
+          required: true
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+        - attachment_code: "STAMP_DUTY_RECEIPT"
+          attachment_name: "Stamp Duty Payment Receipt"
+          required: true
+          required_condition: null
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "STD1"
+          relationship_type: "reference"
+          relationship_description: "Original stamp duty declaration"
+
+      submission_workflow:
+        authentication_required: "Paper submission"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Refund processed to bank account"
+
+  # ==========================================================================
+  # RA10: Investment Tax Credit for Start-ups
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "RA10"
+        form_name_en: "Investment Tax Credit for Start-ups"
+        form_name_mt: "Kreditu tat-Taxxa fuq l-Investiment gÄ§al Start-ups"
+        version: "2024"
+        effective_from: "2017-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "S.L.123.186 - Start-up Investment Tax Credit Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Tax Credit"
+        taxpayer_category: "Individual investors in start-ups"
+        filing_frequency: "Annual"
+        filing_deadline: "With annual tax return"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/tax-credits/Pages/Start-up-Credit.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Tax credit for individuals investing in qualifying start-up
+          companies. Credit of 35% of investment, capped at â‚¬250,000
+          investment. Minimum holding period 3 years.
+
+      sections:
+        - section_id: "INVESTOR_ID"
+          section_name: "Investor Identification"
+          section_description: "Individual investor details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "investor_tin"
+              field_code: "Box 1"
+              field_name_en: "Investor TIN"
+              field_name_mt: "TIN tal-Investitur"
+              field_description: "Investor's Tax Identification Number"
+              data_type: "TIN"
+              format: "0000000X"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA10_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid individual TIN"
+                  rule_expression: "^[0-9]{7}[A-Z]$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra10_claim"
+                column: "investor_tin"
+              ors_mapping:
+                table: "mtca_ors.ra10_startup_credit"
+                column: "investor_tin"
+                data_type: "FixedString(8)"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Assessjar"
+              field_description: "Tax year for which credit is claimed"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.year_of_assessment"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra10_claim"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.ra10_startup_credit"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        - section_id: "STARTUP_DETAILS"
+          section_name: "Start-up Company Details"
+          section_description: "Qualifying start-up information"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "startup_tin"
+              field_code: "Line - Col 1"
+              field_name_en: "Start-up Company TIN"
+              field_name_mt: "TIN tal-Kumpanija Start-up"
+              field_description: "TIN of qualifying start-up"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA10_010"
+                  rule_type: "lookup"
+                  rule_description: "Must be approved start-up"
+                  rule_expression: "EXISTS(startup_register.tin)"
+                  error_message_en: "Company not registered as qualifying start-up"
+                  error_message_mt: "Kumpanija mhix irreÄ¡istrata bÄ§ala start-up kwalifikanti"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "startup_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra10_investment"
+                column: "startup_tin"
+              ors_mapping:
+                table: "mtca_ors.ra10_startup_investment"
+                column: "startup_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "startup_name"
+              field_code: "Line - Col 2"
+              field_name_en: "Start-up Company Name"
+              field_name_mt: "Isem tal-Kumpanija Start-up"
+              field_description: "Name of start-up company"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra10_investment"
+                column: "startup_name"
+              ors_mapping:
+                table: "mtca_ors.ra10_startup_investment"
+                column: "startup_name"
+                data_type: "String"
+
+            - field_id: "investment_date"
+              field_code: "Line - Col 3"
+              field_name_en: "Investment Date"
+              field_name_mt: "Data tal-Investiment"
+              field_description: "Date shares were acquired"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra10_investment"
+                column: "investment_date"
+              ors_mapping:
+                table: "mtca_ors.ra10_startup_investment"
+                column: "investment_date"
+                data_type: "Date"
+
+            - field_id: "investment_amount"
+              field_code: "Line - Col 4"
+              field_name_en: "Investment Amount"
+              field_name_mt: "Ammont tal-Investiment"
+              field_description: "Amount invested in shares"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra10_investment"
+                column: "investment_amount"
+              ors_mapping:
+                table: "mtca_ors.ra10_startup_investment"
+                column: "investment_amount"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "CREDIT_CALCULATION"
+          section_name: "Tax Credit Calculation"
+          section_description: "Start-up investment credit computation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_investment"
+              field_code: "Box 20"
+              field_name_en: "Total Qualifying Investment"
+              field_name_mt: "Investiment Kwalifikanti Totali"
+              field_description: "Sum of all start-up investments"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(investment_amount)"
+              validation_rules:
+                - rule_id: "RA10_020"
+                  rule_type: "range"
+                  rule_description: "Investment cap"
+                  rule_expression: "total_investment <= 250000"
+                  error_message_en: "Investment exceeds â‚¬250,000 cap for credit"
+                  error_message_mt: "Investiment jaqbeÅ¼ il-limitu ta' â‚¬250,000"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra10_claim"
+                column: "total_investment"
+              ors_mapping:
+                table: "mtca_ors.ra10_startup_credit"
+                column: "total_investment"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_credit_claimed"
+              field_code: "Box 21"
+              field_name_en: "Tax Credit Claimed"
+              field_name_mt: "Kreditu tat-Taxxa Mitlub"
+              field_description: "35% of qualifying investment"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MIN(total_investment, 250000) * 0.35"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.tax_credits"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra10_claim"
+                column: "credit_claimed"
+              ors_mapping:
+                table: "mtca_ors.ra10_startup_credit"
+                column: "tax_credit_claimed"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "SHARE_CERT"
+          attachment_name: "Share Certificates"
+          required: true
+          required_condition: null
+          max_file_size_mb: 10
+          allowed_formats:
+            - "PDF"
+        - attachment_code: "STARTUP_CERT"
+          attachment_name: "Start-up Certification"
+          required: true
+          required_condition: null
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "feeds"
+          relationship_description: "Credit claimed on individual return"
+
+      submission_workflow:
+        authentication_required: "Paper submission with tax return"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Credit reflected in assessment"
+
+  # ==========================================================================
+  # RA21: Social Security Contributions Credit
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "RA21"
+        form_name_en: "Social Security Contributions Credit Claim"
+        form_name_mt: "Talba gÄ§al Kreditu ta' Kontribuzzjonijiet tas-SigurtÃ  SoÄ‹jali"
+        version: "2024"
+        effective_from: "2020-01-01"
+        effective_to: "current"
+        legislative_basis: "Social Security Act Cap. 318"
+        subsidiary_legislation:
+          - "SSC Credit Scheme Rules"
+        administering_authority: "DSS"
+        tax_type: "Social Security - Credit"
+        taxpayer_category: "Self-employed individuals"
+        filing_frequency: "Annual"
+        filing_deadline: "With annual tax return"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://socialsecurity.gov.mt/"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Credit for self-employed individuals whose SSC exceeds
+          income tax liability. Encourages formalization of self-employment.
+
+      sections:
+        - section_id: "CLAIMANT_ID"
+          section_name: "Claimant Identification"
+          section_description: "Self-employed individual details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "claimant_tin"
+              field_code: "Box 1"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Claimant's TIN"
+              data_type: "TIN"
+              format: "0000000X"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA21_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid individual TIN"
+                  rule_expression: "^[0-9]{7}[A-Z]$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "ssc_db"
+                table: "ra21_claim"
+                column: "claimant_tin"
+              ors_mapping:
+                table: "mtca_ors.ra21_ssc_credit"
+                column: "claimant_tin"
+                data_type: "FixedString(8)"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Assessjar"
+              field_description: "Tax year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.year_of_assessment"
+              legacy_mapping:
+                database: "ssc_db"
+                table: "ra21_claim"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.ra21_ssc_credit"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        - section_id: "SSC_DETAILS"
+          section_name: "SSC Payment Details"
+          section_description: "Social security contributions paid"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "class_2_ssc_paid"
+              field_code: "Box 10"
+              field_name_en: "Class 2 SSC Paid"
+              field_name_mt: "SSC Klassi 2 ImÄ§allas"
+              field_description: "Total Class 2 SSC paid during year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "ssc_db"
+                table: "ra21_claim"
+                column: "class_2_paid"
+              ors_mapping:
+                table: "mtca_ors.ra21_ssc_credit"
+                column: "class_2_ssc_paid"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "income_tax_liability"
+              field_code: "Box 11"
+              field_name_en: "Income Tax Liability"
+              field_name_mt: "Obbligazzjoni tat-Taxxa fuq id-DÄ§ul"
+              field_description: "Tax due before credits"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.tax_on_income"
+              legacy_mapping:
+                database: "ssc_db"
+                table: "ra21_claim"
+                column: "tax_liability"
+              ors_mapping:
+                table: "mtca_ors.ra21_ssc_credit"
+                column: "income_tax_liability"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "ssc_credit_claimed"
+              field_code: "Box 12"
+              field_name_en: "SSC Credit Claimed"
+              field_name_mt: "Kreditu SSC Mitlub"
+              field_description: "Excess of SSC over tax liability"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MAX(0, class_2_ssc_paid - income_tax_liability)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.tax_credits"
+              legacy_mapping:
+                database: "ssc_db"
+                table: "ra21_claim"
+                column: "credit_claimed"
+              ors_mapping:
+                table: "mtca_ors.ra21_ssc_credit"
+                column: "ssc_credit_claimed"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "SSC_STATEMENT"
+          attachment_name: "SSC Payment Statement"
+          required: true
+          required_condition: null
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "feeds"
+          relationship_description: "Credit claimed on individual return"
+
+      submission_workflow:
+        authentication_required: "Paper submission"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Credit processed with tax assessment"
+
+  # ==========================================================================
+  # RA26: Home Improvement Grant/Credit
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "RA26"
+        form_name_en: "Home Improvement Tax Credit"
+        form_name_mt: "Kreditu tat-Taxxa gÄ§at-Titjib tad-Dar"
+        version: "2024"
+        effective_from: "2022-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "Home Improvement Credit Scheme"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Tax Credit"
+        taxpayer_category: "Homeowners"
+        filing_frequency: "Annual"
+        filing_deadline: "With annual tax return"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/tax-credits/Pages/Home-Improvement.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Tax credit for qualifying home improvement works. Covers
+          renovation, repairs, energy efficiency improvements. Credit
+          capped at â‚¬500 per taxpayer per year.
+
+      sections:
+        - section_id: "HOMEOWNER_ID"
+          section_name: "Homeowner Identification"
+          section_description: "Property owner claiming credit"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "homeowner_tin"
+              field_code: "Box 1"
+              field_name_en: "Homeowner TIN"
+              field_name_mt: "TIN tas-Sid tad-Dar"
+              field_description: "Homeowner's Tax Identification Number"
+              data_type: "TIN"
+              format: "0000000X"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA26_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid individual TIN"
+                  rule_expression: "^[0-9]{7}[A-Z]$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_claim"
+                column: "homeowner_tin"
+              ors_mapping:
+                table: "mtca_ors.ra26_home_improvement"
+                column: "homeowner_tin"
+                data_type: "FixedString(8)"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Assessjar"
+              field_description: "Tax year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.year_of_assessment"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_claim"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.ra26_home_improvement"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        - section_id: "PROPERTY_DETAILS"
+          section_name: "Property Details"
+          section_description: "Property where works were carried out"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "property_address"
+              field_code: "Box 10"
+              field_name_en: "Property Address"
+              field_name_mt: "Indirizz tal-ProprjetÃ "
+              field_description: "Address of property improved"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_claim"
+                column: "property_address"
+              ors_mapping:
+                table: "mtca_ors.ra26_home_improvement"
+                column: "property_address"
+                data_type: "String"
+
+            - field_id: "is_principal_residence"
+              field_code: "Box 11"
+              field_name_en: "Principal Residence Declaration"
+              field_name_mt: "Dikjarazzjoni ta' Residenza PrinÄ‹ipali"
+              field_description: "Confirm property is principal residence"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA26_011"
+                  rule_type: "conditional"
+                  rule_description: "Must be principal residence"
+                  rule_expression: "is_principal_residence = true"
+                  error_message_en: "Property must be your principal residence"
+                  error_message_mt: "ProprjetÃ  trid tkun ir-residenza prinÄ‹ipali tiegÄ§ek"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_claim"
+                column: "principal_residence"
+              ors_mapping:
+                table: "mtca_ors.ra26_home_improvement"
+                column: "is_principal_residence"
+                data_type: "UInt8"
+
+        - section_id: "WORKS_DETAILS"
+          section_name: "Works Details"
+          section_description: "Improvement works carried out"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "work_type"
+              field_code: "Line - Col 1"
+              field_name_en: "Type of Work"
+              field_name_mt: "Tip ta' XogÄ§ol"
+              field_description: "Category of improvement work"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "REN"
+                  description_en: "Renovation"
+                  description_mt: "Rinnovazzjoni"
+                - code: "REP"
+                  description_en: "Repairs"
+                  description_mt: "Tiswijiet"
+                - code: "ENE"
+                  description_en: "Energy Efficiency"
+                  description_mt: "EffiÄ‹jenza fl-EnerÄ¡ija"
+                - code: "ACC"
+                  description_en: "Accessibility Works"
+                  description_mt: "XogÄ§lijiet ta' AÄ‹Ä‹essibbiltÃ "
+                - code: "PLU"
+                  description_en: "Plumbing"
+                  description_mt: "Idraulika"
+                - code: "ELE"
+                  description_en: "Electrical"
+                  description_mt: "Elettriku"
+              reference_table: "work_type_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_works"
+                column: "work_type"
+              ors_mapping:
+                table: "mtca_ors.ra26_works_detail"
+                column: "work_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "contractor_tin"
+              field_code: "Line - Col 2"
+              field_name_en: "Contractor TIN"
+              field_name_mt: "TIN tal-Kuntrattur"
+              field_description: "Tax ID of contractor"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_works"
+                column: "contractor_tin"
+              ors_mapping:
+                table: "mtca_ors.ra26_works_detail"
+                column: "contractor_tin"
+                data_type: "String"
+
+            - field_id: "invoice_amount"
+              field_code: "Line - Col 3"
+              field_name_en: "Invoice Amount (incl. VAT)"
+              field_name_mt: "Ammont tal-Fattura (inkl. VAT)"
+              field_description: "Total invoice amount"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_works"
+                column: "invoice_amount"
+              ors_mapping:
+                table: "mtca_ors.ra26_works_detail"
+                column: "invoice_amount"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "invoice_number"
+              field_code: "Line - Col 4"
+              field_name_en: "Invoice Number"
+              field_name_mt: "Numru tal-Fattura"
+              field_description: "Fiscal invoice reference"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_works"
+                column: "invoice_number"
+              ors_mapping:
+                table: "mtca_ors.ra26_works_detail"
+                column: "invoice_number"
+                data_type: "String"
+
+        - section_id: "CREDIT_CALCULATION"
+          section_name: "Credit Calculation"
+          section_description: "Tax credit computation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_expenditure"
+              field_code: "Box 20"
+              field_name_en: "Total Qualifying Expenditure"
+              field_name_mt: "Nefqa Kwalifikanti Totali"
+              field_description: "Sum of all qualifying invoices"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(invoice_amount)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_claim"
+                column: "total_expenditure"
+              ors_mapping:
+                table: "mtca_ors.ra26_home_improvement"
+                column: "total_expenditure"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_credit_claimed"
+              field_code: "Box 21"
+              field_name_en: "Tax Credit Claimed"
+              field_name_mt: "Kreditu tat-Taxxa Mitlub"
+              field_description: "Credit amount (capped at â‚¬500)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MIN(total_expenditure * credit_rate, 500)"
+              validation_rules:
+                - rule_id: "RA26_021"
+                  rule_type: "range"
+                  rule_description: "Credit cap"
+                  rule_expression: "tax_credit_claimed <= 500"
+                  error_message_en: "Credit cannot exceed â‚¬500"
+                  error_message_mt: "Kreditu ma jistax jaqbeÅ¼ â‚¬500"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.tax_credits"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra26_claim"
+                column: "credit_claimed"
+              ors_mapping:
+                table: "mtca_ors.ra26_home_improvement"
+                column: "tax_credit_claimed"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "INVOICES"
+          attachment_name: "Fiscal Invoices"
+          required: true
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "feeds"
+          relationship_description: "Credit claimed on individual return"
+
+      submission_workflow:
+        authentication_required: "Paper submission"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Credit processed with assessment"
+
+  # ==========================================================================
+  # RA29: Elderly Care Credit
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "RA29"
+        form_name_en: "Elderly Care Tax Credit"
+        form_name_mt: "Kreditu tat-Taxxa gÄ§all-Kura tal-Anzjani"
+        version: "2024"
+        effective_from: "2021-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "Elderly Care Credit Scheme"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Tax Credit"
+        taxpayer_category: "Caregivers of elderly relatives"
+        filing_frequency: "Annual"
+        filing_deadline: "With annual tax return"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/tax-credits/Pages/Elderly-Care.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Tax credit for individuals caring for elderly relatives aged 75+.
+          Covers home care expenses. Credit capped at â‚¬2,500 per year.
+
+      sections:
+        - section_id: "CAREGIVER_ID"
+          section_name: "Caregiver Identification"
+          section_description: "Person providing care"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "caregiver_tin"
+              field_code: "Box 1"
+              field_name_en: "Caregiver TIN"
+              field_name_mt: "TIN tal-Caregiver"
+              field_description: "Tax ID of person claiming credit"
+              data_type: "TIN"
+              format: "0000000X"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA29_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid individual TIN"
+                  rule_expression: "^[0-9]{7}[A-Z]$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "caregiver_tin"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "caregiver_tin"
+                data_type: "FixedString(8)"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Assessjar"
+              field_description: "Tax year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.year_of_assessment"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        - section_id: "ELDERLY_RELATIVE"
+          section_name: "Elderly Relative Details"
+          section_description: "Person receiving care"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "relative_tin"
+              field_code: "Box 10"
+              field_name_en: "Relative's ID Number"
+              field_name_mt: "Numru tal-ID tal-Qarib"
+              field_description: "ID of elderly relative"
+              data_type: "TIN"
+              format: "0000000X"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "relative_tin"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "relative_tin"
+                data_type: "FixedString(8)"
+
+            - field_id: "relative_name"
+              field_code: "Box 11"
+              field_name_en: "Relative's Full Name"
+              field_name_mt: "Isem SÄ§iÄ§ tal-Qarib"
+              field_description: "Name of elderly relative"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "relative_name"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "relative_name"
+                data_type: "String"
+
+            - field_id: "relative_date_of_birth"
+              field_code: "Box 12"
+              field_name_en: "Date of Birth"
+              field_name_mt: "Data tat-Twelid"
+              field_description: "Relative's date of birth"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA29_012"
+                  rule_type: "date"
+                  rule_description: "Must be 75+ years old"
+                  rule_expression: "AGE(relative_date_of_birth) >= 75"
+                  error_message_en: "Relative must be aged 75 or over"
+                  error_message_mt: "Qarib irid ikollu 75 sena jew aktar"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "relative_dob"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "relative_date_of_birth"
+                data_type: "Date"
+
+            - field_id: "relationship"
+              field_code: "Box 13"
+              field_name_en: "Relationship"
+              field_name_mt: "Relazzjoni"
+              field_description: "Relationship to elderly person"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "PAR"
+                  description_en: "Parent"
+                  description_mt: "Ä enitur"
+                - code: "GPA"
+                  description_en: "Grandparent"
+                  description_mt: "Nannu/Nanna"
+                - code: "PIL"
+                  description_en: "Parent-in-Law"
+                  description_mt: "Ä enitur tal-konjuÄ¡i"
+                - code: "SIB"
+                  description_en: "Sibling"
+                  description_mt: "AÄ§wa"
+                - code: "OTH"
+                  description_en: "Other Relative"
+                  description_mt: "Qarib IeÄ§or"
+              reference_table: "relationship_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "relationship"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "relationship"
+                data_type: "FixedString(3)"
+
+        - section_id: "CARE_EXPENSES"
+          section_name: "Care Expenses"
+          section_description: "Qualifying care costs"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "home_care_expenses"
+              field_code: "Box 20"
+              field_name_en: "Home Care Expenses"
+              field_name_mt: "SpejjeÅ¼ tal-Kura fid-Dar"
+              field_description: "Paid home care services"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "home_care"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "home_care_expenses"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "medical_expenses"
+              field_code: "Box 21"
+              field_name_en: "Medical Expenses"
+              field_name_mt: "SpejjeÅ¼ MediÄ‹i"
+              field_description: "Medical and nursing care costs"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "medical_expenses"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "medical_expenses"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_care_expenses"
+              field_code: "Box 22"
+              field_name_en: "Total Care Expenses"
+              field_name_mt: "SpejjeÅ¼ tal-Kura Totali"
+              field_description: "Sum of all care expenses"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "home_care_expenses + medical_expenses"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "total_expenses"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "total_care_expenses"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_credit_claimed"
+              field_code: "Box 23"
+              field_name_en: "Tax Credit Claimed"
+              field_name_mt: "Kreditu tat-Taxxa Mitlub"
+              field_description: "Credit (capped at â‚¬2,500)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MIN(total_care_expenses, 2500)"
+              validation_rules:
+                - rule_id: "RA29_023"
+                  rule_type: "range"
+                  rule_description: "Credit cap"
+                  rule_expression: "tax_credit_claimed <= 2500"
+                  error_message_en: "Credit cannot exceed â‚¬2,500"
+                  error_message_mt: "Kreditu ma jistax jaqbeÅ¼ â‚¬2,500"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.tax_credits"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra29_claim"
+                column: "credit_claimed"
+              ors_mapping:
+                table: "mtca_ors.ra29_elderly_care"
+                column: "tax_credit_claimed"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "CARE_RECEIPTS"
+          attachment_name: "Care Service Receipts"
+          required: true
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+        - attachment_code: "ID_PROOF"
+          attachment_name: "Relative's ID Proof"
+          required: true
+          required_condition: null
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "feeds"
+          relationship_description: "Credit claimed on individual return"
+
+      submission_workflow:
+        authentication_required: "Paper submission"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Credit processed with assessment"
+
+  # ==========================================================================
+  # RA30: Childcare Service Credit
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "RA30"
+        form_name_en: "Childcare Service Tax Credit"
+        form_name_mt: "Kreditu tat-Taxxa gÄ§as-Servizz tal-Childcare"
+        version: "2024"
+        effective_from: "2014-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "Childcare Tax Credit Scheme"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Tax Credit"
+        taxpayer_category: "Working parents using childcare"
+        filing_frequency: "Annual"
+        filing_deadline: "With annual tax return"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/tax-credits/Pages/Childcare.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Tax credit for working parents using registered childcare centres.
+          Covers children aged 0-3 (pre-kindergarten). Credit based on
+          fees paid to licensed centres.
+
+      sections:
+        - section_id: "PARENT_ID"
+          section_name: "Parent Identification"
+          section_description: "Working parent claiming credit"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "parent_tin"
+              field_code: "Box 1"
+              field_name_en: "Parent TIN"
+              field_name_mt: "TIN tal-Ä enitur"
+              field_description: "Parent's Tax ID"
+              data_type: "TIN"
+              format: "0000000X"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA30_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid individual TIN"
+                  rule_expression: "^[0-9]{7}[A-Z]$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra30_claim"
+                column: "parent_tin"
+              ors_mapping:
+                table: "mtca_ors.ra30_childcare"
+                column: "parent_tin"
+                data_type: "FixedString(8)"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Assessjar"
+              field_description: "Tax year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.year_of_assessment"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra30_claim"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.ra30_childcare"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+            - field_id: "employment_declaration"
+              field_code: "Box 3"
+              field_name_en: "Employment Declaration"
+              field_name_mt: "Dikjarazzjoni tal-Impjieg"
+              field_description: "Confirm gainful employment"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA30_003"
+                  rule_type: "conditional"
+                  rule_description: "Must be in employment"
+                  rule_expression: "employment_declaration = true"
+                  error_message_en: "Must confirm gainful employment"
+                  error_message_mt: "Irid tikkonferma li int f'impjieg"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra30_claim"
+                column: "employed"
+              ors_mapping:
+                table: "mtca_ors.ra30_childcare"
+                column: "employment_declaration"
+                data_type: "UInt8"
+
+        - section_id: "CHILD_DETAILS"
+          section_name: "Child Details"
+          section_description: "Children in childcare"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "child_name"
+              field_code: "Line - Col 1"
+              field_name_en: "Child's Name"
+              field_name_mt: "Isem it-Tifel/Tifla"
+              field_description: "Full name of child"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra30_children"
+                column: "child_name"
+              ors_mapping:
+                table: "mtca_ors.ra30_child_detail"
+                column: "child_name"
+                data_type: "String"
+
+            - field_id: "child_date_of_birth"
+              field_code: "Line - Col 2"
+              field_name_en: "Date of Birth"
+              field_name_mt: "Data tat-Twelid"
+              field_description: "Child's date of birth"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "RA30_011"
+                  rule_type: "date"
+                  rule_description: "Child age 0-3"
+                  rule_expression: "AGE(child_date_of_birth) <= 3"
+                  error_message_en: "Child must be aged 0-3"
+                  error_message_mt: "Tifel/Tifla trid tkun ta' etÃ  0-3"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra30_children"
+                column: "child_dob"
+              ors_mapping:
+                table: "mtca_ors.ra30_child_detail"
+                column: "child_date_of_birth"
+                data_type: "Date"
+
+            - field_id: "childcare_centre_name"
+              field_code: "Line - Col 3"
+              field_name_en: "Childcare Centre Name"
+              field_name_mt: "Isem iÄ‹-ÄŠentru tal-Childcare"
+              field_description: "Licensed childcare provider"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "licensed_childcare_centres"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra30_children"
+                column: "centre_name"
+              ors_mapping:
+                table: "mtca_ors.ra30_child_detail"
+                column: "childcare_centre_name"
+                data_type: "String"
+
+            - field_id: "fees_paid"
+              field_code: "Line - Col 4"
+              field_name_en: "Fees Paid"
+              field_name_mt: "Ä¦lasijiet ImÄ§allsa"
+              field_description: "Annual childcare fees"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra30_children"
+                column: "fees_paid"
+              ors_mapping:
+                table: "mtca_ors.ra30_child_detail"
+                column: "fees_paid"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "CREDIT_CALCULATION"
+          section_name: "Credit Calculation"
+          section_description: "Childcare credit computation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_fees"
+              field_code: "Box 20"
+              field_name_en: "Total Childcare Fees"
+              field_name_mt: "Ä¦lasijiet tal-Childcare Totali"
+              field_description: "Sum of all childcare fees"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(fees_paid)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra30_claim"
+                column: "total_fees"
+              ors_mapping:
+                table: "mtca_ors.ra30_childcare"
+                column: "total_fees"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_credit_claimed"
+              field_code: "Box 21"
+              field_name_en: "Tax Credit Claimed"
+              field_name_mt: "Kreditu tat-Taxxa Mitlub"
+              field_description: "Qualifying credit amount"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_fees * credit_rate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.tax_credits"
+              legacy_mapping:
+                database: "tax_credits_db"
+                table: "ra30_claim"
+                column: "credit_claimed"
+              ors_mapping:
+                table: "mtca_ors.ra30_childcare"
+                column: "tax_credit_claimed"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "FEE_RECEIPTS"
+          attachment_name: "Childcare Fee Receipts"
+          required: true
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "e-Return"
+          relationship_type: "feeds"
+          relationship_description: "Credit claimed on individual return"
+
+      submission_workflow:
+        authentication_required: "Paper submission"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Credit processed with assessment"
+
+# ============================================================================
+# Reference Tables for Priority 3D Forms
+# ============================================================================
+reference_tables:
+  work_type_codes:
+    - code: "REN"
+      description_en: "Renovation"
+      description_mt: "Rinnovazzjoni"
+    - code: "REP"
+      description_en: "Repairs"
+      description_mt: "Tiswijiet"
+    - code: "ENE"
+      description_en: "Energy Efficiency"
+      description_mt: "EffiÄ‹jenza fl-EnerÄ¡ija"
+    - code: "ACC"
+      description_en: "Accessibility Works"
+      description_mt: "XogÄ§lijiet ta' AÄ‹Ä‹essibbiltÃ "
+    - code: "PLU"
+      description_en: "Plumbing"
+      description_mt: "Idraulika"
+    - code: "ELE"
+      description_en: "Electrical"
+      description_mt: "Elettriku"
+
+  relationship_codes:
+    - code: "PAR"
+      description_en: "Parent"
+      description_mt: "Ä enitur"
+    - code: "GPA"
+      description_en: "Grandparent"
+      description_mt: "Nannu/Nanna"
+    - code: "PIL"
+      description_en: "Parent-in-Law"
+      description_mt: "Ä enitur tal-konjuÄ¡i"
+    - code: "SIB"
+      description_en: "Sibling"
+      description_mt: "AÄ§wa"
+    - code: "OTH"
+      description_en: "Other Relative"
+      description_mt: "Qarib IeÄ§or"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  tax_credits_db:
+    tables:
+      - legacy_table: "ra6_claim"
+        ors_table: "mtca_ors.ra6_rd_credit"
+        key_columns:
+          - legacy: "claimant_tin"
+            ors: "claimant_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "ra10_claim"
+        ors_table: "mtca_ors.ra10_startup_credit"
+        key_columns:
+          - legacy: "investor_tin"
+            ors: "investor_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "ra26_claim"
+        ors_table: "mtca_ors.ra26_home_improvement"
+        key_columns:
+          - legacy: "homeowner_tin"
+            ors: "homeowner_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "ra29_claim"
+        ors_table: "mtca_ors.ra29_elderly_care"
+        key_columns:
+          - legacy: "caregiver_tin"
+            ors: "caregiver_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "ra30_claim"
+        ors_table: "mtca_ors.ra30_childcare"
+        key_columns:
+          - legacy: "parent_tin"
+            ors: "parent_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+  stamp_duty_db:
+    tables:
+      - legacy_table: "ra9_refund"
+        ors_table: "mtca_ors.ra9_ftb_refund"
+        key_columns:
+          - legacy: "buyer_tin"
+            ors: "buyer_tin"
+          - legacy: "deed_date"
+            ors: "deed_date"
+  ssc_db:
+    tables:
+      - legacy_table: "ra21_claim"
+        ors_table: "mtca_ors.ra21_ssc_credit"
+        key_columns:
+          - legacy: "claimant_tin"
+            ors: "claimant_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"

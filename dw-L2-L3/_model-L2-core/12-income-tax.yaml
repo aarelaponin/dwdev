@@ -1,0 +1,259 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Withholding Tax Domain
+# Generated from: SIGTAS TAX_WITHHELD_PAYE__OTHER schema + tax-capabilities.docx
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    Income Tax Domain
+
+    This domain manages income tax operations.
+
+    Key Business Concepts:
+
+    Domain Dependencies:
+    - party_management: Employer and employee party records
+    - tax_framework: tax types, tax periods
+    - accounting: Income tax transactions and balances
+    - filing_assessment: Integration with overall assessment process
+
+  authors:
+    - "GovStack TA-RDM Working Group"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Registration Building Block"
+    - "Payment Building Block"
+    - "Digital Registries Building Block"
+    - "Identity Building Block"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+# =============================================================================
+# DOMAIN DEFINITION
+# =============================================================================
+
+domains:
+  - name: "income_tax"
+    code: "IT"
+    display_name: "Income Tax Management"
+    description: |
+      Corporate and Personal Income Tax management.
+      Extends core filing-assessment with financial statements,
+      deductions, credits, and TAX LOSS carry-forward.
+
+    dependencies:
+      - "filing_assessment"  # â† EXTENDS THIS
+
+    schemas:
+      - schema_name: "income_tax"
+
+        tables:
+          # ===========================================================
+          # CORPORATE INCOME TAX
+          # ===========================================================
+
+          - name: corporate_tax_return
+            description: |
+              CIT return extending core tax_return.
+
+            columns:
+              - name: corporate_return_id
+                type: bigint
+                constraints:
+                  primary_key: true
+
+              - name: tax_return_id
+                type: bigint
+                description: "Extension point to core tax_return"
+                constraints:
+                  not_null: true
+                  unique: true
+                  foreign_key:
+                    table: "filing_assessment.tax_return"
+                    column: "tax_return_id"
+                    on_delete: "CASCADE"
+
+              # CIT-SPECIFIC FIELDS
+              - name: accounting_period_start
+                type: date
+                description: "Start of accounting/fiscal year"
+
+              - name: accounting_period_end
+                type: date
+                description: "End of accounting/fiscal year"
+
+              - name: accounting_method
+                type: varchar(20)
+                description: "ACCRUAL or CASH"
+
+              - name: total_revenue
+                type: decimal(19,2)
+
+              - name: total_expenses
+                type: decimal(19,2)
+
+              - name: accounting_profit
+                type: decimal(19,2)
+                description: "Profit per financial statements"
+
+              - name: taxable_profit
+                type: decimal(19,2)
+                description: "Profit after tax adjustments"
+
+              - name: corporate_tax_rate
+                type: decimal(5,2)
+                description: "CIT rate % applied"
+
+              - name: losses_carried_forward
+                type: decimal(19,2)
+                description: "Losses from prior years utilized this year"
+
+          # ===========================================================
+          # FINANCIAL STATEMENTS (CIT-SPECIFIC)
+          # ===========================================================
+
+          - name: financial_statement
+            description: |
+              Financial statements attached to CIT return.
+              Balance sheet, P&L, cash flow.
+
+            columns:
+              - name: financial_statement_id
+                type: bigint
+                constraints:
+                  primary_key: true
+
+              - name: corporate_return_id
+                type: bigint
+                constraints:
+                  foreign_key:
+                    table: "income_tax.corporate_tax_return"
+                    column: "corporate_return_id"
+
+              - name: statement_type
+                type: varchar(20)
+                description: "BALANCE_SHEET, PROFIT_LOSS, CASH_FLOW"
+
+              - name: statement_data
+                type: jsonb
+                description: "Structured financial statement data"
+
+          # ===========================================================
+          # TAX LOSS (MOVED FROM CORE DOMAIN 4) â† THIS IS KEY!
+          # ===========================================================
+
+          - name: tax_loss
+            description: |
+              Tax losses for carry-forward or carry-back.
+              MOVED FROM CORE DOMAIN 4 because tax loss is specific
+              to income tax (CIT primarily, sometimes PIT).
+
+              NOT applicable to VAT, withholding, excise, property taxes.
+
+            aspects: ["auditable"]
+
+            columns:
+              - name: tax_loss_id
+                type: bigint
+                constraints:
+                  primary_key: true
+
+              - name: tax_account_id
+                type: bigint
+                description: "Tax account that incurred loss (CIT or PIT)"
+                constraints:
+                  foreign_key:
+                    table: "registration.tax_account"
+                    column: "tax_account_id"
+
+              - name: loss_tax_period_id
+                type: bigint
+                description: "Period in which loss occurred"
+                constraints:
+                  foreign_key:
+                    table: "tax_framework.tax_period"
+                    column: "tax_period_id"
+
+              - name: loss_amount
+                type: decimal(19,2)
+                description: "Amount of loss available for carry-forward/back"
+                constraints:
+                  not_null: true
+                  check: "loss_amount > 0"
+
+              - name: loss_type
+                type: varchar(20)
+                description: "BUSINESS_LOSS, CAPITAL_LOSS, etc."
+
+              - name: carry_forward_years_allowed
+                type: integer
+                description: "Number of years loss can be carried forward (per tax law)"
+
+              - name: expiry_date
+                type: date
+                description: "Date loss expires"
+
+              - name: remaining_balance
+                type: decimal(19,2)
+                description: "Loss amount not yet utilized"
+
+              - name: is_approved
+                type: boolean
+                description: "Loss must be approved before utilization"
+
+          - name: tax_loss_utilization
+            description: |
+              Tracking of loss utilization against future assessments.
+              Links tax_loss to assessments where loss was applied.
+
+            columns:
+              - name: loss_utilization_id
+                type: bigint
+                constraints:
+                  primary_key: true
+
+              - name: tax_loss_id
+                type: bigint
+                constraints:
+                  foreign_key:
+                    table: "income_tax.tax_loss"
+                    column: "tax_loss_id"
+
+              - name: assessment_id
+                type: bigint
+                description: "Assessment where loss was utilized"
+                constraints:
+                  foreign_key:
+                    table: "filing_assessment.assessment"
+                    column: "assessment_id"
+
+              - name: amount_utilized
+                type: decimal(19,2)
+                description: "Amount of loss applied to this assessment"
+                constraints:
+                  not_null: true
+                  check: "amount_utilized > 0"
+
+              - name: utilization_date
+                type: date

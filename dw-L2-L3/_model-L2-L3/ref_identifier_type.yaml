@@ -1,0 +1,847 @@
+# =============================================================================
+# TA-RDM L2 - Reference Identifier Type Table
+# =============================================================================
+# File: ref_identifier_type.yaml
+# Purpose: Define identifier types and validation formats per country
+# Pattern: Multi-Identifier Pattern (Pattern 1 from Generalization Catalog)
+# Version: 1.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L2 Generalization Process
+# =============================================================================
+#
+# This reference table supports the multi-identifier architecture enabling:
+# - Runtime format validation without schema changes
+# - Country-specific identifier formats and checksum algorithms
+# - Universal identifier types applicable across countries
+# - Temporal validity for identifier format changes over time
+#
+# =============================================================================
+
+metadata:
+  table_name: ref_identifier_type
+  schema: reference
+  version: "1.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L2 Generalization"
+  description: |
+    Master reference table defining all valid identifier types across all countries.
+    Supports TIN, VAT number, EORI, national ID, passport, business registration,
+    and other tax-relevant identifiers.
+    
+    Format validation patterns are country-specific, enabling runtime validation
+    without hardcoding formats in application logic or schema constraints.
+    
+    Key design principles:
+    - Universal types have country_code = NULL
+    - Country-specific types have ISO 3166-1 alpha-3 country code
+    - Format regex enables runtime validation
+    - Checksum algorithms support programmatic verification
+    - Temporal validity tracks format changes over time
+
+# -----------------------------------------------------------------------------
+# TABLE DEFINITION
+# -----------------------------------------------------------------------------
+table:
+  name: ref_identifier_type
+  schema: reference
+  type: reference
+  
+  description: |
+    Defines identifier types with country-specific validation rules for tax
+    administration systems. Enables:
+    - Multi-identifier party architecture without schema changes
+    - Consistent validation across all application tiers
+    - Format migration tracking via temporal validity
+    - Self-documenting data through format descriptions and examples
+  
+  business_rules:
+    - "Each country must have exactly one primary tax identifier (is_tax_identifier = TRUE)"
+    - "Universal types (country_code = NULL) apply when no country-specific type exists"
+    - "Format regex patterns use POSIX ERE syntax for cross-platform compatibility"
+    - "Retired identifier types remain in table with effective_to date set"
+    - "New format versions create new rows rather than updating existing"
+  
+  columns:
+    # -------------------------------------------------------------------------
+    # Primary Key
+    # -------------------------------------------------------------------------
+    - name: identifier_type_id
+      type: integer
+      constraints:
+        primary_key: true
+        auto_increment: true
+      description: "Surrogate primary key for foreign key references"
+    
+    # -------------------------------------------------------------------------
+    # Natural Key Components
+    # -------------------------------------------------------------------------
+    - name: identifier_type_code
+      type: varchar(20)
+      constraints:
+        not_null: true
+      description: |
+        Standardized type code: TIN, VAT, EORI, NATID, PASSPORT, SSN, SSC, BRN, etc.
+        Codes are uppercase and consistent across countries where applicable.
+      validation:
+        pattern: "^[A-Z][A-Z0-9_]{1,19}$"
+    
+    - name: country_code
+      type: char(3)
+      constraints:
+        not_null: false
+      description: |
+        ISO 3166-1 alpha-3 country code. NULL indicates universal type
+        applicable across all countries (e.g., PASSPORT, EORI).
+      reference_data: ref_country
+    
+    # -------------------------------------------------------------------------
+    # Display Names
+    # -------------------------------------------------------------------------
+    - name: identifier_name
+      type: varchar(100)
+      constraints:
+        not_null: true
+      description: "Human-readable name in English for UI display and reports"
+    
+    - name: identifier_name_local
+      type: varchar(100)
+      description: |
+        Name in local language using UTF-8 encoding.
+        Examples: "Numru ta' Identifikazzjoni tat-Taxxa" (Maltese)
+    
+    # -------------------------------------------------------------------------
+    # Format Validation
+    # -------------------------------------------------------------------------
+    - name: format_regex
+      type: varchar(255)
+      description: |
+        POSIX ERE validation regex pattern. NULL means no format validation.
+        Should be anchored (^ and $) for full string matching.
+        Examples: "^[0-9]{9}$", "^MT[0-9]{8}$"
+    
+    - name: format_description
+      type: varchar(500)
+      description: |
+        Human-readable format description for error messages and documentation.
+        Should describe the format without requiring regex knowledge.
+        Example: "9 digits" or "MT followed by 8 digits"
+    
+    - name: format_example
+      type: varchar(100)
+      description: |
+        Example of a valid identifier in this format.
+        Use realistic-looking but clearly fake values.
+        Example: "123456789" or "MT12345678"
+    
+    # -------------------------------------------------------------------------
+    # Checksum Validation
+    # -------------------------------------------------------------------------
+    - name: checksum_algorithm
+      type: varchar(50)
+      description: |
+        Standard checksum validation algorithm:
+        - mod10: Luhn-variant modulo 10
+        - mod11: Standard modulo 11
+        - mod97: ISO 7064 modulo 97 (IBAN-style)
+        - luhn: Luhn algorithm (credit cards)
+        - verhoeff: Verhoeff algorithm
+        - iso7064: ISO 7064:2003 pure system
+        - malta_id: Malta ID card check letter
+        - custom: Use checksum_function for custom validation
+        - NULL: No checksum validation
+    
+    - name: checksum_function
+      type: varchar(200)
+      description: |
+        Custom function name when checksum_algorithm = 'custom'.
+        Format: schema.function_name or just function_name.
+        Function signature: (identifier VARCHAR) RETURNS BOOLEAN
+    
+    # -------------------------------------------------------------------------
+    # Length Constraints
+    # -------------------------------------------------------------------------
+    - name: min_length
+      type: integer
+      description: "Minimum identifier length. NULL means no minimum constraint."
+    
+    - name: max_length
+      type: integer
+      description: "Maximum identifier length. NULL means no maximum constraint."
+    
+    # -------------------------------------------------------------------------
+    # Identifier Classification
+    # -------------------------------------------------------------------------
+    - name: is_tax_identifier
+      type: boolean
+      default: false
+      constraints:
+        not_null: true
+      description: |
+        TRUE if this is the PRIMARY tax identifier for the country.
+        Each country should have exactly one is_tax_identifier = TRUE.
+    
+    - name: is_unique_per_party
+      type: boolean
+      default: true
+      constraints:
+        not_null: true
+      description: |
+        TRUE if a party can have only one active identifier of this type.
+        FALSE for types like PASSPORT where a party might have multiple.
+    
+    - name: allows_multiple_countries
+      type: boolean
+      default: false
+      description: |
+        TRUE if the same identifier value is valid across multiple countries.
+        Examples: EORI (valid across EU), passport numbers.
+    
+    # -------------------------------------------------------------------------
+    # Issuing Authority
+    # -------------------------------------------------------------------------
+    - name: issuing_authority
+      type: varchar(200)
+      description: |
+        Official name of the authority that issues this identifier.
+        Example: "Commissioner for Revenue", "National Registration Department"
+    
+    - name: issuing_authority_url
+      type: varchar(500)
+      description: |
+        URL for official identifier verification or issuing authority website.
+        Example: "https://cfr.gov.mt/en/Pages/Home.aspx"
+    
+    # -------------------------------------------------------------------------
+    # Applicability
+    # -------------------------------------------------------------------------
+    - name: applicable_party_types
+      type: varchar(100)
+      default: "ALL"
+      description: |
+        Comma-separated list of party types this identifier applies to:
+        - INDIVIDUAL: Natural persons only
+        - ENTERPRISE: Legal entities (companies, partnerships, etc.)
+        - GOVERNMENT: Government entities
+        - ALL: All party types
+        Examples: "INDIVIDUAL", "ENTERPRISE", "INDIVIDUAL,ENTERPRISE"
+    
+    # -------------------------------------------------------------------------
+    # Temporal Validity
+    # -------------------------------------------------------------------------
+    - name: effective_from
+      type: date
+      constraints:
+        not_null: true
+      description: "Date this identifier type/format became valid"
+    
+    - name: effective_to
+      type: date
+      description: |
+        Date this identifier type/format was retired. NULL means currently active.
+        Set when format changes; create new row for new format.
+    
+    # -------------------------------------------------------------------------
+    # Display and Status
+    # -------------------------------------------------------------------------
+    - name: display_order
+      type: integer
+      default: 100
+      description: "Sort order for UI display within a country. Lower = first."
+    
+    - name: is_active
+      type: boolean
+      default: true
+      constraints:
+        not_null: true
+      description: |
+        Soft delete flag. FALSE = logically deleted.
+        Use effective_to for temporal retirement, is_active for logical deletion.
+    
+    - name: notes
+      type: text
+      description: "Additional notes about this identifier type for administrators"
+
+  # ---------------------------------------------------------------------------
+  # INDEXES
+  # ---------------------------------------------------------------------------
+  indexes:
+    - name: uk_identifier_type_code_country
+      type: unique
+      columns: [identifier_type_code, country_code]
+      nulls_distinct: false
+      description: |
+        Unique type code per country. Treats NULL country_code values as equal
+        (only one universal PASSPORT type, etc.)
+    
+    - name: idx_identifier_type_country
+      columns: [country_code]
+      description: "Fast lookup by country for registration screens"
+    
+    - name: idx_identifier_type_tax
+      columns: [country_code, is_tax_identifier]
+      where: "is_tax_identifier = TRUE"
+      description: "Partial index for finding primary tax identifiers"
+    
+    - name: idx_identifier_type_active
+      columns: [country_code, is_active, effective_to]
+      where: "is_active = TRUE AND effective_to IS NULL"
+      description: "Fast lookup for currently active identifier types"
+
+  # ---------------------------------------------------------------------------
+  # CONSTRAINTS
+  # ---------------------------------------------------------------------------
+  constraints:
+    - name: chk_identifier_type_dates
+      type: check
+      condition: "effective_to IS NULL OR effective_to >= effective_from"
+      description: "Ensure valid date range"
+    
+    - name: chk_identifier_type_length
+      type: check
+      condition: "max_length IS NULL OR min_length IS NULL OR max_length >= min_length"
+      description: "Ensure valid length range"
+    
+    - name: chk_identifier_type_code_format
+      type: check
+      condition: "identifier_type_code ~ '^[A-Z][A-Z0-9_]*$'"
+      description: "Type code must be uppercase alphanumeric"
+    
+    - name: chk_identifier_checksum_function
+      type: check
+      condition: "(checksum_algorithm != 'custom') OR (checksum_function IS NOT NULL)"
+      description: "Custom checksum algorithm requires function name"
+
+# -----------------------------------------------------------------------------
+# SAMPLE DATA
+# -----------------------------------------------------------------------------
+sample_data:
+  # ===========================================================================
+  # UNIVERSAL TYPES (country_code = NULL)
+  # ===========================================================================
+  - identifier_type_code: "PASSPORT"
+    country_code: null
+    identifier_name: "Passport Number"
+    format_description: "International passport number - format varies by issuing country"
+    is_tax_identifier: false
+    is_unique_per_party: false
+    allows_multiple_countries: true
+    issuing_authority: "National passport authority"
+    applicable_party_types: "INDIVIDUAL"
+    effective_from: "2000-01-01"
+    display_order: 90
+    is_active: true
+    notes: "Universal identifier type. Actual format depends on issuing country."
+  
+  - identifier_type_code: "EORI"
+    country_code: null
+    identifier_name: "EORI Number"
+    identifier_name_local: "Economic Operators Registration and Identification"
+    format_regex: "^[A-Z]{2}[0-9A-Z]{1,15}$"
+    format_description: "2-letter ISO country code + up to 15 alphanumeric characters"
+    format_example: "MT12345678"
+    min_length: 3
+    max_length: 17
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: true
+    issuing_authority: "National Customs Authority"
+    applicable_party_types: "ENTERPRISE"
+    effective_from: "2009-07-01"
+    display_order: 50
+    is_active: true
+    notes: "EU-wide identifier for customs. Format: country prefix + national identifier."
+
+  # ===========================================================================
+  # MALTA (MLT)
+  # ===========================================================================
+  - identifier_type_code: "TIN"
+    country_code: "MLT"
+    identifier_name: "Tax Identification Number"
+    identifier_name_local: "Numru ta' Identifikazzjoni tat-Taxxa"
+    format_regex: "^[0-9]{9}$"
+    format_description: "9 digits"
+    format_example: "123456789"
+    min_length: 9
+    max_length: 9
+    is_tax_identifier: true
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Commissioner for Revenue"
+    issuing_authority_url: "https://cfr.gov.mt"
+    applicable_party_types: "ALL"
+    effective_from: "2000-01-01"
+    display_order: 10
+    is_active: true
+    notes: "Primary tax identifier for Malta. Same format for individuals and corporates."
+  
+  - identifier_type_code: "TIN_MALTESE"
+    country_code: "MLT"
+    identifier_name: "Maltese Individual TIN"
+    identifier_name_local: "Numru ta' Identifikazzjoni tat-Taxxa (Malti)"
+    format_regex: "^[0-9]{7}[MGAPLHBZ]$"
+    format_description: "7 digits followed by 1 letter (M, G, A, P, L, H, B, or Z)"
+    format_example: "1234567M"
+    min_length: 8
+    max_length: 8
+    checksum_algorithm: "malta_id"
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Identity Malta"
+    issuing_authority_url: "https://identitymalta.com"
+    applicable_party_types: "INDIVIDUAL"
+    effective_from: "2000-01-01"
+    display_order: 11
+    is_active: true
+    notes: "Alternative TIN format matching Malta ID card. Check letter validates identity."
+  
+  - identifier_type_code: "VAT"
+    country_code: "MLT"
+    identifier_name: "VAT Number"
+    identifier_name_local: "Numru tal-VAT"
+    format_regex: "^MT[0-9]{8}$"
+    format_description: "MT followed by 8 digits"
+    format_example: "MT12345678"
+    min_length: 10
+    max_length: 10
+    checksum_algorithm: "mod97"
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Commissioner for Revenue - VAT Department"
+    issuing_authority_url: "https://cfr.gov.mt/en/vat/Pages/default.aspx"
+    applicable_party_types: "ALL"
+    effective_from: "2004-05-01"
+    display_order: 20
+    is_active: true
+    notes: "Assigned upon VAT registration. Format aligned with EU VIES standard."
+  
+  - identifier_type_code: "NATID"
+    country_code: "MLT"
+    identifier_name: "Malta ID Card Number"
+    identifier_name_local: "Numru tal-Karta tal-Identità"
+    format_regex: "^[0-9]{7}[MGAPLHBZ]$"
+    format_description: "7 digits followed by 1 uppercase letter (M, G, A, P, L, H, B, Z)"
+    format_example: "1234567M"
+    min_length: 8
+    max_length: 8
+    checksum_algorithm: "malta_id"
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Identity Malta"
+    issuing_authority_url: "https://identitymalta.com"
+    applicable_party_types: "INDIVIDUAL"
+    effective_from: "1972-01-01"
+    display_order: 30
+    is_active: true
+    notes: "National identity document number. Check letter algorithm is Malta-specific."
+  
+  - identifier_type_code: "SSC"
+    country_code: "MLT"
+    identifier_name: "Social Security Number"
+    identifier_name_local: "Numru tas-Sigurtà Soċjali"
+    format_regex: "^[0-9]{7}[MGAPLHBZ]$"
+    format_description: "Same format as Malta ID card (7 digits + letter)"
+    format_example: "1234567M"
+    min_length: 8
+    max_length: 8
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Department of Social Security"
+    issuing_authority_url: "https://socialsecurity.gov.mt"
+    applicable_party_types: "INDIVIDUAL"
+    effective_from: "1979-01-01"
+    display_order: 40
+    is_active: true
+    notes: "Typically matches ID card number for Maltese nationals."
+  
+  - identifier_type_code: "ROC"
+    country_code: "MLT"
+    identifier_name: "Company Registration Number"
+    identifier_name_local: "Numru tar-Reġistrazzjoni tal-Kumpanija"
+    format_regex: "^C[0-9]{1,9}$"
+    format_description: "Letter C followed by 1 to 9 digits"
+    format_example: "C12345"
+    min_length: 2
+    max_length: 10
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Malta Business Registry"
+    issuing_authority_url: "https://mbr.mt"
+    applicable_party_types: "ENTERPRISE"
+    effective_from: "1962-01-01"
+    display_order: 25
+    is_active: true
+    notes: "Assigned by MBR upon company registration. Sequential numbering."
+
+  # ===========================================================================
+  # SRI LANKA (LKA)
+  # ===========================================================================
+  - identifier_type_code: "TIN"
+    country_code: "LKA"
+    identifier_name: "Tax Identification Number"
+    identifier_name_local: "බදු හඳුනාගැනීමේ අංකය"
+    format_regex: "^[0-9]{9}$"
+    format_description: "9 digits"
+    format_example: "123456789"
+    min_length: 9
+    max_length: 9
+    is_tax_identifier: true
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Inland Revenue Department"
+    issuing_authority_url: "https://www.ird.gov.lk"
+    applicable_party_types: "ALL"
+    effective_from: "2000-01-01"
+    display_order: 10
+    is_active: true
+    notes: "Primary tax identifier. Required for all tax registrations."
+  
+  - identifier_type_code: "NIC_OLD"
+    country_code: "LKA"
+    identifier_name: "Old NIC Number"
+    identifier_name_local: "පැරණි ජාතික හැඳුනුම්පත් අංකය"
+    format_regex: "^[0-9]{9}[VX]$"
+    format_description: "9 digits followed by V or X"
+    format_example: "123456789V"
+    min_length: 10
+    max_length: 10
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Department for Registration of Persons"
+    issuing_authority_url: "https://www.drp.gov.lk"
+    applicable_party_types: "INDIVIDUAL"
+    effective_from: "1972-01-01"
+    effective_to: "2016-01-01"
+    display_order: 30
+    is_active: true
+    notes: "Legacy format. V=male, X=female. Phased out but still valid for existing holders."
+  
+  - identifier_type_code: "NIC_NEW"
+    country_code: "LKA"
+    identifier_name: "New NIC Number"
+    identifier_name_local: "නව ජාතික හැඳුනුම්පත් අංකය"
+    format_regex: "^[0-9]{12}$"
+    format_description: "12 digits"
+    format_example: "200012345678"
+    min_length: 12
+    max_length: 12
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Department for Registration of Persons"
+    issuing_authority_url: "https://www.drp.gov.lk"
+    applicable_party_types: "INDIVIDUAL"
+    effective_from: "2016-01-01"
+    display_order: 31
+    is_active: true
+    notes: "New format introduced 2016. First 4 digits = birth year, next 3 = day of year."
+  
+  - identifier_type_code: "BRN"
+    country_code: "LKA"
+    identifier_name: "Business Registration Number"
+    identifier_name_local: "ව්‍යාපාර ලියාපදිංචි අංකය"
+    format_regex: "^(PB|PV|PVS|GA|PBS)[0-9]{5,8}$"
+    format_description: "Prefix (PB, PV, PVS, GA, PBS) followed by 5-8 digits"
+    format_example: "PV12345678"
+    min_length: 7
+    max_length: 11
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Registrar of Companies"
+    issuing_authority_url: "https://www.drc.gov.lk"
+    applicable_party_types: "ENTERPRISE"
+    effective_from: "2007-01-01"
+    display_order: 20
+    is_active: true
+    notes: "PB=Private Business, PV=Private Limited, PVS=State Enterprise, GA=Guarantee, PBS=Public."
+  
+  - identifier_type_code: "VAT"
+    country_code: "LKA"
+    identifier_name: "VAT Registration Number"
+    identifier_name_local: "VAT ලියාපදිංචි අංකය"
+    format_regex: "^[0-9]{9}-[0-9]{4}$"
+    format_description: "TIN followed by dash and 4-digit sequence"
+    format_example: "123456789-0001"
+    min_length: 14
+    max_length: 14
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Inland Revenue Department"
+    issuing_authority_url: "https://www.ird.gov.lk"
+    applicable_party_types: "ALL"
+    effective_from: "2002-01-01"
+    display_order: 15
+    is_active: true
+    notes: "Derived from TIN. Suffix indicates VAT registration sequence for taxpayer."
+
+  # ===========================================================================
+  # MOLDOVA (MDA)
+  # ===========================================================================
+  - identifier_type_code: "IDNO"
+    country_code: "MDA"
+    identifier_name: "Legal Entity Identification Number"
+    identifier_name_local: "Numărul de Identificare de Stat"
+    format_regex: "^[0-9]{13}$"
+    format_description: "13 digits"
+    format_example: "1002600012345"
+    min_length: 13
+    max_length: 13
+    checksum_algorithm: "mod11"
+    is_tax_identifier: true
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Public Services Agency"
+    issuing_authority_url: "https://asp.gov.md"
+    applicable_party_types: "ENTERPRISE"
+    effective_from: "2000-01-01"
+    display_order: 10
+    is_active: true
+    notes: "Primary identifier for legal entities. Modulo 11 check digit in last position."
+  
+  - identifier_type_code: "IDNP"
+    country_code: "MDA"
+    identifier_name: "Personal Identification Number"
+    identifier_name_local: "Numărul de Identificare Personal"
+    format_regex: "^[0-9]{13}$"
+    format_description: "13 digits"
+    format_example: "2012345678901"
+    min_length: 13
+    max_length: 13
+    checksum_algorithm: "mod11"
+    is_tax_identifier: true
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Public Services Agency"
+    issuing_authority_url: "https://asp.gov.md"
+    applicable_party_types: "INDIVIDUAL"
+    effective_from: "1996-01-01"
+    display_order: 11
+    is_active: true
+    notes: "Primary identifier for individuals. First digit indicates gender (1=male, 2=female)."
+  
+  - identifier_type_code: "VAT"
+    country_code: "MDA"
+    identifier_name: "VAT Registration Number"
+    identifier_name_local: "Codul de TVA"
+    format_regex: "^[0-9]{7}$"
+    format_description: "7 digits"
+    format_example: "1234567"
+    min_length: 7
+    max_length: 7
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "State Tax Service"
+    issuing_authority_url: "https://sfs.md"
+    applicable_party_types: "ALL"
+    effective_from: "1998-01-01"
+    display_order: 20
+    is_active: true
+    notes: "Separate from IDNO/IDNP. Required when VAT threshold is exceeded."
+
+  # ===========================================================================
+  # LEBANON (LBN)
+  # ===========================================================================
+  - identifier_type_code: "TIN"
+    country_code: "LBN"
+    identifier_name: "Tax Identification Number"
+    identifier_name_local: "رقم التعريف الضريبي"
+    format_regex: "^[0-9]{8}$"
+    format_description: "8 digits"
+    format_example: "12345678"
+    min_length: 8
+    max_length: 8
+    is_tax_identifier: true
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Ministry of Finance - Tax Directorate"
+    issuing_authority_url: "https://www.finance.gov.lb"
+    applicable_party_types: "ALL"
+    effective_from: "1993-01-01"
+    display_order: 10
+    is_active: true
+    notes: "Primary tax identifier for Lebanon. 8-digit sequential number."
+  
+  - identifier_type_code: "VAT"
+    country_code: "LBN"
+    identifier_name: "VAT Registration Number"
+    identifier_name_local: "رقم التسجيل في ضريبة القيمة المضافة"
+    format_regex: "^[0-9]{8}(-[0-9]{3})?$"
+    format_description: "8 digits, optionally followed by dash and 3-digit suffix"
+    format_example: "12345678-001"
+    min_length: 8
+    max_length: 12
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Ministry of Finance - VAT Department"
+    issuing_authority_url: "https://www.finance.gov.lb"
+    applicable_party_types: "ALL"
+    effective_from: "2002-02-01"
+    display_order: 20
+    is_active: true
+    notes: "Based on TIN with optional branch suffix. 11% standard rate."
+  
+  - identifier_type_code: "CR"
+    country_code: "LBN"
+    identifier_name: "Commercial Register Number"
+    identifier_name_local: "رقم السجل التجاري"
+    format_regex: "^[0-9]+$"
+    format_description: "Numeric - length varies by registrar"
+    format_example: "12345"
+    min_length: 1
+    max_length: 15
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "Commercial Register - Ministry of Justice"
+    applicable_party_types: "ENTERPRISE"
+    effective_from: "1926-01-01"
+    display_order: 25
+    is_active: true
+    notes: "Registration number from Commercial Register. Different sequences per district."
+  
+  - identifier_type_code: "NATID"
+    country_code: "LBN"
+    identifier_name: "Civil Register Number"
+    identifier_name_local: "رقم السجل المدني"
+    format_regex: "^[0-9]+$"
+    format_description: "Numeric registration number"
+    format_example: "12345"
+    min_length: 1
+    max_length: 10
+    is_tax_identifier: false
+    is_unique_per_party: true
+    allows_multiple_countries: false
+    issuing_authority: "General Directorate of Civil Status"
+    applicable_party_types: "INDIVIDUAL"
+    effective_from: "1920-01-01"
+    display_order: 30
+    is_active: true
+    notes: "Personal register number from civil status records. Family-based numbering."
+
+# -----------------------------------------------------------------------------
+# DATA QUALITY RULES
+# -----------------------------------------------------------------------------
+data_quality_rules:
+  - rule_id: "DQ001"
+    rule_name: "One Primary Tax ID Per Country"
+    rule_type: "uniqueness"
+    severity: "error"
+    condition: |
+      Each country_code (excluding NULL) should have exactly one record
+      where is_tax_identifier = TRUE AND is_active = TRUE
+    validation_query: |
+      SELECT country_code, COUNT(*) as tax_id_count
+      FROM ref_identifier_type
+      WHERE is_tax_identifier = TRUE
+        AND is_active = TRUE
+        AND country_code IS NOT NULL
+        AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+      GROUP BY country_code
+      HAVING COUNT(*) != 1
+  
+  - rule_id: "DQ002"
+    rule_name: "Valid Regex Syntax"
+    rule_type: "format"
+    severity: "error"
+    condition: "format_regex must be valid POSIX ERE syntax"
+    validation_query: |
+      -- Validate via application code; SQL cannot validate regex syntax
+      SELECT identifier_type_id, identifier_type_code, format_regex
+      FROM ref_identifier_type
+      WHERE format_regex IS NOT NULL
+  
+  - rule_id: "DQ003"
+    rule_name: "Example Matches Format"
+    rule_type: "consistency"
+    severity: "warning"
+    condition: "format_example should match format_regex if both are provided"
+    validation_query: |
+      SELECT identifier_type_id, identifier_type_code, format_regex, format_example
+      FROM ref_identifier_type
+      WHERE format_regex IS NOT NULL
+        AND format_example IS NOT NULL
+        AND format_example !~ format_regex
+  
+  - rule_id: "DQ004"
+    rule_name: "Temporal Overlap Check"
+    rule_type: "consistency"
+    severity: "error"
+    condition: |
+      Same identifier_type_code for same country should not have overlapping
+      validity periods (effective_from to effective_to)
+    validation_query: |
+      SELECT a.identifier_type_id, a.identifier_type_code, a.country_code
+      FROM ref_identifier_type a
+      JOIN ref_identifier_type b
+        ON a.identifier_type_code = b.identifier_type_code
+        AND COALESCE(a.country_code, '') = COALESCE(b.country_code, '')
+        AND a.identifier_type_id < b.identifier_type_id
+      WHERE a.effective_from <= COALESCE(b.effective_to, '9999-12-31')
+        AND COALESCE(a.effective_to, '9999-12-31') >= b.effective_from
+  
+  - rule_id: "DQ005"
+    rule_name: "Length Constraints Match Regex"
+    rule_type: "consistency"
+    severity: "warning"
+    condition: |
+      min_length and max_length should be consistent with format_regex
+      implied length constraints
+    validation_query: |
+      -- Manual review required; document inconsistencies
+      SELECT identifier_type_id, identifier_type_code,
+             format_regex, min_length, max_length
+      FROM ref_identifier_type
+      WHERE format_regex IS NOT NULL
+        AND (min_length IS NOT NULL OR max_length IS NOT NULL)
+
+# -----------------------------------------------------------------------------
+# INTEGRATION POINTS
+# -----------------------------------------------------------------------------
+integration:
+  foreign_key_references:
+    - table: party_identifier
+      column: identifier_type_id
+      description: "Links party identifiers to their type definitions"
+    
+    - table: registration
+      column: identifier_type_id
+      description: "Registration-specific identifier type"
+  
+  validation_service:
+    endpoint: "/api/v1/validation/identifier"
+    description: |
+      REST endpoint for identifier validation using ref_identifier_type rules.
+      Accepts: {identifier_type_code, country_code, identifier_value}
+      Returns: {valid: boolean, errors: string[], format_description: string}
+  
+  migration_notes:
+    - note: |
+        Existing hardcoded format validations in party_identifier table should
+        be replaced with runtime lookups to ref_identifier_type.format_regex
+    - note: |
+        Country-specific identifier columns (e.g., party.tin, party.vat_number)
+        should be migrated to party_identifier junction table pattern
+
+# -----------------------------------------------------------------------------
+# CHANGE LOG
+# -----------------------------------------------------------------------------
+change_log:
+  - version: "1.0.0"
+    date: "2025-12-10"
+    author: "TA-RDM L2 Generalization"
+    changes:
+      - "Initial table creation"
+      - "Added universal types: PASSPORT, EORI"
+      - "Added Malta identifiers: TIN, TIN_MALTESE, VAT, NATID, SSC, ROC"
+      - "Added Sri Lanka identifiers: TIN, NIC_OLD, NIC_NEW, BRN, VAT"
+      - "Added Moldova identifiers: IDNO, IDNP, VAT"
+      - "Added Lebanon identifiers: TIN, VAT, CR, NATID"

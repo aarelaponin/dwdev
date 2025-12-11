@@ -1,0 +1,1614 @@
+# =============================================================================
+# Tax Administration Reference Data Model (TA-RDM)
+# YAML Schema Definition v1.0
+# =============================================================================
+#
+# This document defines the structure and conventions for the TA-RDM YAML files.
+# It serves as both documentation and validation schema for the data model.
+#
+# Purpose:
+#   - Define all possible properties and their meanings
+#   - Establish naming conventions and standards
+#   - Enable automated validation and code generation
+#   - Document best practices for model authors
+#
+# Usage:
+#   - Use this schema to validate actual model YAML files
+#   - Reference this when creating new domain definitions
+#   - Extend carefully with backward compatibility in mind
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# ROOT STRUCTURE
+# -----------------------------------------------------------------------------
+# The root of every TA-RDM YAML file must contain these top-level sections:
+
+root_structure:
+  metadata:
+    required: true
+    description: "Model-level metadata and versioning information"
+
+  domains:
+    required: true
+    description: "Collection of business domain definitions"
+    type: "array"
+
+  reference_data:
+    required: false
+    description: "Static reference/lookup tables"
+    type: "array"
+
+  business_rules:
+    required: false
+    description: "Cross-domain business rules and constraints"
+    type: "array"
+
+  data_quality_rules:
+    required: false
+    description: "Data quality validation rules"
+    type: "array"
+
+  integrations:
+    required: false
+    description: "External system integration points"
+    type: "array"
+
+  security_policies:
+    required: false
+    description: "Security and access control policies"
+    type: "array"
+
+# -----------------------------------------------------------------------------
+# METADATA SECTION
+# -----------------------------------------------------------------------------
+# Provides context about the entire model
+
+metadata:
+  properties:
+    model_name:
+      type: "string"
+      required: true
+      description: "Human-readable name of the data model"
+      example: "Tax Administration Reference Data Model"
+
+    model_code:
+      type: "string"
+      required: true
+      pattern: "^[A-Z0-9_-]+$"
+      description: "Short code/identifier for the model"
+      example: "TA-RDM"
+
+    version:
+      type: "string"
+      required: true
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      description: "Semantic version number (major.minor.patch)"
+      example: "1.0.0"
+
+    version_date:
+      type: "date"
+      required: true
+      format: "YYYY-MM-DD"
+      description: "Date of this version"
+      example: "2025-11-04"
+
+    description:
+      type: "string"
+      required: true
+      description: "Detailed description of the model purpose and scope"
+      multiline: true
+
+    authors:
+      type: "array"
+      required: true
+      description: "List of model authors/contributors"
+      items:
+        type: "string"
+      example: ["Aare Keeman", "Moldova SRS Team"]
+
+    organization:
+      type: "string"
+      required: false
+      description: "Organization responsible for the model"
+      example: "GovStack Initiative"
+
+    license:
+      type: "string"
+      required: false
+      description: "License under which the model is published"
+      example: "CC-BY-4.0"
+
+    govstack_alignment:
+      type: "array"
+      required: false
+      description: "GovStack Building Blocks this model aligns with"
+      items:
+        type: "string"
+      example: ["Registration BB", "Payments BB", "Workflow BB"]
+
+    standards:
+      type: "object"
+      required: true
+      description: "Technical standards and conventions used"
+      properties:
+        database_platform:
+          type: "string"
+          description: "Primary target database platform"
+          example: "PostgreSQL 14+"
+
+        naming_convention:
+          type: "string"
+          enum: ["snake_case", "camelCase", "PascalCase"]
+          description: "Naming convention for database objects"
+          default: "snake_case"
+
+        primary_key_pattern:
+          type: "string"
+          description: "Pattern for primary key column names"
+          example: "{table_name}_id"
+
+        foreign_key_pattern:
+          type: "string"
+          description: "Pattern for foreign key column names"
+          example: "{referenced_table}_id"
+
+        audit_columns:
+          type: "array"
+          description: "Standard audit columns required on all tables"
+          items:
+            type: "string"
+          example: ["created_by", "created_date", "modified_by", "modified_date"]
+
+        temporal_columns:
+          type: "array"
+          description: "Standard temporal columns for historization"
+          items:
+            type: "string"
+          example: ["valid_from", "valid_to", "is_current"]
+
+        soft_delete:
+          type: "object"
+          description: "Soft delete pattern if used"
+          properties:
+            enabled:
+              type: "boolean"
+            column_name:
+              type: "string"
+              example: "deleted_at"
+
+        internationalization:
+          type: "object"
+          description: "i18n approach for multi-language support"
+          properties:
+            enabled:
+              type: "boolean"
+            default_language:
+              type: "string"
+              example: "en"
+            supported_languages:
+              type: "array"
+              items:
+                type: "string"
+              example: ["en", "ru", "ro"]
+
+    changelog:
+      type: "array"
+      required: false
+      description: "Version history and change log"
+      items:
+        type: "object"
+        properties:
+          version:
+            type: "string"
+          date:
+            type: "date"
+          author:
+            type: "string"
+          changes:
+            type: "array"
+            items:
+              type: "string"
+
+  aspects:
+    - name: auditable
+      description: "Standard audit trail columns for tracking data changes"
+      applies_to: "all_tables"  # or specify table patterns
+      columns:
+        - name: created_by
+          type: varchar(100)
+          description: "User ID who created this record. Tracks data lineage and supports audit trails."
+          constraints:
+            not_null: true
+
+        - name: created_date
+          type: timestamp with time zone
+          description: "Timestamp when record was created. Automatically set on insert."
+          constraints:
+            not_null: true
+            default: CURRENT_TIMESTAMP
+
+        - name: modified_by
+          type: varchar(100)
+          description: "User ID who last modified this record. Null if never modified."
+          constraints:
+            not_null: false
+
+        - name: modified_date
+          type: timestamp with time zone
+          description: "Timestamp of last modification. Null if never modified."
+          constraints:
+            not_null: false
+
+    - name: temporal
+      description: "Effective dating columns for time-variant data"
+      applies_to: "opt_in"  # Only tables that explicitly request it
+      columns:
+        - name: valid_from
+          type: date
+          description: "Start date of validity period for this version."
+          constraints:
+            not_null: true
+
+        - name: valid_to
+          type: date
+          description: "End date of validity period. Null for current version."
+          constraints:
+            not_null: false
+
+        - name: is_current
+          type: boolean
+          description: "Flag indicating if this is the current active version."
+          constraints:
+            not_null: true
+            default: true
+
+    - name: soft_deletable
+      description: "Soft delete support for tables requiring deletion tracking"
+      applies_to: "opt_in"
+      columns:
+        - name: is_deleted
+          type: boolean
+          description: "Soft delete flag. True if record is logically deleted."
+          constraints:
+            not_null: true
+            default: false
+
+        - name: deleted_by
+          type: varchar(100)
+          description: "User ID who deleted this record."
+          constraints:
+            not_null: false
+
+        - name: deleted_date
+          type: timestamp with time zone
+          description: "Timestamp when record was deleted."
+          constraints:
+            not_null: false
+
+    - name: versioned
+      description: "Version tracking for documents and templates"
+      columns:
+        - name: version_number
+        - name: version_comment
+
+    - name: geospatial
+      description: "Geographic coordinates for addresses"
+      columns:
+        - name: latitude
+        - name: longitude
+        - name: geolocation  # PostGIS geometry type
+
+    - name: multilingual
+      description: "Multi-language support for descriptions"
+      columns:
+        - name: description_en
+        - name: description_ru
+        - name: description_ro
+
+    - name: workflow_enabled
+      description: "Workflow state tracking"
+      columns:
+        - name: workflow_status
+        - name: workflow_step
+        - name: assigned_to
+
+# -----------------------------------------------------------------------------
+# DOMAIN SECTION
+# -----------------------------------------------------------------------------
+# Logical grouping of related tables and business functionality
+
+domain:
+  properties:
+    name:
+      type: "string"
+      required: true
+      pattern: "^[a-z][a-z0-9_]*$"
+      description: "Domain name in snake_case"
+      example: "party_management"
+
+    code:
+      type: "string"
+      required: true
+      pattern: "^[A-Z]{2,5}$"
+      description: "Short code for the domain (2-5 uppercase letters)"
+      example: "PM"
+
+    display_name:
+      type: "string"
+      required: true
+      description: "Human-readable domain name"
+      example: "Party Management"
+
+    description:
+      type: "string"
+      required: true
+      multiline: true
+      description: "Detailed description of domain purpose and scope"
+
+    business_owner:
+      type: "string"
+      required: false
+      description: "Business department/role owning this domain"
+      example: "Registration Department"
+
+    technical_owner:
+      type: "string"
+      required: false
+      description: "Technical team responsible for this domain"
+      example: "Core Systems Team"
+
+    domain_events:
+      type: "array"
+      required: false
+      description: "Domain events published by this domain"
+      items:
+        type: "object"
+        properties:
+          event_name:
+            type: "string"
+          description:
+            type: "string"
+          payload_schema:
+            type: "string"
+
+    schemas:
+      type: "array"
+      required: true
+      description: "Database schemas within this domain"
+      items:
+        type: "object"
+        # See SCHEMA definition below
+
+    dependencies:
+      type: "array"
+      required: false
+      description: "Other domains this domain depends on"
+      items:
+        type: "string"
+      example: ["reference_data"]
+
+    tags:
+      type: "array"
+      required: false
+      description: "Classification tags for the domain"
+      items:
+        type: "string"
+      example: ["core", "gdpr_relevant", "high_volume"]
+
+# -----------------------------------------------------------------------------
+# SCHEMA SECTION
+# -----------------------------------------------------------------------------
+# Database schema (namespace) containing related tables
+
+schema:
+  properties:
+    schema_name:
+      type: "string"
+      required: true
+      pattern: "^[a-z][a-z0-9_]*$"
+      description: "Database schema name"
+      example: "party"
+
+    description:
+      type: "string"
+      required: true
+      description: "Purpose and contents of this schema"
+
+    owner_role:
+      type: "string"
+      required: false
+      description: "Database role that owns this schema"
+      example: "tax_admin_owner"
+
+    access_roles:
+      type: "array"
+      required: false
+      description: "Roles with access to this schema"
+      items:
+        type: "object"
+        properties:
+          role_name:
+            type: "string"
+          permissions:
+            type: "array"
+            items:
+              type: "string"
+              enum: ["SELECT", "INSERT", "UPDATE", "DELETE"]
+
+    tables:
+      type: "array"
+      required: true
+      description: "Tables within this schema"
+      items:
+        type: "object"
+        # See TABLE definition below
+
+# -----------------------------------------------------------------------------
+# TABLE SECTION
+# -----------------------------------------------------------------------------
+# Individual database table definition
+
+table:
+  properties:
+    name:
+      type: "string"
+      required: true
+      pattern: "^[a-z][a-z0-9_]*$"
+      description: "Table name in snake_case"
+      example: "party"
+
+    display_name:
+      type: "string"
+      required: false
+      description: "Human-readable table name"
+      example: "Party"
+
+    description:
+      type: "string"
+      required: true
+      multiline: true
+      description: "Detailed description of table purpose and contents"
+
+    business_rule:
+      type: "string"
+      required: false
+      multiline: true
+      description: "Business rules and constraints enforced by this table"
+
+    type:
+      type: "string"
+      required: false
+      enum: ["transaction", "master", "reference", "history", "staging", "aggregate"]
+      description: "Type/purpose of the table"
+      default: "transaction"
+
+    tags:
+      type: "array"
+      required: false
+      description: "Classification tags for the table"
+      items:
+        type: "string"
+      example: ["core", "gdpr_sensitive", "high_volume", "pii_data"]
+
+    estimated_rows:
+      type: "object"
+      required: false
+      description: "Estimated row counts for capacity planning"
+      properties:
+        initial:
+          type: "integer"
+          description: "Expected initial row count"
+        annual_growth:
+          type: "integer"
+          description: "Expected annual growth"
+        five_year:
+          type: "integer"
+          description: "Projected count after 5 years"
+
+    columns:
+      type: "array"
+      required: true
+      description: "Column definitions"
+      items:
+        type: "object"
+        # See COLUMN definition below
+
+    primary_key:
+      type: "object"
+      required: false
+      description: "Primary key definition (can also be on column level)"
+      properties:
+        name:
+          type: "string"
+        columns:
+          type: "array"
+          items:
+            type: "string"
+
+    foreign_keys:
+      type: "array"
+      required: false
+      description: "Foreign key constraints"
+      items:
+        type: "object"
+        properties:
+          name:
+            type: "string"
+          columns:
+            type: "array"
+            items:
+              type: "string"
+          referenced_table:
+            type: "string"
+          referenced_columns:
+            type: "array"
+            items:
+              type: "string"
+          on_delete:
+            type: "string"
+            enum: ["CASCADE", "SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION"]
+          on_update:
+            type: "string"
+            enum: ["CASCADE", "SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION"]
+
+    indexes:
+      type: "array"
+      required: false
+      description: "Index definitions"
+      items:
+        type: "object"
+        # See INDEX definition below
+
+    constraints:
+      type: "array"
+      required: false
+      description: "Check constraints and other table-level constraints"
+      items:
+        type: "object"
+        properties:
+          name:
+            type: "string"
+          type:
+            type: "string"
+            enum: ["check", "unique", "exclude"]
+          condition:
+            type: "string"
+          columns:
+            type: "array"
+            items:
+              type: "string"
+          description:
+            type: "string"
+
+    partitioning:
+      type: "object"
+      required: false
+      description: "Table partitioning strategy"
+      properties:
+        type:
+          type: "string"
+          enum: ["range", "list", "hash"]
+        column:
+          type: "string"
+        strategy:
+          type: "string"
+          description: "Partitioning strategy details"
+          example: "monthly"
+        retention:
+          type: "string"
+          description: "Data retention period"
+          example: "10 years"
+
+    archiving:
+      type: "object"
+      required: false
+      description: "Data archiving strategy"
+      properties:
+        enabled:
+          type: "boolean"
+        retention_period:
+          type: "string"
+          example: "7 years"
+        archive_table:
+          type: "string"
+        archive_trigger:
+          type: "string"
+          description: "Condition for archiving"
+
+    row_level_security:
+      type: "object"
+      required: false
+      description: "Row-level security policies"
+      properties:
+        enabled:
+          type: "boolean"
+        policy:
+          type: "string"
+          multiline: true
+          description: "SQL policy definition"
+
+    triggers:
+      type: "array"
+      required: false
+      description: "Database triggers on this table"
+      items:
+        type: "object"
+        properties:
+          name:
+            type: "string"
+          timing:
+            type: "string"
+            enum: ["BEFORE", "AFTER", "INSTEAD OF"]
+          events:
+            type: "array"
+            items:
+              type: "string"
+              enum: ["INSERT", "UPDATE", "DELETE"]
+          for_each:
+            type: "string"
+            enum: ["ROW", "STATEMENT"]
+          condition:
+            type: "string"
+          function:
+            type: "string"
+
+    relationships:
+      type: "array"
+      required: false
+      description: "Logical relationships with other tables"
+      items:
+        type: "object"
+        # See RELATIONSHIP definition below
+
+    documentation:
+      type: "object"
+      required: false
+      properties:
+        examples:
+          type: "array"
+          description: "Example queries and use cases"
+        diagram_url:
+          type: "string"
+          description: "URL to ERD diagram"
+        confluence_page:
+          type: "string"
+          description: "Link to detailed documentation"
+
+# -----------------------------------------------------------------------------
+# COLUMN SECTION
+# -----------------------------------------------------------------------------
+# Individual column definition
+
+column:
+  properties:
+    name:
+      type: "string"
+      required: true
+      pattern: "^[a-z][a-z0-9_]*$"
+      description: "Column name in snake_case"
+      example: "party_id"
+
+    display_name:
+      type: "string"
+      required: false
+      description: "Human-readable column name"
+      example: "Party ID"
+
+    type:
+      type: "string"
+      required: true
+      description: "Database data type"
+      examples:
+        - "bigint"
+        - "integer"
+        - "varchar(100)"
+        - "char(3)"
+        - "decimal(19,2)"
+        - "numeric(10,4)"
+        - "boolean"
+        - "date"
+        - "timestamp"
+        - "timestamp with time zone"
+        - "uuid"
+        - "text"
+        - "json"
+        - "jsonb"
+        - "xml"
+        - "bytea"
+
+    description:
+      type: "string"
+      required: true
+      description: "Detailed column description"
+
+    business_name:
+      type: "string"
+      required: false
+      description: "Business terminology for this column"
+
+    business_rule:
+      type: "string"
+      required: false
+      description: "Business rules related to this column"
+
+    usage_note:
+      type: "string"
+      required: false
+      description: "Important usage notes or caveats"
+
+    constraints:
+      type: "object"
+      required: false
+      description: "Column-level constraints"
+      properties:
+        primary_key:
+          type: "boolean"
+          default: false
+
+        auto_increment:
+          type: "boolean"
+          default: false
+
+        not_null:
+          type: "boolean"
+          default: false
+
+        unique:
+          type: "boolean"
+          default: false
+
+        default:
+          type: "string"
+          description: "Default value expression"
+          examples:
+            - "CURRENT_TIMESTAMP"
+            - "'ACTIVE'"
+            - "gen_random_uuid()"
+            - "0"
+            - "true"
+
+        check:
+          type: "string"
+          description: "Check constraint expression"
+          example: "amount >= 0"
+
+        foreign_key:
+          type: "object"
+          description: "Foreign key reference"
+          properties:
+            table:
+              type: "string"
+            column:
+              type: "string"
+            on_delete:
+              type: "string"
+              enum: ["CASCADE", "SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION"]
+            on_update:
+              type: "string"
+              enum: ["CASCADE", "SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION"]
+
+    reference_data:
+      type: "string"
+      required: false
+      description: "Name of reference data table if this is a foreign key to reference data"
+      example: "ref_country"
+
+    validation:
+      type: "object"
+      required: false
+      description: "Validation rules for this column"
+      properties:
+        pattern:
+          type: "string"
+          description: "Regex pattern for validation"
+          example: "^[0-9]{13}$"
+
+        min_length:
+          type: "integer"
+
+        max_length:
+          type: "integer"
+
+        min_value:
+          type: "number"
+
+        max_value:
+          type: "number"
+
+        allowed_values:
+          type: "array"
+          items:
+            type: "string"
+
+        checksum:
+          type: "string"
+          description: "Checksum algorithm"
+          example: "mod11"
+
+        custom_validation:
+          type: "string"
+          description: "SQL function for custom validation"
+
+    security:
+      type: "object"
+      required: false
+      description: "Security requirements for this column"
+      properties:
+        classification:
+          type: "string"
+          enum: ["public", "internal", "confidential", "restricted"]
+          description: "Data classification level"
+
+        encryption:
+          type: "string"
+          description: "Encryption algorithm if required"
+          example: "AES-256"
+
+        masking:
+          type: "object"
+          description: "Data masking for non-production environments"
+          properties:
+            enabled:
+              type: "boolean"
+            method:
+              type: "string"
+              enum: ["hash", "random", "null", "partial", "custom"]
+            preserve_format:
+              type: "boolean"
+
+        pii:
+          type: "boolean"
+          description: "Contains personally identifiable information"
+
+        gdpr_relevant:
+          type: "boolean"
+          description: "Subject to GDPR regulations"
+
+    indexing:
+      type: "array"
+      required: false
+      description: "Index hints for this column"
+      items:
+        type: "object"
+        properties:
+          type:
+            type: "string"
+            enum: ["btree", "hash", "gin", "gist", "brin"]
+          name:
+            type: "string"
+          unique:
+            type: "boolean"
+          where:
+            type: "string"
+            description: "Partial index condition"
+          expression:
+            type: "string"
+            description: "Expression index"
+
+    examples:
+      type: "array"
+      required: false
+      description: "Example values"
+      items:
+        type: "string"
+
+    derived:
+      type: "object"
+      required: false
+      description: "If this is a computed/generated column"
+      properties:
+        expression:
+          type: "string"
+        stored:
+          type: "boolean"
+
+    internationalization:
+      type: "object"
+      required: false
+      description: "Multi-language support for this column"
+      properties:
+        translatable:
+          type: "boolean"
+        translation_table:
+          type: "string"
+
+# -----------------------------------------------------------------------------
+# INDEX SECTION
+# -----------------------------------------------------------------------------
+# Database index definition
+
+index:
+  properties:
+    name:
+      type: "string"
+      required: true
+      pattern: "^idx_[a-z][a-z0-9_]*$"
+      description: "Index name with idx_ prefix"
+      example: "idx_party_name"
+
+    columns:
+      type: "array"
+      required: true
+      description: "Columns in the index"
+      items:
+        type: "string"
+      example: ["party_type_code", "party_status_code"]
+
+    type:
+      type: "string"
+      required: false
+      enum: ["btree", "hash", "gin", "gist", "brin", "spgist"]
+      default: "btree"
+      description: "Index type"
+
+    unique:
+      type: "boolean"
+      required: false
+      default: false
+      description: "Whether this is a unique index"
+
+    where:
+      type: "string"
+      required: false
+      description: "Partial index condition"
+      example: "is_current = true"
+
+    expression:
+      type: "string"
+      required: false
+      description: "Expression index definition"
+      example: "to_tsvector('english', party_name)"
+
+    include:
+      type: "array"
+      required: false
+      description: "Additional columns to include (covering index)"
+      items:
+        type: "string"
+
+    description:
+      type: "string"
+      required: false
+      description: "Purpose and rationale for this index"
+
+    performance_note:
+      type: "string"
+      required: false
+      description: "Performance characteristics or benchmarks"
+
+# -----------------------------------------------------------------------------
+# RELATIONSHIP SECTION
+# -----------------------------------------------------------------------------
+# Logical relationship between tables
+
+relationship:
+  properties:
+    type:
+      type: "string"
+      required: true
+      enum: ["one_to_one", "one_to_many", "many_to_many", "inheritance"]
+      description: "Type of relationship"
+
+    name:
+      type: "string"
+      required: false
+      description: "Name of the relationship"
+
+    source_table:
+      type: "string"
+      required: false
+      description: "Source table (usually implicit from context)"
+
+    source_column:
+      type: "string"
+      required: true
+      description: "Source column(s)"
+
+    target_table:
+      type: "string"
+      required: true
+      description: "Target table"
+
+    target_column:
+      type: "string"
+      required: true
+      description: "Target column(s)"
+
+    cardinality:
+      type: "string"
+      required: true
+      pattern: "^(0|1|N):(0|1|N)$"
+      description: "Relationship cardinality"
+      examples: ["1:1", "1:N", "0:N", "N:M"]
+
+    description:
+      type: "string"
+      required: true
+      description: "Business meaning of the relationship"
+
+    referential_integrity:
+      type: "string"
+      required: false
+      enum: ["enforced", "not_enforced", "application_level"]
+      default: "enforced"
+
+    cascade_behavior:
+      type: "object"
+      required: false
+      properties:
+        on_delete:
+          type: "string"
+          enum: ["CASCADE", "SET NULL", "RESTRICT"]
+        on_update:
+          type: "string"
+          enum: ["CASCADE", "SET NULL", "RESTRICT"]
+
+# -----------------------------------------------------------------------------
+# REFERENCE DATA SECTION
+# -----------------------------------------------------------------------------
+# Static lookup/reference tables
+
+reference_data:
+  properties:
+    name:
+      type: "string"
+      required: true
+      pattern: "^ref_[a-z][a-z0-9_]*$"
+      description: "Reference table name with ref_ prefix"
+      example: "ref_country"
+
+    description:
+      type: "string"
+      required: true
+      description: "Purpose of this reference data"
+
+    type:
+      type: "string"
+      required: false
+      enum: ["static", "configurable", "iso_standard", "local_standard"]
+      description: "Type of reference data"
+
+    schema:
+      type: "string"
+      required: false
+      description: "Database schema containing this reference table"
+      default: "reference"
+
+    columns:
+      type: "array"
+      required: true
+      description: "Column definitions"
+      items:
+        type: "object"
+        properties:
+          name:
+            type: "string"
+          type:
+            type: "string"
+          primary_key:
+            type: "boolean"
+          description:
+            type: "string"
+
+    data:
+      type: "array"
+      required: false
+      description: "Initial data rows"
+      items:
+        type: "object"
+
+    source:
+      type: "string"
+      required: false
+      description: "Source of this reference data"
+      example: "ISO 3166-1"
+
+    update_frequency:
+      type: "string"
+      required: false
+      description: "How often this data changes"
+      example: "annually"
+
+# -----------------------------------------------------------------------------
+# BUSINESS RULE SECTION
+# -----------------------------------------------------------------------------
+# Cross-table business rules and constraints
+
+business_rule:
+  properties:
+    id:
+      type: "string"
+      required: true
+      pattern: "^BR-[A-Z]{2,5}-[0-9]{3,4}$"
+      description: "Unique business rule identifier"
+      example: "BR-PM-001"
+
+    domain:
+      type: "string"
+      required: true
+      description: "Domain this rule belongs to"
+
+    name:
+      type: "string"
+      required: true
+      description: "Short name for the rule"
+
+    description:
+      type: "string"
+      required: true
+      multiline: true
+      description: "Detailed description of the rule"
+
+    severity:
+      type: "string"
+      required: true
+      enum: ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+      description: "Severity level if rule is violated"
+
+    type:
+      type: "string"
+      required: false
+      enum: ["validation", "calculation", "transformation", "constraint"]
+
+    affected_tables:
+      type: "array"
+      required: false
+      items:
+        type: "string"
+
+    validation_query:
+      type: "string"
+      required: false
+      multiline: true
+      description: "SQL query to detect violations"
+
+    enforcement:
+      type: "string"
+      required: false
+      enum: ["database", "application", "manual"]
+      description: "Where/how this rule is enforced"
+
+    remediation:
+      type: "string"
+      required: false
+      description: "How to fix violations"
+
+    examples:
+      type: "array"
+      required: false
+      items:
+        type: "object"
+        properties:
+          scenario:
+            type: "string"
+          valid:
+            type: "boolean"
+          reason:
+            type: "string"
+
+# -----------------------------------------------------------------------------
+# DATA QUALITY RULE SECTION
+# -----------------------------------------------------------------------------
+# Data quality checks and monitoring
+
+data_quality_rule:
+  properties:
+    id:
+      type: "string"
+      required: true
+      pattern: "^DQ-[A-Z]{2,5}-[0-9]{3,4}$"
+      description: "Unique data quality rule identifier"
+
+    table:
+      type: "string"
+      required: true
+      description: "Table this rule applies to"
+
+    column:
+      type: "string"
+      required: false
+      description: "Specific column if applicable"
+
+    dimension:
+      type: "string"
+      required: true
+      enum: ["completeness", "accuracy", "consistency", "timeliness", "validity", "uniqueness"]
+      description: "Data quality dimension"
+
+    checks:
+      type: "array"
+      required: true
+      items:
+        type: "object"
+        properties:
+          type:
+            type: "string"
+            enum: ["not_null", "unique", "range", "format", "reference", "custom"]
+          threshold:
+            type: "number"
+            description: "Acceptable threshold (e.g., 95% for completeness)"
+          severity:
+            type: "string"
+            enum: ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+          query:
+            type: "string"
+            description: "SQL query for custom checks"
+
+    monitoring:
+      type: "object"
+      required: false
+      properties:
+        frequency:
+          type: "string"
+          enum: ["real_time", "hourly", "daily", "weekly", "monthly"]
+        alert_threshold:
+          type: "number"
+        notification:
+          type: "array"
+          items:
+            type: "string"
+
+# -----------------------------------------------------------------------------
+# INTEGRATION SECTION
+# -----------------------------------------------------------------------------
+# External system integration points
+
+integration:
+  properties:
+    name:
+      type: "string"
+      required: true
+      pattern: "^[a-z][a-z0-9_]*$"
+      description: "Integration identifier"
+
+    description:
+      type: "string"
+      required: true
+      description: "Purpose of this integration"
+
+    external_system:
+      type: "string"
+      required: true
+      description: "Name of external system"
+
+    tables:
+      type: "array"
+      required: true
+      description: "Tables involved in this integration"
+      items:
+        type: "string"
+
+    direction:
+      type: "string"
+      required: true
+      enum: ["inbound", "outbound", "bi-directional"]
+      description: "Data flow direction"
+
+    frequency:
+      type: "string"
+      required: true
+      description: "Integration frequency"
+      examples: ["real-time", "every 5 minutes", "hourly", "daily", "weekly"]
+
+    method:
+      type: "string"
+      required: true
+      enum: ["api", "file", "database", "message_queue", "etl"]
+      description: "Integration method"
+
+    api_endpoint:
+      type: "string"
+      required: false
+      description: "API endpoint if applicable"
+
+    authentication:
+      type: "string"
+      required: false
+      enum: ["oauth2", "api_key", "basic", "certificate", "none"]
+
+    data_format:
+      type: "string"
+      required: false
+      enum: ["json", "xml", "csv", "parquet", "avro"]
+
+    mapping:
+      type: "array"
+      required: false
+      description: "Field mappings"
+      items:
+        type: "object"
+        properties:
+          source_field:
+            type: "string"
+          target_field:
+            type: "string"
+          transformation:
+            type: "string"
+
+    error_handling:
+      type: "object"
+      required: false
+      properties:
+        retry_policy:
+          type: "string"
+        dead_letter_queue:
+          type: "string"
+        notification:
+          type: "array"
+          items:
+            type: "string"
+
+# -----------------------------------------------------------------------------
+# SECURITY POLICY SECTION
+# -----------------------------------------------------------------------------
+# Security and access control policies
+
+security_policy:
+  properties:
+    name:
+      type: "string"
+      required: true
+      description: "Policy name"
+
+    type:
+      type: "string"
+      required: true
+      enum: ["row_level_security", "column_masking", "encryption", "access_control"]
+
+    applies_to:
+      type: "object"
+      required: true
+      properties:
+        tables:
+          type: "array"
+          items:
+            type: "string"
+        columns:
+          type: "array"
+          items:
+            type: "string"
+
+    description:
+      type: "string"
+      required: true
+
+    policy_definition:
+      type: "string"
+      required: true
+      multiline: true
+      description: "SQL policy definition or rule expression"
+
+    roles:
+      type: "array"
+      required: false
+      description: "Roles this policy applies to"
+      items:
+        type: "string"
+
+# =============================================================================
+# NAMING CONVENTIONS
+# =============================================================================
+
+naming_conventions:
+  general:
+    - "Use snake_case for all database objects (tables, columns, indexes)"
+    - "Use singular nouns for table names (party, not parties)"
+    - "Use descriptive names, avoid abbreviations unless standard"
+    - "Maximum length: 63 characters (PostgreSQL limit)"
+
+  tables:
+    - "Table names should be singular nouns"
+    - "Use domain prefixes for clarity when needed (ref_, tmp_, stg_)"
+    - "Avoid reserved words"
+
+  columns:
+    - "Primary keys: {table_name}_id"
+    - "Foreign keys: {referenced_table}_id or descriptive name"
+    - "Booleans: is_{condition} or has_{condition}"
+    - "Dates: {event}_date (e.g., created_date, birth_date)"
+    - "Timestamps: {event}_timestamp or {event}_at"
+    - "Amounts: {type}_amount"
+    - "Codes: {type}_code"
+    - "Flags: {condition}_flag or is_{condition}"
+
+  indexes:
+    - "Primary key: pk_{table_name}"
+    - "Foreign key: fk_{table}_{referenced_table}"
+    - "Unique: uk_{table}_{columns}"
+    - "Regular: idx_{table}_{columns}"
+
+  constraints:
+    - "Check: chk_{table}_{description}"
+    - "Unique: uk_{table}_{description}"
+    - "Foreign key: fk_{table}_{referenced_table}"
+
+# =============================================================================
+# DATA TYPES GUIDE
+# =============================================================================
+
+data_types:
+  identifiers:
+    primary_keys:
+      recommended: "bigint"
+      alternative: "uuid"
+      note: "Use bigint for performance, uuid for distributed systems"
+
+    foreign_keys:
+      rule: "Must match the referenced primary key type"
+
+  strings:
+    fixed_length:
+      type: "char(n)"
+      use_case: "Country codes, fixed codes"
+      example: "char(3) for ISO country codes"
+
+    variable_length:
+      type: "varchar(n)"
+      use_case: "Most text fields with known max length"
+      example: "varchar(100) for names"
+
+    unlimited:
+      type: "text"
+      use_case: "Large text with no practical limit"
+      note: "Performance impact minimal in PostgreSQL"
+
+  numbers:
+    integers:
+      - type: "smallint"
+        range: "-32768 to 32767"
+        use_case: "Small counts, status codes"
+
+      - type: "integer"
+        range: "-2147483648 to 2147483647"
+        use_case: "Standard counts and IDs"
+
+      - type: "bigint"
+        range: "-9223372036854775808 to 9223372036854775807"
+        use_case: "Primary keys, large counts"
+
+    decimals:
+      - type: "decimal(p,s) / numeric(p,s)"
+        use_case: "Exact decimal numbers (money, tax amounts)"
+        example: "decimal(19,2) for currency"
+        note: "Always use for financial calculations"
+
+      - type: "real / double precision"
+        use_case: "Scientific calculations, approximate values"
+        warning: "Never use for money!"
+
+  temporal:
+    - type: "date"
+      format: "YYYY-MM-DD"
+      use_case: "Birth dates, tax periods"
+
+    - type: "timestamp"
+      format: "YYYY-MM-DD HH:MM:SS"
+      use_case: "Event timestamps without timezone"
+
+    - type: "timestamp with time zone"
+      format: "YYYY-MM-DD HH:MM:SS+TZ"
+      use_case: "Event timestamps (preferred)"
+      note: "Recommended for all timestamps"
+
+    - type: "interval"
+      use_case: "Time durations"
+
+  boolean:
+    type: "boolean"
+    values: "true, false, null"
+    use_case: "Flags and binary states"
+    naming: "is_{condition} or has_{condition}"
+
+  other:
+    - type: "uuid"
+      use_case: "Globally unique identifiers"
+      note: "Good for distributed systems"
+
+    - type: "json / jsonb"
+      use_case: "Semi-structured data"
+      note: "Prefer jsonb for better performance"
+
+    - type: "xml"
+      use_case: "XML documents"
+
+    - type: "bytea"
+      use_case: "Binary data"
+
+# =============================================================================
+# BEST PRACTICES
+# =============================================================================
+
+best_practices:
+  general:
+    - "Always include audit columns (created_by, created_date, etc.)"
+    - "Use temporal columns for historization"
+    - "Implement soft deletes where data cannot be physically removed"
+    - "Document all business rules and constraints"
+    - "Use meaningful names, avoid cryptic abbreviations"
+    - "Keep tables normalized unless performance requires denormalization"
+
+  performance:
+    - "Create indexes on foreign keys"
+    - "Create indexes on frequently filtered columns"
+    - "Use partial indexes for filtered queries"
+    - "Consider covering indexes for read-heavy queries"
+    - "Partition large tables (>10M rows)"
+    - "Use appropriate data types (smaller is faster)"
+
+  security:
+    - "Classify data sensitivity (public, internal, confidential, restricted)"
+    - "Encrypt PII and sensitive data at rest"
+    - "Implement row-level security where needed"
+    - "Use masking for non-production environments"
+    - "Log all access to sensitive data"
+
+  maintainability:
+    - "Version control all schema changes"
+    - "Use migration tools (Flyway, Liquibase)"
+    - "Document complex business logic"
+    - "Create views for complex queries"
+    - "Maintain data dictionary in sync with schema"
+
+  data_quality:
+    - "Use NOT NULL where appropriate"
+    - "Implement check constraints for data validation"
+    - "Use foreign keys to enforce referential integrity"
+    - "Create unique constraints for natural keys"
+    - "Implement data quality monitoring"
+
+# =============================================================================
+# VALIDATION RULES
+# =============================================================================
+
+validation_rules:
+  required_sections:
+    - metadata
+    - domains
+
+  required_metadata_fields:
+    - model_name
+    - model_code
+    - version
+    - version_date
+    - description
+    - authors
+    - standards
+
+  table_requirements:
+    - name
+    - description
+    - columns
+    - "At least one primary key column"
+
+  column_requirements:
+    - name
+    - type
+    - description
+
+  naming_validation:
+    tables:
+      pattern: "^[a-z][a-z0-9_]*$"
+      max_length: 63
+
+    columns:
+      pattern: "^[a-z][a-z0-9_]*$"
+      max_length: 63
+
+    indexes:
+      pattern: "^(idx|pk|fk|uk)_[a-z][a-z0-9_]*$"
+      max_length: 63
+
+# =============================================================================
+# VERSION HISTORY
+# =============================================================================
+
+version_history:
+  - version: "1.0.0"
+    date: "2025-11-04"
+    author: "Aare Keeman"
+    changes:
+      - "Initial schema definition"
+      - "Complete structure for all sections"
+      - "Documentation and best practices"
+      - "Validation rules and conventions"

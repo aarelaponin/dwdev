@@ -1,0 +1,885 @@
+# =============================================================================
+# Malta L3 Warehouse: fact_customs_declaration Fact Table
+# =============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Phase: C - L3 Warehouse Model Development
+# Step: 11b - Financial & Customs Facts
+# =============================================================================
+
+fact_table:
+  name: "fact_customs_declaration"
+  schema: "warehouse"
+  description: |
+    Transactional fact table tracking customs declarations for import/export
+    analysis. Each row represents a single customs declaration at the SAD
+    (Single Administrative Document) header level.
+    
+    The SAD is the standard EU document for customs declarations, containing
+    information about goods, parties, procedures, and duties payable.
+    
+    Key Systems Integration:
+    - AIS (Automated Import System) for import declarations
+    - AES (Automated Export System) for export declarations
+    - NCTS-P5 for transit movements
+    - EMCS for excise movements
+    
+    Declaration Types:
+    - IM: Import declarations (H1-H7 categories)
+    - EX: Export declarations (B1-B4 categories)
+    - CO: Transhipment
+    - EU: Union goods declarations
+    
+    Note: This fact is at the SAD HEADER level. Line item detail is not
+    included as it would create a different grain. A separate fact table
+    (fact_customs_declaration_item) could be created for line-level analysis.
+    
+  fact_type: "TRANSACTIONAL"
+  grain: "One row per customs declaration (SAD header)"
+  
+  business_context:
+    domain: "Malta Customs"
+    primary_use: "Duty/VAT collection analysis, trade statistics, procedure utilization"
+    usage_pattern: "High read volume for trade dashboards and compliance monitoring"
+    refresh: "Daily incremental based on L2 modified_date"
+    
+  estimated_volume:
+    initial_rows: 2000000
+    annual_growth_rows: 500000
+    average_daily_inserts: 1400
+    note: |
+      Malta processes ~500K declarations annually.
+      Includes both import and export declarations.
+    
+  # ===========================================================================
+  # DIMENSION FOREIGN KEYS
+  # ===========================================================================
+  dimension_keys:
+    - name: "declarant_party_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_party"
+      description: |
+        Party submitting the declaration.
+        Usually a customs broker or self-declaring economic operator.
+      
+    - name: "importer_exporter_party_key"
+      data_type: "BIGINT"
+      nullable: true
+      dimension: "dim_party"
+      description: |
+        Actual importer or exporter if different from declarant.
+        NULL when declarant is the importer/exporter.
+      default_value: -1
+      
+    - name: "registration_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_registration"
+      description: "EORI registration of the declarant"
+      
+    - name: "customs_procedure_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_customs_procedure"
+      description: "Customs procedure code (4+2 digit format)"
+      
+    - name: "country_of_origin_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_international_country"
+      role: "Country of Origin"
+      description: "Country where goods were produced/manufactured"
+      default_value: -1
+      
+    - name: "country_of_dispatch_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_international_country"
+      role: "Country of Dispatch"
+      description: "Country from which goods were dispatched"
+      default_value: -1
+      
+    - name: "country_of_destination_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_international_country"
+      role: "Country of Destination"
+      description: "Country where goods are destined"
+      default_value: -1
+      
+    - name: "risk_category_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_risk_category"
+      description: "Risk assessment category assigned to declaration"
+      default_value: -1
+
+  # ===========================================================================
+  # ROLE-PLAYING DATE KEYS
+  # ===========================================================================
+  date_keys:
+    - name: "acceptance_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Acceptance Date"
+      description: "Date declaration was accepted by customs"
+      format: "YYYYMMDD smart key"
+      source: "customs_declaration.acceptance_date"
+      
+    - name: "release_date_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Release Date"
+      description: "Date goods were released"
+      format: "YYYYMMDD smart key"
+      source: "customs_declaration.release_date"
+      default_value: -1
+      
+    - name: "payment_date_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Payment Date"
+      description: "Date customs duties were paid"
+      format: "YYYYMMDD smart key"
+      source: "customs_declaration.payment_date"
+      default_value: -1
+
+  # ===========================================================================
+  # DEGENERATE DIMENSIONS
+  # ===========================================================================
+  degenerate_dimensions:
+    - name: "declaration_source_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "L2 customs_declaration_id - primary key from source"
+      source: "malta_customs.customs_declaration.declaration_id"
+      role: "PRIMARY_KEY"
+      
+    - name: "mrn"
+      data_type: "VARCHAR(18)"
+      nullable: false
+      description: |
+        Movement Reference Number - unique EU-wide identifier.
+        Format: YYCCnnnnnnnnnnnnnnC (e.g., 24MT000000000000001)
+        YY=Year, CC=Country, 14 alphanumeric + check digit
+      source: "customs_declaration.mrn"
+      pattern: "^[0-9]{2}[A-Z]{2}[A-Z0-9]{14}$"
+      
+    - name: "lrn"
+      data_type: "VARCHAR(22)"
+      nullable: true
+      description: "Local Reference Number - declarant's internal reference"
+      source: "customs_declaration.lrn"
+      
+    - name: "declaration_type_code"
+      data_type: "VARCHAR(5)"
+      nullable: false
+      description: "Declaration type"
+      source: "customs_declaration.declaration_type_code"
+      allowed_values:
+        - "IM"   # Import
+        - "EX"   # Export
+        - "CO"   # Transhipment
+        - "EU"   # Union goods
+        
+    - name: "declaration_category_code"
+      data_type: "VARCHAR(5)"
+      nullable: false
+      description: |
+        UCC declaration category.
+        Import: H1-H7, I1 (simplified)
+        Export: B1-B4
+      source: "customs_declaration.declaration_category_code"
+      allowed_values:
+        - "H1"   # Release for free circulation
+        - "H2"   # Customs warehousing
+        - "H3"   # Temporary admission
+        - "H4"   # Inward processing
+        - "H5"   # End-use
+        - "H6"   # Admission to free zone
+        - "H7"   # Low-value consignment
+        - "I1"   # Simplified declaration
+        - "I2"   # Entry in records
+        - "B1"   # Standard export
+        - "B2"   # Simplified export
+        - "B3"   # Re-export
+        - "B4"   # Exit summary
+        
+    - name: "declarant_eori"
+      data_type: "VARCHAR(17)"
+      nullable: false
+      description: "Declarant's EORI number"
+      source: "customs_declaration.declarant_eori"
+      pattern: "^MT[0-9]{8}$"
+      
+    - name: "importer_exporter_eori"
+      data_type: "VARCHAR(17)"
+      nullable: true
+      description: "Importer/Exporter EORI if different from declarant"
+      source: "customs_declaration.importer_exporter_eori"
+      
+    - name: "transport_mode_code"
+      data_type: "VARCHAR(2)"
+      nullable: true
+      description: "Mode of transport at border"
+      source: "customs_declaration.transport_mode_code"
+      allowed_values:
+        - "1"    # Sea transport
+        - "2"    # Rail transport
+        - "3"    # Road transport
+        - "4"    # Air transport
+        - "5"    # Mail (postal)
+        - "7"    # Fixed transport (pipeline)
+        - "8"    # Inland waterway
+        - "9"    # Own propulsion
+        
+    - name: "customs_office_code"
+      data_type: "VARCHAR(10)"
+      nullable: false
+      description: "Customs office code where declaration processed"
+      source: "customs_declaration.customs_office_code"
+      pattern: "^MT[0-9]{6}$"
+      
+    - name: "declaration_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Current status of the declaration"
+      source: "customs_declaration.declaration_status_code"
+      allowed_values:
+        - "SUBMITTED"
+        - "ACCEPTED"
+        - "UNDER_CONTROL"
+        - "RELEASED"
+        - "CLEARED"
+        - "REJECTED"
+        - "INVALIDATED"
+        - "CANCELLED"
+        
+    - name: "payment_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Status of duty payment"
+      source: "customs_declaration.payment_status_code"
+      allowed_values:
+        - "PENDING"
+        - "PAID"
+        - "GUARANTEED"
+        - "DEFERRED"
+        - "EXEMPT"
+        - null
+
+  # ===========================================================================
+  # ADDITIVE MEASURES - QUANTITIES
+  # ===========================================================================
+  measures_additive_quantity:
+    - name: "total_packages"
+      data_type: "INT"
+      nullable: true
+      description: "Total number of packages in declaration"
+      source: "customs_declaration.total_packages"
+      aggregation: "SUM"
+      
+    - name: "total_items"
+      data_type: "SMALLINT"
+      nullable: false
+      description: "Number of line items in declaration"
+      source: "customs_declaration.total_items"
+      aggregation: "SUM"
+      
+    - name: "total_gross_mass_kg"
+      data_type: "DECIMAL(15,3)"
+      nullable: true
+      description: "Total gross mass in kilograms"
+      source: "customs_declaration.total_gross_mass_kg"
+      unit: "KG"
+      aggregation: "SUM"
+      
+    - name: "total_net_mass_kg"
+      data_type: "DECIMAL(15,3)"
+      nullable: true
+      description: "Total net mass in kilograms"
+      source: "customs_declaration.total_net_mass_kg"
+      unit: "KG"
+      aggregation: "SUM"
+      
+    - name: "supplementary_units"
+      data_type: "DECIMAL(15,3)"
+      nullable: true
+      description: "Supplementary units (e.g., liters, units) when applicable"
+      source: "SUM from declaration items"
+      aggregation: "SUM"
+
+  # ===========================================================================
+  # ADDITIVE MEASURES - VALUES
+  # ===========================================================================
+  measures_additive_value:
+    - name: "statistical_value"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Statistical value in EUR.
+        CIF value for imports, FOB value for exports.
+      source: "customs_declaration.statistical_value"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Primary value for trade statistics"
+      
+    - name: "customs_value"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Value for customs purposes.
+        Transaction value per WTO Valuation Agreement.
+      source: "customs_declaration.customs_value"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Basis for duty calculation"
+      
+    - name: "invoice_value"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Invoice value (may be in different currency)"
+      source: "customs_declaration.invoice_value"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "freight_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Freight/transport costs"
+      source: "customs_declaration.freight_amount"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "insurance_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Insurance costs"
+      source: "customs_declaration.insurance_amount"
+      unit: "EUR"
+      aggregation: "SUM"
+
+  # ===========================================================================
+  # ADDITIVE MEASURES - DUTIES AND TAXES
+  # ===========================================================================
+  measures_additive_duties:
+    - name: "customs_duty_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Customs duty calculated"
+      source: "SUM from customs_declaration_tax WHERE tax_type = 'A00'"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "anti_dumping_duty"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      default_value: 0.00
+      description: "Anti-dumping duty if applicable"
+      source: "SUM from customs_declaration_tax WHERE tax_type = 'A30'"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "countervailing_duty"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      default_value: 0.00
+      description: "Countervailing duty if applicable"
+      source: "SUM from customs_declaration_tax WHERE tax_type = 'A40'"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "vat_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Import VAT calculated"
+      source: "SUM from customs_declaration_tax WHERE tax_type = 'B00'"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "VAT on imports collected at customs"
+      
+    - name: "excise_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      default_value: 0.00
+      description: "Excise duty if applicable"
+      source: "SUM from customs_declaration_tax WHERE tax_type IN ('1xx', '2xx', '3xx')"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "other_charges"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      default_value: 0.00
+      description: "Other charges and levies"
+      source: "SUM of non-standard duty types"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "total_charges"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: |
+        Sum of all duties, taxes, and charges.
+        customs_duty + vat + excise + other charges
+      source: "Calculated: SUM of all duty components"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Total amount due to customs"
+      
+    - name: "amount_paid"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Amount actually paid"
+      source: "customs_declaration.amount_paid"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "amount_guaranteed"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Amount covered by customs guarantee"
+      source: "customs_declaration.amount_guaranteed"
+      unit: "EUR"
+      aggregation: "SUM"
+
+  # ===========================================================================
+  # SEMI-ADDITIVE MEASURES
+  # ===========================================================================
+  measures_semi_additive:
+    - name: "processing_minutes"
+      data_type: "INT"
+      nullable: true
+      description: "Time from acceptance to release in minutes"
+      source: "TIMESTAMPDIFF(MINUTE, acceptance_datetime, release_datetime)"
+      aggregation: "AVG"
+      note: "Measures clearance efficiency"
+
+  # ===========================================================================
+  # NON-ADDITIVE MEASURES
+  # ===========================================================================
+  measures_non_additive:
+    - name: "effective_duty_rate"
+      data_type: "DECIMAL(7,4)"
+      nullable: true
+      description: "Effective customs duty rate"
+      source: "customs_duty_amount / NULLIF(customs_value, 0)"
+      aggregation: "Recalculate from sums"
+      
+    - name: "effective_total_rate"
+      data_type: "DECIMAL(7,4)"
+      nullable: true
+      description: "Effective total charges rate"
+      source: "total_charges / NULLIF(customs_value, 0)"
+      aggregation: "Recalculate from sums"
+
+  # ===========================================================================
+  # FLAGS
+  # ===========================================================================
+  flags:
+    - name: "is_import"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Declaration is for import"
+      source: "declaration_type_code = 'IM'"
+      
+    - name: "is_export"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Declaration is for export"
+      source: "declaration_type_code = 'EX'"
+      
+    - name: "is_transit"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Declaration involves transit procedure"
+      source: "Derived from procedure_code or separate transit record"
+      
+    - name: "is_simplified_procedure"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Uses simplified/authorized procedure"
+      source: "declaration_category_code IN ('I1', 'I2', 'B2')"
+      
+    - name: "is_aeo_declarant"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Declarant is an Authorized Economic Operator"
+      source: "Derived from declarant's AEO status"
+      
+    - name: "is_eu_trade"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Trade with EU member state"
+      source: |
+        For imports: country_of_dispatch is EU member
+        For exports: country_of_destination is EU member
+      
+    - name: "is_preferential"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Preferential duty rate applied"
+      source: "Derived from preference code in declaration"
+      note: "FTA or GSP preference"
+      
+    - name: "is_selected_for_control"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Declaration selected for physical/documentary control"
+      source: "declaration_status_code = 'UNDER_CONTROL' at any point"
+      
+    - name: "is_released"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Goods have been released"
+      source: "release_date IS NOT NULL AND declaration_status_code = 'RELEASED'"
+      
+    - name: "is_paid"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "All duties and taxes paid"
+      source: "payment_status_code = 'PAID'"
+      
+    - name: "is_high_value"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Declaration exceeds high-value threshold"
+      source: "customs_value > high_value_threshold (e.g., 100000 EUR)"
+      
+    - name: "is_controlled_goods"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Declaration contains controlled/restricted goods"
+      source: "Derived from commodity codes requiring licenses"
+
+  # ===========================================================================
+  # ETL METADATA
+  # ===========================================================================
+  metadata:
+    - name: "etl_batch_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch that created/updated this record"
+      
+    - name: "etl_load_timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when record was loaded to warehouse"
+      
+    - name: "source_system"
+      data_type: "VARCHAR(50)"
+      nullable: false
+      description: "Source system identifier"
+      allowed_values: ["L2_MALTA_CUSTOMS", "AIS", "AES"]
+
+  # ===========================================================================
+  # INDEXES
+  # ===========================================================================
+  indexes:
+    - name: "pk_fact_customs"
+      columns: ["declaration_source_id"]
+      type: "PRIMARY KEY"
+      
+    - name: "uk_fact_customs_mrn"
+      columns: ["mrn"]
+      type: "UNIQUE"
+      description: "MRN is business key and EU-wide unique"
+      
+    - name: "idx_fact_customs_declarant"
+      columns: ["declarant_party_key", "acceptance_date_key"]
+      type: "BTREE"
+      description: "Declarant declaration history"
+      
+    - name: "idx_fact_customs_procedure"
+      columns: ["customs_procedure_key", "acceptance_date_key"]
+      type: "BTREE"
+      description: "Procedure utilization analysis"
+      
+    - name: "idx_fact_customs_origin"
+      columns: ["country_of_origin_key", "acceptance_date_key"]
+      type: "BTREE"
+      description: "Trade by country of origin"
+      
+    - name: "idx_fact_customs_destination"
+      columns: ["country_of_destination_key", "acceptance_date_key"]
+      type: "BTREE"
+      description: "Trade by destination"
+      
+    - name: "idx_fact_customs_date"
+      columns: ["acceptance_date_key"]
+      type: "BTREE"
+      description: "Date-based queries"
+      
+    - name: "idx_fact_customs_type"
+      columns: ["declaration_type_code", "acceptance_date_key"]
+      type: "BTREE"
+      description: "Import vs export analysis"
+      
+    - name: "idx_fact_customs_status"
+      columns: ["declaration_status_code", "acceptance_date_key"]
+      type: "BTREE"
+      description: "Status-based workload queries"
+
+  # ===========================================================================
+  # SOURCE MAPPING
+  # ===========================================================================
+  source_mapping:
+    primary_source:
+      schema: "malta_customs"
+      table: "customs_declaration"
+      key: "declaration_id"
+      filter: "All declaration types (IM, EX, CO, EU)"
+      
+    tax_aggregation:
+      schema: "malta_customs"
+      table: "customs_declaration_tax"
+      join_key: "declaration_id"
+      aggregation: |
+        SELECT 
+            declaration_id,
+            SUM(CASE WHEN tax_type_code = 'A00' THEN calculated_amount ELSE 0 END) AS customs_duty_amount,
+            SUM(CASE WHEN tax_type_code = 'A30' THEN calculated_amount ELSE 0 END) AS anti_dumping_duty,
+            SUM(CASE WHEN tax_type_code = 'A40' THEN calculated_amount ELSE 0 END) AS countervailing_duty,
+            SUM(CASE WHEN tax_type_code = 'B00' THEN calculated_amount ELSE 0 END) AS vat_amount,
+            SUM(CASE WHEN tax_type_code LIKE '1%' OR tax_type_code LIKE '2%' OR tax_type_code LIKE '3%' 
+                     THEN calculated_amount ELSE 0 END) AS excise_amount
+        FROM malta_customs.customs_declaration_tax
+        GROUP BY declaration_id
+        
+    joins:
+      - table: "warehouse.dim_party"
+        alias: "dp_declarant"
+        type: "INNER"
+        condition: "cd.declarant_party_id = dp_declarant.party_source_id AND dp_declarant.is_current_flag = TRUE"
+        
+      - table: "warehouse.dim_party"
+        alias: "dp_ie"
+        type: "LEFT"
+        condition: "cd.importer_exporter_party_id = dp_ie.party_source_id AND dp_ie.is_current_flag = TRUE"
+        
+      - table: "warehouse.dim_customs_procedure"
+        alias: "dcp"
+        type: "INNER"
+        condition: "cd.procedure_code = dcp.procedure_code"
+        
+      - table: "warehouse.dim_international_country"
+        alias: "dic_origin"
+        type: "LEFT"
+        condition: "cd.country_of_origin_code = dic_origin.country_code_alpha2"
+        
+      - table: "warehouse.dim_international_country"
+        alias: "dic_dispatch"
+        type: "LEFT"
+        condition: "cd.country_of_dispatch_code = dic_dispatch.country_code_alpha2"
+        
+      - table: "warehouse.dim_international_country"
+        alias: "dic_dest"
+        type: "LEFT"
+        condition: "cd.country_of_destination_code = dic_dest.country_code_alpha2"
+        
+      - table: "warehouse.dim_date"
+        alias: "dd_acceptance"
+        type: "INNER"
+        condition: "DATE_FORMAT(cd.acceptance_date, '%Y%m%d') = dd_acceptance.date_key"
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+  business_rules:
+    - rule_id: "FCD_001"
+      description: "Total charges must equal sum of components"
+      validation_sql: |
+        SELECT declaration_source_id
+        FROM warehouse.fact_customs_declaration
+        WHERE ABS(total_charges - (customs_duty_amount 
+              + COALESCE(anti_dumping_duty, 0)
+              + COALESCE(countervailing_duty, 0)
+              + vat_amount 
+              + COALESCE(excise_amount, 0)
+              + COALESCE(other_charges, 0))) > 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FCD_002"
+      description: "Import/Export flag consistency"
+      validation_sql: |
+        SELECT declaration_source_id
+        FROM warehouse.fact_customs_declaration
+        WHERE (is_import = TRUE AND declaration_type_code != 'IM')
+           OR (is_export = TRUE AND declaration_type_code != 'EX')
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FCD_003"
+      description: "Released declarations must have release date"
+      validation_sql: |
+        SELECT declaration_source_id
+        FROM warehouse.fact_customs_declaration
+        WHERE is_released = TRUE 
+          AND (release_date_key IS NULL OR release_date_key = -1)
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FCD_004"
+      description: "MRN format validation"
+      validation_sql: |
+        SELECT declaration_source_id
+        FROM warehouse.fact_customs_declaration
+        WHERE NOT mrn REGEXP '^[0-9]{2}MT[A-Z0-9]{14}$'
+      expected_result: "0 rows"
+      severity: "WARNING"
+      note: "Malta MRNs should start with YY then MT"
+      
+    - rule_id: "FCD_005"
+      description: "Paid amount should not exceed total charges"
+      validation_sql: |
+        SELECT declaration_source_id
+        FROM warehouse.fact_customs_declaration
+        WHERE amount_paid > total_charges + 0.01
+      expected_result: "0 rows"
+      severity: "WARNING"
+      note: "May indicate overpayment or timing issue"
+      
+    - rule_id: "FCD_006"
+      description: "Country dimensions must be valid"
+      validation_sql: |
+        SELECT 'origin' AS dimension, COUNT(*) AS missing
+        FROM warehouse.fact_customs_declaration fcd
+        WHERE fcd.country_of_origin_key > 0
+          AND NOT EXISTS (SELECT 1 FROM warehouse.dim_international_country dic 
+                          WHERE dic.country_key = fcd.country_of_origin_key)
+        UNION ALL
+        SELECT 'destination', COUNT(*)
+        FROM warehouse.fact_customs_declaration fcd
+        WHERE fcd.country_of_destination_key > 0
+          AND NOT EXISTS (SELECT 1 FROM warehouse.dim_international_country dic 
+                          WHERE dic.country_key = fcd.country_of_destination_key)
+      expected_result: "All counts = 0"
+      severity: "CRITICAL"
+
+  # ===========================================================================
+  # SAMPLE QUERIES
+  # ===========================================================================
+  sample_queries:
+    - name: "Trade Volume by Country"
+      description: "Import/export analysis by trading partner"
+      sql: |
+        SELECT 
+            dic.country_name,
+            dic.eu_member_flag,
+            SUM(CASE WHEN fcd.is_import THEN 1 ELSE 0 END) AS import_count,
+            SUM(CASE WHEN fcd.is_export THEN 1 ELSE 0 END) AS export_count,
+            SUM(CASE WHEN fcd.is_import THEN fcd.statistical_value ELSE 0 END) AS import_value,
+            SUM(CASE WHEN fcd.is_export THEN fcd.statistical_value ELSE 0 END) AS export_value,
+            SUM(CASE WHEN fcd.is_import THEN fcd.statistical_value ELSE 0 END) 
+              - SUM(CASE WHEN fcd.is_export THEN fcd.statistical_value ELSE 0 END) AS trade_balance
+        FROM warehouse.fact_customs_declaration fcd
+        LEFT JOIN warehouse.dim_international_country dic 
+            ON COALESCE(fcd.country_of_origin_key, fcd.country_of_destination_key) = dic.country_key
+        JOIN warehouse.dim_date dd ON fcd.acceptance_date_key = dd.date_key
+        WHERE dd.calendar_year = 2024
+        GROUP BY dic.country_name, dic.eu_member_flag
+        ORDER BY import_value + export_value DESC;
+        
+    - name: "Customs Revenue Collection"
+      description: "Revenue by duty type"
+      sql: |
+        SELECT 
+            dd.calendar_year_month,
+            SUM(fcd.customs_duty_amount) AS customs_duty,
+            SUM(fcd.vat_amount) AS import_vat,
+            SUM(fcd.excise_amount) AS excise,
+            SUM(fcd.total_charges) AS total_revenue,
+            COUNT(*) AS declaration_count
+        FROM warehouse.fact_customs_declaration fcd
+        JOIN warehouse.dim_date dd ON fcd.acceptance_date_key = dd.date_key
+        WHERE fcd.is_import = TRUE
+          AND fcd.is_paid = TRUE
+        GROUP BY dd.calendar_year_month
+        ORDER BY dd.calendar_year_month DESC;
+        
+    - name: "Procedure Utilization"
+      description: "Analysis of customs procedures used"
+      sql: |
+        SELECT 
+            dcp.procedure_code,
+            dcp.procedure_name,
+            dcp.procedure_category,
+            COUNT(*) AS usage_count,
+            SUM(fcd.customs_value) AS total_value,
+            AVG(fcd.processing_minutes) AS avg_processing_mins
+        FROM warehouse.fact_customs_declaration fcd
+        JOIN warehouse.dim_customs_procedure dcp ON fcd.customs_procedure_key = dcp.customs_procedure_key
+        JOIN warehouse.dim_date dd ON fcd.acceptance_date_key = dd.date_key
+        WHERE dd.calendar_year = 2024
+        GROUP BY dcp.procedure_code, dcp.procedure_name, dcp.procedure_category
+        ORDER BY usage_count DESC;
+        
+    - name: "AEO vs Non-AEO Performance"
+      description: "Compare processing times for AEO operators"
+      sql: |
+        SELECT 
+            fcd.is_aeo_declarant,
+            COUNT(*) AS declaration_count,
+            AVG(fcd.processing_minutes) AS avg_processing_mins,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY fcd.processing_minutes) AS median_processing_mins,
+            SUM(CASE WHEN fcd.is_selected_for_control THEN 1 ELSE 0 END) AS control_count,
+            ROUND(100.0 * SUM(CASE WHEN fcd.is_selected_for_control THEN 1 ELSE 0 END) / COUNT(*), 2) AS control_rate
+        FROM warehouse.fact_customs_declaration fcd
+        WHERE fcd.is_released = TRUE
+        GROUP BY fcd.is_aeo_declarant;
+        
+    - name: "Preferential Trade Analysis"
+      description: "Utilization of preferential duty rates"
+      sql: |
+        SELECT 
+            dic.region_name,
+            COUNT(*) AS total_declarations,
+            SUM(CASE WHEN fcd.is_preferential THEN 1 ELSE 0 END) AS preferential_count,
+            ROUND(100.0 * SUM(CASE WHEN fcd.is_preferential THEN 1 ELSE 0 END) / COUNT(*), 2) AS preference_rate,
+            SUM(fcd.customs_duty_amount) AS actual_duty,
+            -- Estimated duty savings would require additional calculation
+            SUM(fcd.customs_value) AS total_value
+        FROM warehouse.fact_customs_declaration fcd
+        JOIN warehouse.dim_international_country dic ON fcd.country_of_origin_key = dic.country_key
+        WHERE fcd.is_import = TRUE
+        GROUP BY dic.region_name
+        ORDER BY preferential_count DESC;
+        
+    - name: "Transport Mode Analysis"
+      description: "Trade by mode of transport"
+      sql: |
+        SELECT 
+            CASE fcd.transport_mode_code
+                WHEN '1' THEN 'Sea'
+                WHEN '2' THEN 'Rail'
+                WHEN '3' THEN 'Road'
+                WHEN '4' THEN 'Air'
+                WHEN '5' THEN 'Mail'
+                WHEN '7' THEN 'Pipeline'
+                WHEN '8' THEN 'Inland Waterway'
+                ELSE 'Other'
+            END AS transport_mode,
+            COUNT(*) AS declaration_count,
+            SUM(fcd.total_gross_mass_kg) / 1000 AS total_tonnes,
+            SUM(fcd.statistical_value) AS total_value,
+            AVG(fcd.processing_minutes) AS avg_processing_mins
+        FROM warehouse.fact_customs_declaration fcd
+        GROUP BY fcd.transport_mode_code
+        ORDER BY declaration_count DESC;

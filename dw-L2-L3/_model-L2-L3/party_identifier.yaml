@@ -1,0 +1,435 @@
+# =============================================================================
+# TA-RDM L2 - Party Identifier Table
+# =============================================================================
+# Purpose: Store all identifiers for parties with temporal tracking
+# Pattern: Multi-Identifier Pattern (Pattern 1 from Generalization Catalog)
+# =============================================================================
+
+metadata:
+  table_name: party_identifier
+  schema: party
+  version: "1.0.0"
+  created_date: "2025-12-10"
+  description: |
+    Stores all identifiers for a party. A party can have multiple identifiers
+    of different types (TIN, VAT, EORI, etc.) and historical records of
+    identifiers that changed over time.
+    
+    This table replaces direct TIN/VAT columns in individual/enterprise tables,
+    enabling country-agnostic identifier management.
+
+table:
+  name: party_identifier
+  schema: party
+  type: transaction
+  
+  description: |
+    Multi-identifier storage for parties. Key features:
+    - One party can have multiple identifier types
+    - Temporal validity tracks identifier changes
+    - Verification tracking for compliance
+    - is_primary flag identifies main identifier per type/country
+  
+  columns:
+    - name: party_identifier_id
+      type: bigint
+      constraints:
+        primary_key: true
+        auto_increment: true
+      description: "Surrogate primary key"
+    
+    - name: party_id
+      type: bigint
+      constraints:
+        not_null: true
+        foreign_key:
+          table: party.party
+          column: party_id
+          on_delete: CASCADE
+          on_update: CASCADE
+      description: "Reference to party"
+    
+    - name: identifier_type_code
+      type: varchar(20)
+      constraints:
+        not_null: true
+      description: "Type of identifier: TIN, VAT, EORI, NATID, etc."
+    
+    - name: country_code
+      type: char(3)
+      constraints:
+        not_null: true
+      description: "Country that issued this identifier (ISO 3166-1 alpha-3)"
+    
+    - name: identifier_value
+      type: varchar(50)
+      constraints:
+        not_null: true
+      description: "The actual identifier value"
+    
+    - name: identifier_value_normalized
+      type: varchar(50)
+      description: "Normalized value (uppercase, no spaces/dashes) for matching"
+    
+    - name: is_primary
+      type: boolean
+      default: false
+      constraints:
+        not_null: true
+      description: "Primary identifier of this type for this party"
+    
+    - name: is_verified
+      type: boolean
+      default: false
+      constraints:
+        not_null: true
+      description: "Has been verified against issuing authority"
+    
+    - name: verification_status
+      type: varchar(20)
+      default: "'UNVERIFIED'"
+      description: "UNVERIFIED, PENDING, VERIFIED, FAILED, EXPIRED"
+    
+    - name: verification_date
+      type: timestamp
+      description: "When verification was performed"
+    
+    - name: verification_source
+      type: varchar(100)
+      description: "How verified: ONLINE_API, DOCUMENT, MANUAL, THIRD_PARTY"
+    
+    - name: verification_reference
+      type: varchar(200)
+      description: "Reference number from verification (API response ID, etc.)"
+    
+    - name: issued_date
+      type: date
+      description: "Date identifier was issued"
+    
+    - name: expiry_date
+      type: date
+      description: "Date identifier expires (for passports, licenses, etc.)"
+    
+    - name: issued_by
+      type: varchar(200)
+      description: "Issuing authority name"
+    
+    - name: valid_from
+      type: date
+      constraints:
+        not_null: true
+      description: "When this identifier became valid for this party"
+    
+    - name: valid_to
+      type: date
+      description: "When this identifier ceased to be valid (NULL = current)"
+    
+    - name: replacement_identifier_id
+      type: bigint
+      constraints:
+        foreign_key:
+          table: party.party_identifier
+          column: party_identifier_id
+      description: "If replaced, link to new identifier"
+    
+    - name: source_system
+      type: varchar(50)
+      description: "System that provided this identifier"
+    
+    - name: source_reference
+      type: varchar(100)
+      description: "Reference in source system"
+    
+    - name: notes
+      type: text
+      description: "Additional notes"
+    
+    # Audit columns
+    - name: created_by
+      type: varchar(100)
+      constraints:
+        not_null: true
+    
+    - name: created_date
+      type: timestamp
+      constraints:
+        not_null: true
+      default: CURRENT_TIMESTAMP
+    
+    - name: modified_by
+      type: varchar(100)
+    
+    - name: modified_date
+      type: timestamp
+    
+    - name: version
+      type: integer
+      default: 1
+      constraints:
+        not_null: true
+      description: "Optimistic locking version"
+
+  indexes:
+    - name: idx_party_identifier_party
+      columns: [party_id]
+      description: "Find all identifiers for a party"
+    
+    - name: idx_party_identifier_lookup
+      columns: [identifier_type_code, country_code, identifier_value]
+      description: "Find party by identifier"
+    
+    - name: idx_party_identifier_normalized
+      columns: [identifier_type_code, country_code, identifier_value_normalized]
+      description: "Find party by normalized identifier"
+    
+    - name: idx_party_identifier_primary
+      columns: [party_id, identifier_type_code, country_code]
+      where: "is_primary = TRUE AND valid_to IS NULL"
+      description: "Find primary active identifier"
+    
+    - name: idx_party_identifier_verification
+      columns: [verification_status, verification_date]
+      where: "verification_status = 'PENDING'"
+      description: "Find identifiers needing verification"
+    
+    - name: idx_party_identifier_expiry
+      columns: [expiry_date]
+      where: "expiry_date IS NOT NULL"
+      description: "Find expiring identifiers"
+
+  constraints:
+    - name: uk_party_identifier_active
+      type: unique
+      columns: [party_id, identifier_type_code, country_code, identifier_value, valid_from]
+      description: "Prevent duplicate active identifiers"
+    
+    - name: chk_party_identifier_dates
+      type: check
+      condition: "valid_to IS NULL OR valid_to >= valid_from"
+      description: "Valid_to must be after valid_from"
+    
+    - name: chk_party_identifier_expiry
+      type: check
+      condition: "expiry_date IS NULL OR issued_date IS NULL OR expiry_date >= issued_date"
+      description: "Expiry must be after issue date"
+    
+    - name: chk_verification_status
+      type: check
+      condition: "verification_status IN ('UNVERIFIED', 'PENDING', 'VERIFIED', 'FAILED', 'EXPIRED')"
+
+  triggers:
+    - name: trg_party_identifier_normalize
+      timing: BEFORE INSERT OR UPDATE
+      description: "Normalize identifier_value to identifier_value_normalized"
+      logic: |
+        SET NEW.identifier_value_normalized = UPPER(REPLACE(REPLACE(NEW.identifier_value, ' ', ''), '-', ''));
+    
+    - name: trg_party_identifier_single_primary
+      timing: BEFORE INSERT OR UPDATE
+      description: "Ensure only one primary identifier per type/country/party"
+      logic: |
+        IF NEW.is_primary = TRUE THEN
+          UPDATE party.party_identifier 
+          SET is_primary = FALSE 
+          WHERE party_id = NEW.party_id 
+            AND identifier_type_code = NEW.identifier_type_code
+            AND country_code = NEW.country_code
+            AND valid_to IS NULL
+            AND party_identifier_id != NEW.party_identifier_id;
+        END IF;
+
+  business_rules:
+    - rule_id: BR_PI_001
+      description: "Each party must have at least one primary tax identifier"
+      severity: WARNING
+      validation_query: |
+        SELECT p.party_id
+        FROM party.party p
+        LEFT JOIN party.party_identifier pi ON p.party_id = pi.party_id
+          AND pi.is_primary = TRUE
+          AND pi.valid_to IS NULL
+          AND EXISTS (
+            SELECT 1 FROM reference.ref_identifier_type rit
+            WHERE rit.identifier_type_code = pi.identifier_type_code
+              AND rit.is_tax_identifier = TRUE
+          )
+        WHERE pi.party_identifier_id IS NULL
+    
+    - rule_id: BR_PI_002
+      description: "Identifier value must match format in ref_identifier_type"
+      severity: ERROR
+      validation_query: |
+        SELECT pi.party_identifier_id, pi.identifier_value, rit.format_regex
+        FROM party.party_identifier pi
+        JOIN reference.ref_identifier_type rit 
+          ON pi.identifier_type_code = rit.identifier_type_code
+          AND (pi.country_code = rit.country_code OR rit.country_code IS NULL)
+        WHERE rit.format_regex IS NOT NULL
+          AND pi.identifier_value NOT REGEXP rit.format_regex
+
+# =============================================================================
+# Composite Foreign Key Validation
+# =============================================================================
+# The identifier_type_code + country_code combination should reference 
+# ref_identifier_type. Since ref_identifier_type allows NULL country_code 
+# for universal types, application layer should validate:
+#
+# SELECT 1 FROM reference.ref_identifier_type
+# WHERE identifier_type_code = :type_code
+#   AND (country_code = :country_code OR country_code IS NULL)
+#   AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+#   AND is_active = TRUE;
+# =============================================================================
+
+views:
+  - name: v_party_current_identifiers
+    schema: party
+    description: "Current (active) identifiers for all parties"
+    definition: |
+      SELECT 
+        pi.party_id,
+        pi.identifier_type_code,
+        pi.country_code,
+        pi.identifier_value,
+        pi.is_primary,
+        pi.is_verified,
+        pi.verification_status,
+        rit.identifier_name,
+        rit.is_tax_identifier
+      FROM party.party_identifier pi
+      JOIN reference.ref_identifier_type rit 
+        ON pi.identifier_type_code = rit.identifier_type_code
+        AND (pi.country_code = rit.country_code OR rit.country_code IS NULL)
+      WHERE pi.valid_to IS NULL
+  
+  - name: v_party_primary_tin
+    schema: party
+    description: "Primary tax identifier for each party (for backward compatibility)"
+    definition: |
+      SELECT 
+        pi.party_id,
+        pi.country_code,
+        pi.identifier_value AS tin,
+        pi.is_verified,
+        pi.verification_date
+      FROM party.party_identifier pi
+      JOIN reference.ref_identifier_type rit 
+        ON pi.identifier_type_code = rit.identifier_type_code
+        AND (pi.country_code = rit.country_code OR rit.country_code IS NULL)
+      WHERE pi.valid_to IS NULL
+        AND pi.is_primary = TRUE
+        AND rit.is_tax_identifier = TRUE
+
+sample_data:
+  # Malta individual with TIN and ID card
+  - party_id: 1001
+    identifier_type_code: "TIN"
+    country_code: "MLT"
+    identifier_value: "123456789"
+    is_primary: true
+    is_verified: true
+    verification_status: "VERIFIED"
+    verification_date: "2024-01-15 10:30:00"
+    verification_source: "ONLINE_API"
+    valid_from: "2020-01-01"
+    created_by: "SYSTEM"
+  
+  - party_id: 1001
+    identifier_type_code: "NATID"
+    country_code: "MLT"
+    identifier_value: "123456M"
+    is_primary: true
+    is_verified: true
+    verification_status: "VERIFIED"
+    valid_from: "2020-01-01"
+    created_by: "SYSTEM"
+  
+  # Malta enterprise with TIN, VAT, EORI
+  - party_id: 2001
+    identifier_type_code: "TIN"
+    country_code: "MLT"
+    identifier_value: "987654321"
+    is_primary: true
+    is_verified: true
+    verification_status: "VERIFIED"
+    valid_from: "2015-03-01"
+    created_by: "SYSTEM"
+  
+  - party_id: 2001
+    identifier_type_code: "VAT"
+    country_code: "MLT"
+    identifier_value: "MT98765432"
+    is_primary: true
+    is_verified: true
+    verification_status: "VERIFIED"
+    valid_from: "2015-03-01"
+    created_by: "SYSTEM"
+  
+  - party_id: 2001
+    identifier_type_code: "EORI"
+    country_code: "MLT"
+    identifier_value: "MT987654321000"
+    is_primary: true
+    is_verified: true
+    verification_status: "VERIFIED"
+    valid_from: "2015-03-01"
+    created_by: "SYSTEM"
+  
+  # Sri Lanka individual
+  - party_id: 3001
+    identifier_type_code: "TIN"
+    country_code: "LKA"
+    identifier_value: "123456789"
+    is_primary: true
+    is_verified: false
+    verification_status: "UNVERIFIED"
+    valid_from: "2023-01-01"
+    created_by: "RAMIS_IMPORT"
+  
+  # Moldova enterprise
+  - party_id: 4001
+    identifier_type_code: "IDNO"
+    country_code: "MDA"
+    identifier_value: "1234567890123"
+    is_primary: true
+    is_verified: true
+    verification_status: "VERIFIED"
+    valid_from: "2018-06-15"
+    created_by: "SFS_IMPORT"
+
+# =============================================================================
+# Migration Notes
+# =============================================================================
+# For existing systems with direct TIN columns:
+#
+# INSERT INTO party.party_identifier (
+#   party_id, identifier_type_code, country_code, identifier_value,
+#   is_primary, is_verified, verification_status, valid_from, created_by
+# )
+# SELECT 
+#   i.party_id,
+#   'TIN',
+#   'MLT',  -- or appropriate country
+#   i.tax_identification_number,
+#   TRUE,
+#   TRUE,
+#   'VERIFIED',
+#   COALESCE(i.created_date, '2000-01-01'),
+#   'MIGRATION'
+# FROM party.individual i
+# WHERE i.tax_identification_number IS NOT NULL;
+# =============================================================================
+
+# =============================================================================
+# Validation Criteria
+# =============================================================================
+# | Check                      | Expected                                    |
+# |----------------------------|---------------------------------------------|
+# | Surrogate PK               | party_identifier_id (bigint)                |
+# | Party FK                   | References party.party                      |
+# | Temporal columns           | valid_from (required), valid_to (nullable)  |
+# | Verification tracking      | is_verified, verification_status, etc.      |
+# | Normalization trigger      | identifier_value_normalized auto-populated  |
+# | Single primary constraint  | Trigger ensures one primary per type/country|
+# | Sample data                | Multiple countries, multiple identifier types|
+# =============================================================================

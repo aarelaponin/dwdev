@@ -1,0 +1,1748 @@
+# ============================================================================
+# MTCA Forms - Priority 2D: Gaming Tax Returns
+# Forms: Gaming Tax Return, Industry Performance Return, Compliance Contribution
+# Version: 1.0
+# Date: 2025-12-05
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# Note: Administered by Malta Gaming Authority (MGA), data shared with CFR
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # Gaming Tax Return: Monthly Gaming Revenue Declaration
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "GAMING_TAX_RETURN"
+        form_name_en: "Gaming Tax Return"
+        form_name_mt: "Dikjarazzjoni tat-Taxxa tal-LogÄ§ob"
+        version: "2024"
+        effective_from: "2018-08-01"
+        effective_to: "current"
+        legislative_basis: "Gaming Act Cap. 583"
+        subsidiary_legislation:
+          - "S.L.583.04 - Gaming Tax Regulations"
+          - "S.L.583.05 - Gaming Licence Fees Regulations"
+        administering_authority: "Malta Gaming Authority (MGA)"
+        tax_type: "Gaming Tax"
+        taxpayer_category: "Company (Licensed Gaming Operator)"
+        filing_frequency: "Monthly"
+        filing_deadline: "20th of following month"
+        submission_method: "Electronic"
+        electronic_portal: "MGA Licensee Relationship Management System (LRMS)"
+        source_url: "https://www.mga.org.mt/licensee-compliance/tax-matters/"
+        pdf_available: false
+        online_form_available: true
+        xml_schema_ref: "MGA Gaming Tax Schema v3.0"
+        notes: |
+          Monthly declaration of gaming revenue for licensed operators.
+          Gaming tax rate: 5% of gaming revenue (GGR).
+          Applies to B2C gaming licensees (Type 1-4 licenses).
+          B2B licensees (Type 3 critical supply) have different obligations.
+          Minimum annual gaming tax: â‚¬25,000 per license type.
+          Data shared with CFR for corporate tax reconciliation.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Licensee Identification
+        # ----------------------------------------------------------------------
+        - section_id: "LICENSEE"
+          section_name: "Licensee Details"
+          section_description: "MGA licensed gaming operator"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "mga_license_number"
+              field_code: "Section 1.1"
+              field_name_en: "MGA License Number"
+              field_name_mt: "Numru tal-LiÄ‹enzja tal-MGA"
+              field_description: "Gaming license reference"
+              data_type: "STRING"
+              format: "MGA/B2C/###/YYYY or MGA/B2B/###/YYYY"
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "GT_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid MGA license format"
+                  rule_expression: "^MGA/(B2C|B2B)/[0-9]{3,4}/[0-9]{4}$"
+                  error_message_en: "Invalid MGA license number format"
+                  error_message_mt: "Format tan-numru tal-liÄ‹enzja mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "mga_licenses"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "mga_license"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "mga_license_number"
+                data_type: "String"
+
+            - field_id: "licensee_tin"
+              field_code: "Section 1.2"
+              field_name_en: "Company TIN"
+              field_name_mt: "TIN tal-Kumpanija"
+              field_description: "Tax identification number"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: "e-CO.company_tin"
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "company_tin"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "licensee_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "licensee_name"
+              field_code: "Section 1.3"
+              field_name_en: "Licensee Legal Name"
+              field_name_mt: "Isem Legali tal-LiÄ‹enzjat"
+              field_description: "Company legal name as per license"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "licensee_name"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "licensee_name"
+                data_type: "String"
+
+            - field_id: "license_type"
+              field_code: "Section 1.4"
+              field_name_en: "License Type"
+              field_name_mt: "Tip ta' LiÄ‹enzja"
+              field_description: "Category of gaming license"
+              data_type: "CODE"
+              format: null
+              max_length: 5
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "B2C_1"
+                  description_en: "Type 1 - Casino Games"
+                  description_mt: "Tip 1 - LogÄ§ob tal-Casino"
+                - code: "B2C_2"
+                  description_en: "Type 2 - Fixed Odds Betting"
+                  description_mt: "Tip 2 - ImÄ§atri bi Kwoti Fissi"
+                - code: "B2C_3"
+                  description_en: "Type 3 - P2P Games"
+                  description_mt: "Tip 3 - LogÄ§ob P2P"
+                - code: "B2C_4"
+                  description_en: "Type 4 - Controlled Skill Games"
+                  description_mt: "Tip 4 - LogÄ§ob ta' Ä¦ila Kkontrollat"
+                - code: "B2B"
+                  description_en: "B2B Critical Gaming Supply"
+                  description_mt: "B2B Provvista Kritika tal-LogÄ§ob"
+              reference_table: "mga_license_types"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "license_type"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "license_type"
+                data_type: "FixedString(5)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Return Period
+        # ----------------------------------------------------------------------
+        - section_id: "PERIOD"
+          section_name: "Return Period"
+          section_description: "Monthly reporting period"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "return_year"
+              field_code: "Section 2.1"
+              field_name_en: "Year"
+              field_name_mt: "Sena"
+              field_description: "Calendar year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "return_year"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "return_year"
+                data_type: "UInt16"
+
+            - field_id: "return_month"
+              field_code: "Section 2.2"
+              field_name_en: "Month"
+              field_name_mt: "Xahar"
+              field_description: "Calendar month (1-12)"
+              data_type: "INTEGER"
+              format: "##"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "GT_010"
+                  rule_type: "range"
+                  rule_description: "Valid month"
+                  rule_expression: "return_month >= 1 AND return_month <= 12"
+                  error_message_en: "Month must be 1-12"
+                  error_message_mt: "Xahar irid ikun 1-12"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "return_month"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "return_month"
+                data_type: "UInt8"
+
+            - field_id: "period_start"
+              field_code: "Section 2.3"
+              field_name_en: "Period Start Date"
+              field_name_mt: "Data tal-Bidu tal-Perjodu"
+              field_description: "First day of month"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "return_year-return_month-01"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "period_start"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "period_start"
+                data_type: "Date"
+
+            - field_id: "period_end"
+              field_code: "Section 2.4"
+              field_name_en: "Period End Date"
+              field_name_mt: "Data tat-Tmiem tal-Perjodu"
+              field_description: "Last day of month"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "Last day of return_month"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "period_end"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "period_end"
+                data_type: "Date"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Gaming Revenue - By Game Type
+        # ----------------------------------------------------------------------
+        - section_id: "REVENUE_BY_GAME"
+          section_name: "Gaming Revenue by Game Type"
+          section_description: "Gross Gaming Revenue breakdown"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "game_type"
+              field_code: "Section 3.1"
+              field_name_en: "Game Type"
+              field_name_mt: "Tip ta' LogÄ§ba"
+              field_description: "Category of game"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "SLT"
+                  description_en: "Slots"
+                  description_mt: "Slots"
+                - code: "TBL"
+                  description_en: "Table Games"
+                  description_mt: "LogÄ§ob tal-Mejda"
+                - code: "POK"
+                  description_en: "Poker"
+                  description_mt: "Poker"
+                - code: "BNG"
+                  description_en: "Bingo"
+                  description_mt: "Bingo"
+                - code: "LOT"
+                  description_en: "Lottery"
+                  description_mt: "Lotterija"
+                - code: "SPT"
+                  description_en: "Sports Betting"
+                  description_mt: "ImÄ§atri fuq l-Isport"
+                - code: "VRT"
+                  description_en: "Virtual Sports"
+                  description_mt: "Sports Virtwali"
+                - code: "ESP"
+                  description_en: "eSports Betting"
+                  description_mt: "ImÄ§atri fuq eSports"
+                - code: "OTH"
+                  description_en: "Other Games"
+                  description_mt: "LogÄ§ob IeÄ§or"
+              reference_table: "game_types"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_revenue_detail"
+                column: "game_type"
+              ors_mapping:
+                table: "mtca_ors.gaming_revenue_detail"
+                column: "game_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "total_stakes"
+              field_code: "Section 3.2"
+              field_name_en: "Total Stakes/Turnover"
+              field_name_mt: "ImÄ§atri/Turnover Totali"
+              field_description: "Total amount wagered"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "GT_020"
+                  rule_type: "range"
+                  rule_description: "Must be non-negative"
+                  rule_expression: "total_stakes >= 0"
+                  error_message_en: "Stakes cannot be negative"
+                  error_message_mt: "ImÄ§atri ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_revenue_detail"
+                column: "total_stakes"
+              ors_mapping:
+                table: "mtca_ors.gaming_revenue_detail"
+                column: "total_stakes"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "total_winnings"
+              field_code: "Section 3.3"
+              field_name_en: "Total Player Winnings"
+              field_name_mt: "RebÄ§iet tal-Plejers Totali"
+              field_description: "Total paid out to players"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_revenue_detail"
+                column: "total_winnings"
+              ors_mapping:
+                table: "mtca_ors.gaming_revenue_detail"
+                column: "total_winnings"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "bonuses_paid"
+              field_code: "Section 3.4"
+              field_name_en: "Bonuses Paid"
+              field_name_mt: "Bonusijiet ImÄ§allsa"
+              field_description: "Free bets and promotional bonuses"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_revenue_detail"
+                column: "bonuses_paid"
+              ors_mapping:
+                table: "mtca_ors.gaming_revenue_detail"
+                column: "bonuses_paid"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "gross_gaming_revenue"
+              field_code: "Section 3.5"
+              field_name_en: "Gross Gaming Revenue (GGR)"
+              field_name_mt: "Introjtu Gross mill-LogÄ§ob (GGR)"
+              field_description: "Stakes minus winnings minus bonuses"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_stakes - total_winnings - bonuses_paid"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_revenue_detail"
+                column: "ggr"
+              ors_mapping:
+                table: "mtca_ors.gaming_revenue_detail"
+                column: "gross_gaming_revenue"
+                data_type: "Decimal(18,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Gaming Tax Calculation
+        # ----------------------------------------------------------------------
+        - section_id: "TAX_CALC"
+          section_name: "Gaming Tax Calculation"
+          section_description: "5% gaming tax on GGR"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_ggr"
+              field_code: "Section 4.1"
+              field_name_en: "Total Gross Gaming Revenue"
+              field_name_mt: "GGR Totali"
+              field_description: "Sum of all game types GGR"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(gross_gaming_revenue for all game types)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "total_ggr"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "total_ggr"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "deductions"
+              field_code: "Section 4.2"
+              field_name_en: "Allowable Deductions"
+              field_name_mt: "Tnaqqis Permess"
+              field_description: "Regulatory approved deductions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "GT_030"
+                  rule_type: "comparison"
+                  rule_description: "Cannot exceed GGR"
+                  rule_expression: "deductions <= total_ggr"
+                  error_message_en: "Deductions cannot exceed GGR"
+                  error_message_mt: "Tnaqqis ma jistax jaqbeÅ¼ il-GGR"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "deductions"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "deductions"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "taxable_ggr"
+              field_code: "Section 4.3"
+              field_name_en: "Taxable GGR"
+              field_name_mt: "GGR Taxxabbli"
+              field_description: "GGR after deductions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MAX(0, total_ggr - deductions)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "taxable_ggr"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "taxable_ggr"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "gaming_tax_rate"
+              field_code: "Section 4.4"
+              field_name_en: "Gaming Tax Rate"
+              field_name_mt: "Rata tat-Taxxa tal-LogÄ§ob"
+              field_description: "Current rate (5%)"
+              data_type: "PERCENTAGE"
+              format: "#%"
+              max_length: null
+              precision: 3
+              scale: 1
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "5.0"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "gaming_tax_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "tax_rate"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "gaming_tax_rate"
+                data_type: "Decimal(3,1)"
+
+            - field_id: "gaming_tax_due"
+              field_code: "Section 4.5"
+              field_name_en: "Gaming Tax Due"
+              field_name_mt: "Taxxa tal-LogÄ§ob Dovuta"
+              field_description: "5% of taxable GGR"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "taxable_ggr * (gaming_tax_rate / 100)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "tax_due"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "gaming_tax_due"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "ytd_gaming_tax"
+              field_code: "Section 4.6"
+              field_name_en: "Year-to-Date Gaming Tax"
+              field_name_mt: "Taxxa tal-LogÄ§ob Sas-Sena"
+              field_description: "Cumulative tax for year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "Sum of gaming_tax_due for months 1 to return_month"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "ytd_tax"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "ytd_gaming_tax"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "minimum_tax_check"
+              field_code: "Section 4.7"
+              field_name_en: "Minimum Tax Threshold Check"
+              field_name_mt: "Kontroll tal-Limitu Minimu tat-Taxxa"
+              field_description: "Whether â‚¬25,000 minimum reached"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "IF ytd_gaming_tax >= 25000 THEN Y ELSE N"
+              validation_rules: []
+              allowed_values:
+                - code: "Y"
+                  description_en: "Yes - Minimum met"
+                  description_mt: "Iva - Minimu milÄ§uq"
+                - code: "N"
+                  description_en: "No - Below minimum"
+                  description_mt: "Le - TaÄ§t il-minimu"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "min_tax_met"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "minimum_tax_check"
+                data_type: "UInt8"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Player Statistics
+        # ----------------------------------------------------------------------
+        - section_id: "PLAYER_STATS"
+          section_name: "Player Statistics"
+          section_description: "Monthly player activity metrics"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "registered_players"
+              field_code: "Section 5.1"
+              field_name_en: "Total Registered Players"
+              field_name_mt: "Plejers ReÄ¡istrati Totali"
+              field_description: "Cumulative registered accounts"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "registered_players"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "registered_players"
+                data_type: "UInt64"
+
+            - field_id: "active_players"
+              field_code: "Section 5.2"
+              field_name_en: "Active Players (Month)"
+              field_name_mt: "Plejers Attivi (Xahar)"
+              field_description: "Players who wagered in month"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "active_players"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "active_players"
+                data_type: "UInt64"
+
+            - field_id: "new_registrations"
+              field_code: "Section 5.3"
+              field_name_en: "New Registrations (Month)"
+              field_name_mt: "ReÄ¡istrazzjonijiet Ä odda (Xahar)"
+              field_description: "New player accounts in month"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "new_registrations"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "new_registrations"
+                data_type: "UInt64"
+
+            - field_id: "maltese_players_pct"
+              field_code: "Section 5.4"
+              field_name_en: "Maltese Players (%)"
+              field_name_mt: "Plejers Maltin (%)"
+              field_description: "Percentage of players from Malta"
+              data_type: "PERCENTAGE"
+              format: "##.#%"
+              max_length: null
+              precision: 4
+              scale: 1
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "gaming_tax_return"
+                column: "maltese_pct"
+              ors_mapping:
+                table: "mtca_ors.gaming_tax_return"
+                column: "maltese_players_pct"
+                data_type: "Decimal(4,1)"
+
+      attachments:
+        - attachment_code: "REVENUE_BREAKDOWN"
+          attachment_name: "Detailed Revenue Breakdown"
+          required: true
+          required_condition: null
+          max_file_size_mb: 10
+          allowed_formats:
+            - "XLSX"
+            - "CSV"
+        - attachment_code: "AUDIT_TRAIL"
+          attachment_name: "System Audit Trail"
+          required: false
+          required_condition: null
+          max_file_size_mb: 50
+          allowed_formats:
+            - "CSV"
+            - "XML"
+
+      related_forms:
+        - form_code: "COMPLIANCE_CONTRIBUTION"
+          relationship_type: "filed_with"
+          relationship_description: "Filed same deadline"
+        - form_code: "e-CO"
+          relationship_type: "reconciled_with"
+          relationship_description: "Corporate tax return"
+
+      submission_workflow:
+        authentication_required: "MGA LRMS Portal"
+        signature_required: true
+        payment_integration: true
+        acknowledgment_type: "LRMS receipt with reference"
+
+  # ==========================================================================
+  # Compliance Contribution Return
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "COMPLIANCE_CONTRIBUTION"
+        form_name_en: "Gaming Compliance Contribution Return"
+        form_name_mt: "Dikjarazzjoni tal-Kontribuzzjoni tal-KonformitÃ  tal-LogÄ§ob"
+        version: "2024"
+        effective_from: "2018-08-01"
+        effective_to: "current"
+        legislative_basis: "Gaming Act Cap. 583"
+        subsidiary_legislation:
+          - "S.L.583.05 - Gaming Licence Fees Regulations"
+        administering_authority: "Malta Gaming Authority (MGA)"
+        tax_type: "Regulatory Fee"
+        taxpayer_category: "Company (Licensed Gaming Operator)"
+        filing_frequency: "Monthly"
+        filing_deadline: "20th of following month"
+        submission_method: "Electronic"
+        electronic_portal: "MGA LRMS"
+        source_url: "https://www.mga.org.mt/licensee-compliance/"
+        pdf_available: false
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Monthly compliance contribution based on gaming revenue.
+          0.4% of GGR for B2C operators.
+          Fixed annual amount for B2B operators.
+          Funds MGA regulatory activities.
+
+      sections:
+        - section_id: "LICENSEE"
+          section_name: "Licensee Details"
+          section_description: "Same as Gaming Tax Return"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "mga_license_number"
+              field_code: "Box 1"
+              field_name_en: "MGA License Number"
+              field_name_mt: "Numru tal-LiÄ‹enzja tal-MGA"
+              field_description: "Gaming license reference"
+              data_type: "STRING"
+              format: "MGA/B2C/###/YYYY"
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "mga_licenses"
+              cross_form_reference: "GAMING_TAX_RETURN.mga_license_number"
+              legacy_mapping:
+                database: "gaming_db"
+                table: "compliance_contribution"
+                column: "mga_license"
+              ors_mapping:
+                table: "mtca_ors.gaming_compliance_contribution"
+                column: "mga_license_number"
+                data_type: "String"
+
+            - field_id: "licensee_tin"
+              field_code: "Box 2"
+              field_name_en: "Company TIN"
+              field_name_mt: "TIN tal-Kumpanija"
+              field_description: "Tax identification"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: "GAMING_TAX_RETURN.licensee_tin"
+              legacy_mapping:
+                database: "gaming_db"
+                table: "compliance_contribution"
+                column: "company_tin"
+              ors_mapping:
+                table: "mtca_ors.gaming_compliance_contribution"
+                column: "licensee_tin"
+                data_type: "FixedString(9)"
+
+        - section_id: "PERIOD"
+          section_name: "Return Period"
+          section_description: "Monthly period"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "return_year"
+              field_code: "Box 5"
+              field_name_en: "Year"
+              field_name_mt: "Sena"
+              field_description: "Calendar year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "compliance_contribution"
+                column: "return_year"
+              ors_mapping:
+                table: "mtca_ors.gaming_compliance_contribution"
+                column: "return_year"
+                data_type: "UInt16"
+
+            - field_id: "return_month"
+              field_code: "Box 6"
+              field_name_en: "Month"
+              field_name_mt: "Xahar"
+              field_description: "Calendar month"
+              data_type: "INTEGER"
+              format: "##"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "compliance_contribution"
+                column: "return_month"
+              ors_mapping:
+                table: "mtca_ors.gaming_compliance_contribution"
+                column: "return_month"
+                data_type: "UInt8"
+
+        - section_id: "CONTRIBUTION_CALC"
+          section_name: "Contribution Calculation"
+          section_description: "0.4% of GGR"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "ggr_from_tax_return"
+              field_code: "Box 10"
+              field_name_en: "GGR (from Gaming Tax Return)"
+              field_name_mt: "GGR (mill-Dikjarazzjoni tat-Taxxa tal-LogÄ§ob)"
+              field_description: "Imported from Gaming Tax Return"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "GAMING_TAX_RETURN.total_ggr"
+              legacy_mapping:
+                database: "gaming_db"
+                table: "compliance_contribution"
+                column: "ggr"
+              ors_mapping:
+                table: "mtca_ors.gaming_compliance_contribution"
+                column: "ggr_from_tax_return"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "contribution_rate"
+              field_code: "Box 11"
+              field_name_en: "Contribution Rate"
+              field_name_mt: "Rata tal-Kontribuzzjoni"
+              field_description: "0.4% for B2C"
+              data_type: "PERCENTAGE"
+              format: "#.#%"
+              max_length: null
+              precision: 3
+              scale: 1
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "0.4"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "compliance_contribution"
+                column: "contribution_rate"
+              ors_mapping:
+                table: "mtca_ors.gaming_compliance_contribution"
+                column: "contribution_rate"
+                data_type: "Decimal(3,1)"
+
+            - field_id: "compliance_contribution_due"
+              field_code: "Box 12"
+              field_name_en: "Compliance Contribution Due"
+              field_name_mt: "Kontribuzzjoni tal-KonformitÃ  Dovuta"
+              field_description: "0.4% of GGR"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "ggr_from_tax_return * (contribution_rate / 100)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "compliance_contribution"
+                column: "contribution_due"
+              ors_mapping:
+                table: "mtca_ors.gaming_compliance_contribution"
+                column: "compliance_contribution_due"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "GAMING_TAX_RETURN"
+          relationship_type: "derived_from"
+          relationship_description: "GGR imported from Gaming Tax Return"
+
+      submission_workflow:
+        authentication_required: "MGA LRMS"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "LRMS receipt"
+
+  # ==========================================================================
+  # Industry Performance Return
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "INDUSTRY_PERFORMANCE"
+        form_name_en: "Gaming Industry Performance Return"
+        form_name_mt: "Dikjarazzjoni tal-Prestazzjoni tal-Industrija tal-LogÄ§ob"
+        version: "2024"
+        effective_from: "2018-08-01"
+        effective_to: "current"
+        legislative_basis: "Gaming Act Cap. 583"
+        subsidiary_legislation: []
+        administering_authority: "Malta Gaming Authority (MGA)"
+        tax_type: "Statistical Return"
+        taxpayer_category: "Company (Licensed Gaming Operator)"
+        filing_frequency: "Bi-annual"
+        filing_deadline: "February 28 (for prior year)"
+        submission_method: "Electronic"
+        electronic_portal: "MGA LRMS"
+        source_url: "https://www.mga.org.mt/licensee-compliance/"
+        pdf_available: false
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Bi-annual statistical return for industry analysis.
+          Detailed operational data for MGA market studies.
+          Not a tax form but required for compliance.
+          Data used for MGA annual reports and policy development.
+
+      sections:
+        - section_id: "LICENSEE"
+          section_name: "Licensee Details"
+          section_description: "Licensed operator"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "mga_license_number"
+              field_code: "Section 1"
+              field_name_en: "MGA License Number"
+              field_name_mt: "Numru tal-LiÄ‹enzja tal-MGA"
+              field_description: "Gaming license"
+              data_type: "STRING"
+              format: "MGA/B2C/###/YYYY"
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "mga_licenses"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "mga_license"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "mga_license_number"
+                data_type: "String"
+
+            - field_id: "licensee_tin"
+              field_code: "Section 2"
+              field_name_en: "Company TIN"
+              field_name_mt: "TIN tal-Kumpanija"
+              field_description: "Tax ID"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "company_tin"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "licensee_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "reporting_year"
+              field_code: "Section 3"
+              field_name_en: "Reporting Year"
+              field_name_mt: "Sena tar-RapportaÄ¡Ä¡"
+              field_description: "Calendar year reported"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "reporting_year"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "reporting_year"
+                data_type: "UInt16"
+
+        - section_id: "OPERATIONAL"
+          section_name: "Operational Statistics"
+          section_description: "Annual operational metrics"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "annual_ggr"
+              field_code: "Section 10"
+              field_name_en: "Annual Gross Gaming Revenue"
+              field_name_mt: "GGR Annwali"
+              field_description: "Total GGR for year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "annual_ggr"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "annual_ggr"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "annual_turnover"
+              field_code: "Section 11"
+              field_name_en: "Annual Total Turnover"
+              field_name_mt: "Turnover Annwali Totali"
+              field_description: "Total stakes for year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "annual_turnover"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "annual_turnover"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "total_registered_players"
+              field_code: "Section 12"
+              field_name_en: "Total Registered Players (Year End)"
+              field_name_mt: "Plejers ReÄ¡istrati Totali (Fi Tmiem is-Sena)"
+              field_description: "Player accounts at year end"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "total_players"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "total_registered_players"
+                data_type: "UInt64"
+
+            - field_id: "active_players_annual"
+              field_code: "Section 13"
+              field_name_en: "Annual Active Players"
+              field_name_mt: "Plejers Attivi Annwali"
+              field_description: "Unique players who wagered during year"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "active_players"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "active_players_annual"
+                data_type: "UInt64"
+
+        - section_id: "EMPLOYMENT"
+          section_name: "Employment Data"
+          section_description: "Workforce statistics"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_employees"
+              field_code: "Section 20"
+              field_name_en: "Total Employees"
+              field_name_mt: "Impjegati Totali"
+              field_description: "FTE employees at year end"
+              data_type: "INTEGER"
+              format: null
+              max_length: 6
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "total_employees"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "total_employees"
+                data_type: "UInt32"
+
+            - field_id: "malta_based_employees"
+              field_code: "Section 21"
+              field_name_en: "Malta-Based Employees"
+              field_name_mt: "Impjegati IbbaÅ¼ati f'Malta"
+              field_description: "Employees working from Malta"
+              data_type: "INTEGER"
+              format: null
+              max_length: 6
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "malta_employees"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "malta_based_employees"
+                data_type: "UInt32"
+
+            - field_id: "total_payroll"
+              field_code: "Section 22"
+              field_name_en: "Total Annual Payroll"
+              field_name_mt: "Payroll Annwali Totali"
+              field_description: "Annual salary costs"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance"
+                column: "total_payroll"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_performance"
+                column: "total_payroll"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "GEOGRAPHIC"
+          section_name: "Geographic Distribution"
+          section_description: "Player geography breakdown"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "country_code"
+              field_code: "Section 30"
+              field_name_en: "Country"
+              field_name_mt: "PajjiÅ¼"
+              field_description: "ISO country code"
+              data_type: "CODE"
+              format: "ISO 3166-1 alpha-2"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_countries"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance_geo"
+                column: "country_code"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_geo"
+                column: "country_code"
+                data_type: "FixedString(2)"
+
+            - field_id: "player_count"
+              field_code: "Section 31"
+              field_name_en: "Active Players from Country"
+              field_name_mt: "Plejers Attivi mill-PajjiÅ¼"
+              field_description: "Number of active players"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance_geo"
+                column: "player_count"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_geo"
+                column: "player_count"
+                data_type: "UInt64"
+
+            - field_id: "ggr_from_country"
+              field_code: "Section 32"
+              field_name_en: "GGR from Country"
+              field_name_mt: "GGR mill-PajjiÅ¼"
+              field_description: "Revenue from country"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "gaming_db"
+                table: "industry_performance_geo"
+                column: "ggr"
+              ors_mapping:
+                table: "mtca_ors.gaming_industry_geo"
+                column: "ggr_from_country"
+                data_type: "Decimal(18,2)"
+
+      attachments:
+        - attachment_code: "DETAILED_STATS"
+          attachment_name: "Detailed Statistical Breakdown"
+          required: true
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "XLSX"
+            - "CSV"
+
+      related_forms:
+        - form_code: "GAMING_TAX_RETURN"
+          relationship_type: "aggregation"
+          relationship_description: "Aggregates monthly returns"
+
+      submission_workflow:
+        authentication_required: "MGA LRMS"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "LRMS receipt"
+
+# ============================================================================
+# Reference Tables for Priority 2D Forms
+# ============================================================================
+reference_tables:
+  mga_license_types:
+    - code: "B2C_1"
+      description_en: "Type 1 - Casino Games"
+      min_tax: 25000
+    - code: "B2C_2"
+      description_en: "Type 2 - Fixed Odds Betting"
+      min_tax: 25000
+    - code: "B2C_3"
+      description_en: "Type 3 - P2P Games"
+      min_tax: 25000
+    - code: "B2C_4"
+      description_en: "Type 4 - Controlled Skill Games"
+      min_tax: 25000
+    - code: "B2B"
+      description_en: "B2B Critical Gaming Supply"
+      min_tax: 0
+
+  game_types:
+    - code: "SLT"
+      description_en: "Slots"
+    - code: "TBL"
+      description_en: "Table Games"
+    - code: "POK"
+      description_en: "Poker"
+    - code: "BNG"
+      description_en: "Bingo"
+    - code: "LOT"
+      description_en: "Lottery"
+    - code: "SPT"
+      description_en: "Sports Betting"
+    - code: "VRT"
+      description_en: "Virtual Sports"
+    - code: "ESP"
+      description_en: "eSports Betting"
+    - code: "OTH"
+      description_en: "Other Games"
+
+  gaming_tax_rates:
+    b2c:
+      rate: 5.0
+      minimum_annual: 25000
+      effective_from: "2018-08-01"
+    compliance_contribution:
+      rate: 0.4
+      effective_from: "2018-08-01"
+
+# ============================================================================
+# Cross-Form Relationships - Gaming to CFR
+# ============================================================================
+cross_authority_integration:
+  mga_to_cfr:
+    - source_form: "GAMING_TAX_RETURN"
+      target_authority: "CFR"
+      data_elements:
+        - "licensee_tin"
+        - "total_ggr"
+        - "gaming_tax_due"
+      frequency: "Monthly"
+      purpose: "Corporate tax reconciliation"
+    - source_form: "INDUSTRY_PERFORMANCE"
+      target_authority: "CFR"
+      data_elements:
+        - "licensee_tin"
+        - "annual_ggr"
+        - "total_payroll"
+      frequency: "Annual"
+      purpose: "Tax audit support"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  gaming_db:
+    tables:
+      - legacy_table: "gaming_tax_return"
+        ors_table: "mtca_ors.gaming_tax_return"
+        key_columns:
+          - legacy: "mga_license"
+            ors: "mga_license_number"
+          - legacy: "return_year"
+            ors: "return_year"
+          - legacy: "return_month"
+            ors: "return_month"
+      - legacy_table: "gaming_revenue_detail"
+        ors_table: "mtca_ors.gaming_revenue_detail"
+        key_columns:
+          - legacy: "mga_license"
+            ors: "mga_license_number"
+          - legacy: "return_year"
+            ors: "return_year"
+          - legacy: "return_month"
+            ors: "return_month"
+          - legacy: "game_type"
+            ors: "game_type"
+      - legacy_table: "compliance_contribution"
+        ors_table: "mtca_ors.gaming_compliance_contribution"
+        key_columns:
+          - legacy: "mga_license"
+            ors: "mga_license_number"
+          - legacy: "return_year"
+            ors: "return_year"
+          - legacy: "return_month"
+            ors: "return_month"
+      - legacy_table: "industry_performance"
+        ors_table: "mtca_ors.gaming_industry_performance"
+        key_columns:
+          - legacy: "mga_license"
+            ors: "mga_license_number"
+          - legacy: "reporting_year"
+            ors: "reporting_year"
+      - legacy_table: "industry_performance_geo"
+        ors_table: "mtca_ors.gaming_industry_geo"
+        key_columns:
+          - legacy: "mga_license"
+            ors: "mga_license_number"
+          - legacy: "reporting_year"
+            ors: "reporting_year"
+          - legacy: "country_code"
+            ors: "country_code"

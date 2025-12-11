@@ -1,0 +1,2288 @@
+# ============================================================================
+# MTCA Forms - Priority 3B: Employer Obligations (FSS System)
+# Forms: FS3, FS4, FS5, FS7, FB1
+# Version: 1.0
+# Date: 2025-12-06
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # FS3: Payee Statement of Earnings
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "FS3"
+        form_name_en: "Payee Statement of Earnings"
+        form_name_mt: "Dikjarazzjoni tal-QligÄ§ tal-BenefiÄ‹jarju"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "ITMA Cap. 372"
+          - "S.L.372.18 - Final Settlement System Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - FSS"
+        taxpayer_category: "Employer"
+        filing_frequency: "Annual"
+        filing_deadline: "February 15 following calendar year"
+        submission_method: "Both"
+        electronic_portal: "MTCA Employer Portal"
+        source_url: "https://cfr.gov.mt/en/employers/Pages/FSS-Forms.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: "FS3_XML_v2024"
+        notes: |
+          Annual statement of earnings and tax deducted issued by employer to each
+          employee. Mandatory electronic submission for employers with 10+ employees.
+          Pre-populates employee's individual tax return. Must reconcile with FS7.
+
+      sections:
+        - section_id: "EMPLOYER_ID"
+          section_name: "Employer Identification"
+          section_description: "Payer/employer details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "employer_tin"
+              field_code: "Box 1"
+              field_name_en: "Employer Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa tal-Employer"
+              field_description: "9-digit TIN of the employer"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS3_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid employer TIN format"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid Employer TIN format"
+                  error_message_mt: "Format tat-TIN tal-employer mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "employer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "employer"
+                column: "employer_tin"
+              ors_mapping:
+                table: "mtca_ors.employer"
+                column: "employer_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "calendar_year"
+              field_code: "Box 3"
+              field_name_en: "Calendar Year"
+              field_name_mt: "Sena Kalendarja"
+              field_description: "Year for which FS3 is issued"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS3_003"
+                  rule_type: "range"
+                  rule_description: "Valid calendar year"
+                  rule_expression: "calendar_year >= 2000 AND calendar_year <= CURRENT_YEAR"
+                  error_message_en: "Invalid calendar year"
+                  error_message_mt: "Sena kalendarja mhux valida"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "calendar_year"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "calendar_year"
+                data_type: "UInt16"
+
+        - section_id: "EMPLOYEE_ID"
+          section_name: "Employee Identification"
+          section_description: "Payee/employee details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "employee_tin"
+              field_code: "Box 10"
+              field_name_en: "Employee Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa tal-Impjegat"
+              field_description: "Employee's Maltese ID or TIN"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS3_010"
+                  rule_type: "pattern"
+                  rule_description: "Valid individual TIN format"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid Employee TIN format"
+                  error_message_mt: "Format tat-TIN tal-impjegat mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: "e-Return.taxpayer_tin"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "employee_tin"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "employee_tin"
+                data_type: "String"
+
+            - field_id: "employee_surname"
+              field_code: "Box 11"
+              field_name_en: "Employee Surname"
+              field_name_mt: "Kunjom tal-Impjegat"
+              field_description: "Employee's surname"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "employee_surname"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "employee_surname"
+                data_type: "String"
+
+            - field_id: "employee_first_name"
+              field_code: "Box 12"
+              field_name_en: "Employee First Name"
+              field_name_mt: "Isem tal-Impjegat"
+              field_description: "Employee's first name"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "employee_first_name"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "employee_first_name"
+                data_type: "String"
+
+        - section_id: "EARNINGS"
+          section_name: "Earnings Details"
+          section_description: "Annual gross emoluments and components"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "gross_emoluments"
+              field_code: "Box 20"
+              field_name_en: "Gross Emoluments"
+              field_name_mt: "Emolumenti Gross"
+              field_description: "Total gross salary, wages, bonuses for the year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS5.gross_emoluments) for employee"
+              validation_rules:
+                - rule_id: "FS3_020"
+                  rule_type: "range"
+                  rule_description: "Must be non-negative"
+                  rule_expression: "gross_emoluments >= 0"
+                  error_message_en: "Gross emoluments cannot be negative"
+                  error_message_mt: "Emolumenti gross ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.gross_emoluments"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "gross_emoluments"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "gross_emoluments"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "fringe_benefits"
+              field_code: "Box 23"
+              field_name_en: "Taxable Fringe Benefits"
+              field_name_mt: "BenefiÄ‹Ä‹ji Fringe Taxabbli"
+              field_description: "Total taxable value of fringe benefits"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: null
+              editable: false
+              default_value: 0
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FB1.total_fringe_benefits"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "fringe_benefits"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "fringe_benefits"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "DEDUCTIONS"
+          section_name: "Deductions"
+          section_description: "Tax and social security contributions deducted"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "fss_tax_deducted"
+              field_code: "Box 30"
+              field_name_en: "FSS Tax Deducted"
+              field_name_mt: "Taxxa FSS Imnaqqsa"
+              field_description: "Total income tax withheld under FSS"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS5.fss_tax_employee) for employee"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.fss_tax_deducted"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "fss_tax"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "fss_tax_deducted"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "ssc_employee"
+              field_code: "Box 31"
+              field_name_en: "Employee SSC Deducted"
+              field_name_mt: "SSC tal-Impjegat Imnaqqas"
+              field_description: "Social Security Contribution deducted from employee (Class 1)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS5.ssc_employee) for employee"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-Return.ssc_employee"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "ssc_employee"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "ssc_employee"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "ssc_employer"
+              field_code: "Box 32"
+              field_name_en: "Employer SSC Contribution"
+              field_name_mt: "Kontribuzzjoni SSC tal-Employer"
+              field_description: "Employer's share of Social Security Contribution"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS5.ssc_employer) for employee"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "ssc_employer"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "ssc_employer"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "maternity_fund"
+              field_code: "Box 33"
+              field_name_en: "Maternity/Work Life Balance Fund"
+              field_name_mt: "Fond tal-MaternitÃ /Work Life Balance"
+              field_description: "Employer's contribution to maternity fund (0.3%)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS5.maternity_fund) for employee"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs3"
+                column: "maternity_fund"
+              ors_mapping:
+                table: "mtca_ors.fs3_statement"
+                column: "maternity_fund"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "FS5"
+          relationship_type: "aggregation"
+          relationship_description: "Annual totals derived from monthly FS5"
+        - form_code: "FS7"
+          relationship_type: "reconciliation"
+          relationship_description: "Must reconcile with FS7 totals"
+        - form_code: "e-Return"
+          relationship_type: "output"
+          relationship_description: "Pre-populates employee tax return"
+        - form_code: "FB1"
+          relationship_type: "input"
+          relationship_description: "Fringe benefits from FB1"
+
+      submission_workflow:
+        authentication_required: "Employer portal login"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Submission confirmation with reference"
+
+  # ==========================================================================
+  # FS4: Payee Status Declaration
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "FS4"
+        form_name_en: "Payee Status Declaration"
+        form_name_mt: "Dikjarazzjoni tal-Istatus tal-BenefiÄ‹jarju"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "S.L.372.18 - Final Settlement System Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - FSS"
+        taxpayer_category: "Employee"
+        filing_frequency: "Event-driven"
+        filing_deadline: "Within 7 days of commencing employment"
+        submission_method: "Both"
+        electronic_portal: "MTCA Employer Portal / CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/employers/Pages/FSS-Forms.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Declaration by new employee to employer indicating tax status
+          for FSS deduction calculation. Determines applicable tax rate.
+          Employer submits to MTCA. Can be integrated with JobsPlus.
+
+      sections:
+        - section_id: "EMPLOYEE_DETAILS"
+          section_name: "Employee Personal Details"
+          section_description: "New employee identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "employee_tin"
+              field_code: "Box 1"
+              field_name_en: "Employee Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa tal-Impjegat"
+              field_description: "Employee's Maltese ID or TIN"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS4_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid individual TIN format"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tat-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs4"
+                column: "employee_tin"
+              ors_mapping:
+                table: "mtca_ors.fs4_declaration"
+                column: "employee_tin"
+                data_type: "String"
+
+            - field_id: "employee_surname"
+              field_code: "Box 2"
+              field_name_en: "Surname"
+              field_name_mt: "Kunjom"
+              field_description: "Employee surname"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs4"
+                column: "surname"
+              ors_mapping:
+                table: "mtca_ors.fs4_declaration"
+                column: "employee_surname"
+                data_type: "String"
+
+            - field_id: "employee_first_name"
+              field_code: "Box 3"
+              field_name_en: "First Name"
+              field_name_mt: "Isem"
+              field_description: "Employee first name"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs4"
+                column: "first_name"
+              ors_mapping:
+                table: "mtca_ors.fs4_declaration"
+                column: "employee_first_name"
+                data_type: "String"
+
+        - section_id: "TAX_STATUS"
+          section_name: "Tax Status Declaration"
+          section_description: "Status for FSS tax calculation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "marital_status"
+              field_code: "Box 10"
+              field_name_en: "Marital Status"
+              field_name_mt: "Stat ÄŠivili"
+              field_description: "Current marital status"
+              data_type: "CODE"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "S"
+                  description_en: "Single"
+                  description_mt: "Single"
+                - code: "M"
+                  description_en: "Married"
+                  description_mt: "MiÅ¼Å¼ewweÄ¡/MiÅ¼Å¼ewÄ¡a"
+                - code: "W"
+                  description_en: "Widowed"
+                  description_mt: "Armel/Armla"
+                - code: "D"
+                  description_en: "Divorced/Separated"
+                  description_mt: "Divorzjat/a"
+              reference_table: "marital_status_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs4"
+                column: "marital_status"
+              ors_mapping:
+                table: "mtca_ors.fs4_declaration"
+                column: "marital_status"
+                data_type: "FixedString(1)"
+
+            - field_id: "tax_computation_status"
+              field_code: "Box 11"
+              field_name_en: "Tax Computation Status"
+              field_name_mt: "Status tal-Kalkolu tat-Taxxa"
+              field_description: "Applicable tax rate category"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "SIN"
+                  description_en: "Single Rates"
+                  description_mt: "Rati Single"
+                - code: "MAR"
+                  description_en: "Married Rates"
+                  description_mt: "Rati MiÅ¼Å¼ewÄ¡in"
+                - code: "PAR"
+                  description_en: "Parent Rates"
+                  description_mt: "Rati Ä enituri"
+              reference_table: "tax_computation_status_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs4"
+                column: "tax_status"
+              ors_mapping:
+                table: "mtca_ors.fs4_declaration"
+                column: "tax_computation_status"
+                data_type: "FixedString(3)"
+
+            - field_id: "other_employment"
+              field_code: "Box 12"
+              field_name_en: "Other Employment"
+              field_name_mt: "Impjieg IeÄ§or"
+              field_description: "Has other employment with another employer"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs4"
+                column: "other_employment"
+              ors_mapping:
+                table: "mtca_ors.fs4_declaration"
+                column: "other_employment"
+                data_type: "UInt8"
+
+        - section_id: "EMPLOYMENT_DETAILS"
+          section_name: "Employment Details"
+          section_description: "New employment information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "employer_tin"
+              field_code: "Box 20"
+              field_name_en: "Employer TIN"
+              field_name_mt: "TIN tal-Employer"
+              field_description: "New employer's Tax Identification Number"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS4_020"
+                  rule_type: "lookup"
+                  rule_description: "Employer must be registered"
+                  rule_expression: "EXISTS(employer_register.tin)"
+                  error_message_en: "Employer not registered"
+                  error_message_mt: "Employer mhux irreÄ¡istrat"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "employer_register"
+              cross_form_reference: "FS3.employer_tin"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs4"
+                column: "employer_tin"
+              ors_mapping:
+                table: "mtca_ors.fs4_declaration"
+                column: "employer_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "employment_start_date"
+              field_code: "Box 21"
+              field_name_en: "Employment Start Date"
+              field_name_mt: "Data tal-Bidu tal-Impjieg"
+              field_description: "Date employment commenced"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS3.employment_start_date"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs4"
+                column: "start_date"
+              ors_mapping:
+                table: "mtca_ors.fs4_declaration"
+                column: "employment_start_date"
+                data_type: "Date"
+
+            - field_id: "employment_type"
+              field_code: "Box 22"
+              field_name_en: "Employment Type"
+              field_name_mt: "Tip ta' Impjieg"
+              field_description: "Full-time or Part-time"
+              data_type: "CODE"
+              format: null
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "FT"
+                  description_en: "Full-Time"
+                  description_mt: "Full-Time"
+                - code: "PT"
+                  description_en: "Part-Time"
+                  description_mt: "Part-Time"
+              reference_table: "employment_type_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs4"
+                column: "employment_type"
+              ors_mapping:
+                table: "mtca_ors.fs4_declaration"
+                column: "employment_type"
+                data_type: "FixedString(2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "FS3"
+          relationship_type: "followup"
+          relationship_description: "Initiates annual FS3 reporting for employee"
+        - form_code: "FS5"
+          relationship_type: "followup"
+          relationship_description: "Triggers monthly FS5 inclusion"
+
+      submission_workflow:
+        authentication_required: "Employer portal or paper submission"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Registration confirmation"
+
+  # ==========================================================================
+  # FS5: Payer's Monthly Payment Advice
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "FS5"
+        form_name_en: "Payer's Monthly Payment Advice"
+        form_name_mt: "AvviÅ¼ ta' Ä¦las Fix-Xahar tal-Pagatur"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "ITMA Cap. 372"
+          - "S.L.372.18 - Final Settlement System Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - FSS"
+        taxpayer_category: "Employer"
+        filing_frequency: "Monthly"
+        filing_deadline: "Last working day of following month"
+        submission_method: "Electronic-only"
+        electronic_portal: "MTCA Employer Portal"
+        source_url: "https://cfr.gov.mt/en/employers/Pages/FSS-Forms.aspx"
+        pdf_available: false
+        online_form_available: true
+        xml_schema_ref: "FS5_XML_v2024"
+        notes: |
+          Mandatory monthly electronic filing for ALL employers. Summary of
+          emoluments paid, tax withheld, and SSC for each employee. Can be
+          uploaded via XML, API, or web form.
+
+      sections:
+        - section_id: "EMPLOYER_PERIOD"
+          section_name: "Employer and Period"
+          section_description: "Payer identification and reporting month"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "employer_tin"
+              field_code: "Box 1"
+              field_name_en: "Employer TIN"
+              field_name_mt: "TIN tal-Employer"
+              field_description: "Employer's Tax Identification Number"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS5_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid employer TIN"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid Employer TIN"
+                  error_message_mt: "TIN tal-employer mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "employer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "employer_tin"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "employer_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "pay_period_month"
+              field_code: "Box 2"
+              field_name_en: "Pay Period Month"
+              field_name_mt: "Xahar tal-Perjodu ta' Ä¦las"
+              field_description: "Month for which payment advice is submitted"
+              data_type: "INTEGER"
+              format: "MM"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS5_002"
+                  rule_type: "range"
+                  rule_description: "Valid month"
+                  rule_expression: "pay_period_month >= 1 AND pay_period_month <= 12"
+                  error_message_en: "Invalid month"
+                  error_message_mt: "Xahar mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "pay_month"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "pay_period_month"
+                data_type: "UInt8"
+
+            - field_id: "pay_period_year"
+              field_code: "Box 3"
+              field_name_en: "Pay Period Year"
+              field_name_mt: "Sena tal-Perjodu ta' Ä¦las"
+              field_description: "Year for which payment advice is submitted"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "pay_year"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "pay_period_year"
+                data_type: "UInt16"
+
+        - section_id: "EMPLOYEE_DETAILS"
+          section_name: "Employee Details"
+          section_description: "Per-employee earnings and deductions for the month"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "employee_tin"
+              field_code: "Line - Col 1"
+              field_name_en: "Employee TIN"
+              field_name_mt: "TIN tal-Impjegat"
+              field_description: "Employee's Tax Identification Number"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS5_010"
+                  rule_type: "pattern"
+                  rule_description: "Valid individual TIN"
+                  rule_expression: "^([0-9]{7}[A-Z]|[0-9]{9})$"
+                  error_message_en: "Invalid Employee TIN"
+                  error_message_mt: "TIN tal-impjegat mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5_detail"
+                column: "employee_tin"
+              ors_mapping:
+                table: "mtca_ors.fs5_employee_detail"
+                column: "employee_tin"
+                data_type: "String"
+
+            - field_id: "gross_emoluments"
+              field_code: "Line - Col 2"
+              field_name_en: "Gross Emoluments"
+              field_name_mt: "Emolumenti Gross"
+              field_description: "Gross pay for the month"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS5_011"
+                  rule_type: "range"
+                  rule_description: "Must be non-negative"
+                  rule_expression: "gross_emoluments >= 0"
+                  error_message_en: "Gross pay cannot be negative"
+                  error_message_mt: "Paga gross ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5_detail"
+                column: "gross_pay"
+              ors_mapping:
+                table: "mtca_ors.fs5_employee_detail"
+                column: "gross_emoluments"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "fss_tax_employee"
+              field_code: "Line - Col 3"
+              field_name_en: "FSS Tax Deducted"
+              field_name_mt: "Taxxa FSS Imnaqqsa"
+              field_description: "Income tax withheld from employee"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5_detail"
+                column: "fss_tax"
+              ors_mapping:
+                table: "mtca_ors.fs5_employee_detail"
+                column: "fss_tax_employee"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "ssc_employee"
+              field_code: "Line - Col 4"
+              field_name_en: "Employee SSC"
+              field_name_mt: "SSC tal-Impjegat"
+              field_description: "Employee's SSC deducted"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5_detail"
+                column: "ssc_employee"
+              ors_mapping:
+                table: "mtca_ors.fs5_employee_detail"
+                column: "ssc_employee"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "ssc_employer"
+              field_code: "Line - Col 5"
+              field_name_en: "Employer SSC"
+              field_name_mt: "SSC tal-Employer"
+              field_description: "Employer's SSC contribution"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5_detail"
+                column: "ssc_employer"
+              ors_mapping:
+                table: "mtca_ors.fs5_employee_detail"
+                column: "ssc_employer"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "maternity_fund"
+              field_code: "Line - Col 6"
+              field_name_en: "Maternity/WLB Fund"
+              field_name_mt: "Fond MaternitÃ /WLB"
+              field_description: "Employer's maternity fund contribution (0.3%)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: true
+              calculation_formula: "gross_emoluments * 0.003"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5_detail"
+                column: "maternity"
+              ors_mapping:
+                table: "mtca_ors.fs5_employee_detail"
+                column: "maternity_fund"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "MONTHLY_TOTALS"
+          section_name: "Monthly Totals"
+          section_description: "Summary totals for the month"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_employees"
+              field_code: "Box 30"
+              field_name_en: "Total Number of Employees"
+              field_name_mt: "Numru Totali ta' Impjegati"
+              field_description: "Count of employees in this submission"
+              data_type: "INTEGER"
+              format: null
+              max_length: 5
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "COUNT(employee_tin)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "employee_count"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "total_employees"
+                data_type: "UInt32"
+
+            - field_id: "total_gross_emoluments"
+              field_code: "Box 31"
+              field_name_en: "Total Gross Emoluments"
+              field_name_mt: "Emolumenti Gross Totali"
+              field_description: "Sum of all employee gross pay"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(gross_emoluments)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "total_gross"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "total_gross_emoluments"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_fss_tax"
+              field_code: "Box 32"
+              field_name_en: "Total FSS Tax"
+              field_name_mt: "Taxxa FSS Totali"
+              field_description: "Sum of tax withheld"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(fss_tax_employee)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "total_fss_tax"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "total_fss_tax"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_ssc_employee"
+              field_code: "Box 33"
+              field_name_en: "Total Employee SSC"
+              field_name_mt: "SSC tal-Impjegati Totali"
+              field_description: "Sum of employee SSC deducted"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(ssc_employee)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "total_ssc_ee"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "total_ssc_employee"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_ssc_employer"
+              field_code: "Box 34"
+              field_name_en: "Total Employer SSC"
+              field_name_mt: "SSC tal-Employer Totali"
+              field_description: "Sum of employer SSC contributions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(ssc_employer)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "total_ssc_er"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "total_ssc_employer"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_maternity_fund"
+              field_code: "Box 35"
+              field_name_en: "Total Maternity/WLB Fund"
+              field_name_mt: "Fond MaternitÃ /WLB Totali"
+              field_description: "Sum of maternity fund contributions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(maternity_fund)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "total_maternity"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "total_maternity_fund"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_amount_due"
+              field_code: "Box 36"
+              field_name_en: "Total Amount Due"
+              field_name_mt: "Ammont Totali Dovut"
+              field_description: "Total payment due to MTCA"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_fss_tax + total_ssc_employee + total_ssc_employer + total_maternity_fund"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs5"
+                column: "total_due"
+              ors_mapping:
+                table: "mtca_ors.fs5_monthly"
+                column: "total_amount_due"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "FS3"
+          relationship_type: "feeds"
+          relationship_description: "Monthly data aggregated into annual FS3"
+        - form_code: "FS7"
+          relationship_type: "reconciliation"
+          relationship_description: "Monthly totals reconciled in annual FS7"
+
+      submission_workflow:
+        authentication_required: "Employer portal login"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Submission confirmation and payment receipt"
+
+  # ==========================================================================
+  # FS7: Annual Reconciliation Statement
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "FS7"
+        form_name_en: "Annual Reconciliation Statement"
+        form_name_mt: "Dikjarazzjoni ta' RikonÄ‹iljazzjoni Annwali"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "ITMA Cap. 372"
+          - "S.L.372.18 - Final Settlement System Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - FSS"
+        taxpayer_category: "Employer"
+        filing_frequency: "Annual"
+        filing_deadline: "February 15 following calendar year"
+        submission_method: "Both"
+        electronic_portal: "MTCA Employer Portal"
+        source_url: "https://cfr.gov.mt/en/employers/Pages/FSS-Forms.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: "FS7_XML_v2024"
+        notes: |
+          Annual reconciliation of all FS5 monthly submissions. Must match
+          sum of all FS3 statements issued. Mandatory electronic for 10+
+          employees. Any balance due must be paid with submission.
+
+      sections:
+        - section_id: "EMPLOYER_ID"
+          section_name: "Employer Identification"
+          section_description: "Employer details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "employer_tin"
+              field_code: "Box 1"
+              field_name_en: "Employer TIN"
+              field_name_mt: "TIN tal-Employer"
+              field_description: "Employer's Tax Identification Number"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FS7_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid employer TIN"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid Employer TIN"
+                  error_message_mt: "TIN tal-employer mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "employer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "employer_tin"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "employer_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "calendar_year"
+              field_code: "Box 2"
+              field_name_en: "Calendar Year"
+              field_name_mt: "Sena Kalendarja"
+              field_description: "Year being reconciled"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "calendar_year"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "calendar_year"
+                data_type: "UInt16"
+
+        - section_id: "ANNUAL_TOTALS"
+          section_name: "Annual Totals"
+          section_description: "Total amounts for the year"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_employees"
+              field_code: "Box 10"
+              field_name_en: "Total Employees for Year"
+              field_name_mt: "Impjegati Totali gÄ§as-Sena"
+              field_description: "Total employees who received emoluments"
+              data_type: "INTEGER"
+              format: null
+              max_length: 5
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "COUNT(DISTINCT FS3.employee_tin)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "total_employees"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "total_employees"
+                data_type: "UInt32"
+
+            - field_id: "total_gross_emoluments"
+              field_code: "Box 11"
+              field_name_en: "Total Gross Emoluments"
+              field_name_mt: "Emolumenti Gross Totali"
+              field_description: "Sum of all FS3 gross emoluments"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS3.gross_emoluments)"
+              validation_rules:
+                - rule_id: "FS7_010"
+                  rule_type: "cross-reference"
+                  rule_description: "Must match FS5 annual total"
+                  rule_expression: "total_gross_emoluments = SUM(FS5.total_gross_emoluments)"
+                  error_message_en: "Does not reconcile with monthly FS5 submissions"
+                  error_message_mt: "Ma jaqbilx mas-sottomissjonijiet FS5 fix-xahar"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS5"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "total_gross"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "total_gross_emoluments"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_fss_tax"
+              field_code: "Box 12"
+              field_name_en: "Total FSS Tax Withheld"
+              field_name_mt: "Taxxa FSS Totali MiÅ¼muma"
+              field_description: "Sum of all FSS tax deducted"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS3.fss_tax_deducted)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS5"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "total_fss_tax"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "total_fss_tax"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_ssc_employee"
+              field_code: "Box 13"
+              field_name_en: "Total Employee SSC"
+              field_name_mt: "SSC tal-Impjegati Totali"
+              field_description: "Sum of employee SSC deducted"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS3.ssc_employee)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS5"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "total_ssc_ee"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "total_ssc_employee"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_ssc_employer"
+              field_code: "Box 14"
+              field_name_en: "Total Employer SSC"
+              field_name_mt: "SSC tal-Employer Totali"
+              field_description: "Sum of employer SSC"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS3.ssc_employer)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS5"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "total_ssc_er"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "total_ssc_employer"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_maternity_fund"
+              field_code: "Box 15"
+              field_name_en: "Total Maternity/WLB Fund"
+              field_name_mt: "Fond MaternitÃ /WLB Totali"
+              field_description: "Sum of maternity fund contributions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS3.maternity_fund)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS5"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "total_maternity"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "total_maternity_fund"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "RECONCILIATION"
+          section_name: "Reconciliation"
+          section_description: "Payments vs liability reconciliation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_liability"
+              field_code: "Box 20"
+              field_name_en: "Total Annual Liability"
+              field_name_mt: "Obbligazzjoni Annwali Totali"
+              field_description: "Total FSS + SSC + Maternity due for year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_fss_tax + total_ssc_employee + total_ssc_employer + total_maternity_fund"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "total_liability"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "total_liability"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_payments"
+              field_code: "Box 21"
+              field_name_en: "Total Payments Made"
+              field_name_mt: "Ä¦lasijiet Totali MagÄ§mula"
+              field_description: "Sum of all FS5 payments during year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(FS5_payments)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS5"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "total_payments"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "total_payments"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "balance_due"
+              field_code: "Box 22"
+              field_name_en: "Balance Due/(Overpaid)"
+              field_name_mt: "BilanÄ‹ Dovut/(Å»ejjed)"
+              field_description: "Difference between liability and payments"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_liability - total_payments"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fs7"
+                column: "balance_due"
+              ors_mapping:
+                table: "mtca_ors.fs7_reconciliation"
+                column: "balance_due"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "FS3"
+          relationship_type: "aggregation"
+          relationship_description: "Sum of all FS3 must equal FS7 totals"
+        - form_code: "FS5"
+          relationship_type: "reconciliation"
+          relationship_description: "Sum of monthly FS5 payments reconciled"
+
+      submission_workflow:
+        authentication_required: "Employer portal login"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Reconciliation confirmation with payment receipt if balance due"
+
+  # ==========================================================================
+  # FB1: Fringe Benefits Personal History
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "FB1"
+        form_name_en: "Fringe Benefits Personal History"
+        form_name_mt: "Storja Personali tal-BenefiÄ‹Ä‹ji Fringe"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "S.L.123.55 - Fringe Benefits Rules"
+        administering_authority: "CFR"
+        tax_type: "Income Tax - Fringe Benefits"
+        taxpayer_category: "Employer"
+        filing_frequency: "Annual"
+        filing_deadline: "February 15 following calendar year"
+        submission_method: "Paper"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/employers/Pages/Fringe-Benefits.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Documentation of taxable fringe benefits provided to employees.
+          Values feed into FS3 fringe benefits field. Covers company cars,
+          housing, loans, and other non-cash benefits.
+
+      sections:
+        - section_id: "EMPLOYER_EMPLOYEE"
+          section_name: "Employer and Employee"
+          section_description: "Identification of parties"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "employer_tin"
+              field_code: "Box 1"
+              field_name_en: "Employer TIN"
+              field_name_mt: "TIN tal-Employer"
+              field_description: "Employer's Tax Identification Number"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "employer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fb1"
+                column: "employer_tin"
+              ors_mapping:
+                table: "mtca_ors.fringe_benefits"
+                column: "employer_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "employee_tin"
+              field_code: "Box 2"
+              field_name_en: "Employee TIN"
+              field_name_mt: "TIN tal-Impjegat"
+              field_description: "Employee receiving benefits"
+              data_type: "TIN"
+              format: "0000000X or 999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: "FS3.employee_tin"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fb1"
+                column: "employee_tin"
+              ors_mapping:
+                table: "mtca_ors.fringe_benefits"
+                column: "employee_tin"
+                data_type: "String"
+
+            - field_id: "calendar_year"
+              field_code: "Box 3"
+              field_name_en: "Calendar Year"
+              field_name_mt: "Sena Kalendarja"
+              field_description: "Year for which benefits apply"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fb1"
+                column: "calendar_year"
+              ors_mapping:
+                table: "mtca_ors.fringe_benefits"
+                column: "calendar_year"
+                data_type: "UInt16"
+
+        - section_id: "BENEFIT_DETAILS"
+          section_name: "Benefit Details"
+          section_description: "Types and values of fringe benefits"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "benefit_type"
+              field_code: "Box 10"
+              field_name_en: "Benefit Type"
+              field_name_mt: "Tip ta' BenefiÄ‹Ä‹ju"
+              field_description: "Category of fringe benefit"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "CAR"
+                  description_en: "Company Car"
+                  description_mt: "Karozza tal-Kumpanija"
+                - code: "HOU"
+                  description_en: "Housing/Accommodation"
+                  description_mt: "Akkomodazzjoni"
+                - code: "LON"
+                  description_en: "Interest-Free Loan"
+                  description_mt: "Self MingÄ§ajr ImgÄ§ax"
+                - code: "INS"
+                  description_en: "Insurance Premium"
+                  description_mt: "Premium tal-Assigurazzjoni"
+                - code: "EDU"
+                  description_en: "Education"
+                  description_mt: "Edukazzjoni"
+                - code: "OTH"
+                  description_en: "Other Benefits"
+                  description_mt: "BenefiÄ‹Ä‹ji OÄ§ra"
+              reference_table: "benefit_type_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fb1_detail"
+                column: "benefit_type"
+              ors_mapping:
+                table: "mtca_ors.fringe_benefit_detail"
+                column: "benefit_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "benefit_description"
+              field_code: "Box 11"
+              field_name_en: "Benefit Description"
+              field_name_mt: "Deskrizzjoni tal-BenefiÄ‹Ä‹ju"
+              field_description: "Specific details of the benefit"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fb1_detail"
+                column: "description"
+              ors_mapping:
+                table: "mtca_ors.fringe_benefit_detail"
+                column: "benefit_description"
+                data_type: "String"
+
+            - field_id: "cash_equivalent"
+              field_code: "Box 12"
+              field_name_en: "Cash Equivalent Value"
+              field_name_mt: "Valur Ekwivalenti fi Flus"
+              field_description: "Taxable value of benefit per FB rules"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "FB1_010"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "cash_equivalent >= 0"
+                  error_message_en: "Benefit value cannot be negative"
+                  error_message_mt: "Valur tal-benefiÄ‹Ä‹ju ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fb1_detail"
+                column: "cash_value"
+              ors_mapping:
+                table: "mtca_ors.fringe_benefit_detail"
+                column: "cash_equivalent"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "period_from"
+              field_code: "Box 13"
+              field_name_en: "Period From"
+              field_name_mt: "Perjodu Minn"
+              field_description: "Start date of benefit period"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fb1_detail"
+                column: "period_from"
+              ors_mapping:
+                table: "mtca_ors.fringe_benefit_detail"
+                column: "period_from"
+                data_type: "Date"
+
+            - field_id: "period_to"
+              field_code: "Box 14"
+              field_name_en: "Period To"
+              field_name_mt: "Perjodu Sa"
+              field_description: "End date of benefit period"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "fss_db"
+                table: "fb1_detail"
+                column: "period_to"
+              ors_mapping:
+                table: "mtca_ors.fringe_benefit_detail"
+                column: "period_to"
+                data_type: "Date"
+
+        - section_id: "TOTALS"
+          section_name: "Totals"
+          section_description: "Total fringe benefits for the year"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_fringe_benefits"
+              field_code: "Box 20"
+              field_name_en: "Total Taxable Fringe Benefits"
+              field_name_mt: "BenefiÄ‹Ä‹ji Fringe Taxabbli Totali"
+              field_description: "Sum of all benefit cash equivalents"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(cash_equivalent)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS3.fringe_benefits"
+              legacy_mapping:
+                database: "fss_db"
+                table: "fb1"
+                column: "total_benefits"
+              ors_mapping:
+                table: "mtca_ors.fringe_benefits"
+                column: "total_fringe_benefits"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "SUPPORTING_DOCS"
+          attachment_name: "Supporting Documentation"
+          required: false
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "FS3"
+          relationship_type: "feeds"
+          relationship_description: "Total feeds into FS3 fringe benefits field"
+
+      submission_workflow:
+        authentication_required: "Employer submission"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Acknowledgment of receipt"
+
+# ============================================================================
+# Reference Tables for Priority 3B Forms
+# ============================================================================
+reference_tables:
+  marital_status_codes:
+    - code: "S"
+      description_en: "Single"
+      description_mt: "Single"
+    - code: "M"
+      description_en: "Married"
+      description_mt: "MiÅ¼Å¼ewweÄ¡/MiÅ¼Å¼ewÄ¡a"
+    - code: "W"
+      description_en: "Widowed"
+      description_mt: "Armel/Armla"
+    - code: "D"
+      description_en: "Divorced/Separated"
+      description_mt: "Divorzjat/a"
+
+  tax_computation_status_codes:
+    - code: "SIN"
+      description_en: "Single Rates"
+      description_mt: "Rati Single"
+    - code: "MAR"
+      description_en: "Married Rates"
+      description_mt: "Rati MiÅ¼Å¼ewÄ¡in"
+    - code: "PAR"
+      description_en: "Parent Rates"
+      description_mt: "Rati Ä enituri"
+
+  employment_type_codes:
+    - code: "FT"
+      description_en: "Full-Time"
+      description_mt: "Full-Time"
+    - code: "PT"
+      description_en: "Part-Time"
+      description_mt: "Part-Time"
+
+  benefit_type_codes:
+    - code: "CAR"
+      description_en: "Company Car"
+      description_mt: "Karozza tal-Kumpanija"
+    - code: "HOU"
+      description_en: "Housing/Accommodation"
+      description_mt: "Akkomodazzjoni"
+    - code: "LON"
+      description_en: "Interest-Free Loan"
+      description_mt: "Self MingÄ§ajr ImgÄ§ax"
+    - code: "INS"
+      description_en: "Insurance Premium"
+      description_mt: "Premium tal-Assigurazzjoni"
+    - code: "EDU"
+      description_en: "Education"
+      description_mt: "Edukazzjoni"
+    - code: "OTH"
+      description_en: "Other Benefits"
+      description_mt: "BenefiÄ‹Ä‹ji OÄ§ra"
+
+# ============================================================================
+# Cross-Form Relationships Summary
+# ============================================================================
+form_relationships:
+  fss_chain:
+    description: "FSS employer obligations filing chain"
+    flow:
+      - source: "FS4"
+        target: "FS5"
+        relationship: "New employee triggers FS5 inclusion"
+      - source: "FS5"
+        target: "FS3"
+        relationship: "Monthly data aggregated into annual FS3"
+      - source: "FS5"
+        target: "FS7"
+        relationship: "Monthly payments reconciled in FS7"
+      - source: "FS3"
+        target: "FS7"
+        relationship: "FS3 totals must match FS7"
+      - source: "FB1"
+        target: "FS3"
+        relationship: "Fringe benefits feed into FS3"
+      - source: "FS3"
+        target: "e-Return"
+        relationship: "Pre-populates employee tax return"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  fss_db:
+    tables:
+      - legacy_table: "employer"
+        ors_table: "mtca_ors.employer"
+        key_columns:
+          - legacy: "employer_tin"
+            ors: "employer_tin"
+      - legacy_table: "fs3"
+        ors_table: "mtca_ors.fs3_statement"
+        key_columns:
+          - legacy: "employer_tin"
+            ors: "employer_tin"
+          - legacy: "employee_tin"
+            ors: "employee_tin"
+          - legacy: "calendar_year"
+            ors: "calendar_year"
+      - legacy_table: "fs4"
+        ors_table: "mtca_ors.fs4_declaration"
+        key_columns:
+          - legacy: "employee_tin"
+            ors: "employee_tin"
+          - legacy: "employer_tin"
+            ors: "employer_tin"
+          - legacy: "start_date"
+            ors: "employment_start_date"
+      - legacy_table: "fs5"
+        ors_table: "mtca_ors.fs5_monthly"
+        key_columns:
+          - legacy: "employer_tin"
+            ors: "employer_tin"
+          - legacy: "pay_year"
+            ors: "pay_period_year"
+          - legacy: "pay_month"
+            ors: "pay_period_month"
+      - legacy_table: "fs5_detail"
+        ors_table: "mtca_ors.fs5_employee_detail"
+        key_columns:
+          - legacy: "employer_tin"
+            ors: "employer_tin"
+          - legacy: "employee_tin"
+            ors: "employee_tin"
+          - legacy: "pay_year"
+            ors: "pay_period_year"
+          - legacy: "pay_month"
+            ors: "pay_period_month"
+      - legacy_table: "fs7"
+        ors_table: "mtca_ors.fs7_reconciliation"
+        key_columns:
+          - legacy: "employer_tin"
+            ors: "employer_tin"
+          - legacy: "calendar_year"
+            ors: "calendar_year"
+      - legacy_table: "fb1"
+        ors_table: "mtca_ors.fringe_benefits"
+        key_columns:
+          - legacy: "employer_tin"
+            ors: "employer_tin"
+          - legacy: "employee_tin"
+            ors: "employee_tin"
+          - legacy: "calendar_year"
+            ors: "calendar_year"
+      - legacy_table: "fb1_detail"
+        ors_table: "mtca_ors.fringe_benefit_detail"
+        key_columns:
+          - legacy: "employer_tin"
+            ors: "employer_tin"
+          - legacy: "employee_tin"
+            ors: "employee_tin"
+          - legacy: "benefit_type"
+            ors: "benefit_type"
+          - legacy: "period_from"
+            ors: "period_from"

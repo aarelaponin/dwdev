@@ -1,0 +1,3110 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Document Management Domain
+# Generated from: SIGTAS schemas (DOCUMENT, FORMLETTER, APPROVAL, TASK_ROLE,
+#                 IRD_FILE_MANAGEMENT) + tax-capabilities.docx
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    The Document Management Domain provides comprehensive capabilities for
+    managing all documents, correspondence, approvals, workflows, and tasks
+    within the tax administration system. This domain ensures proper tracking,
+    version control, security, and lifecycle management of all organizational
+    documents, both incoming and outgoing, physical and electronic.
+
+    The domain synthesizes patterns from:
+    - SIGTAS DOCUMENT schema: Document metadata, storage, versioning, and
+      lifecycle management with strong typing and categorization
+    - SIGTAS FORMLETTER schema: Communication templates, letter generation,
+      correspondence tracking, and notification management
+    - SIGTAS APPROVAL schema: Multi-level approval workflows with position-based
+      and role-based approval chains, signature blocks, and approval documentation
+    - SIGTAS TASK_ROLE schema: Task assignment, user roles, and work queue
+      management with employee-role-task relationships
+    - SIGTAS IRD_FILE_MANAGEMENT schema: Internal file tracking, file movements,
+      file exits/returns, and physical file location management
+    - Tax Capabilities Document: Modern document management requirements including
+      electronic delivery, version control, privacy protection, archiving, and
+      knowledge management
+
+    Key capabilities provided:
+    âœ“ Document lifecycle management (creation â†’ review â†’ approval â†’ distribution â†’ archival)
+    âœ“ Version control with complete change history
+    âœ“ Multi-channel document delivery (electronic, paper, portal)
+    âœ“ Communication templates with dynamic content generation
+    âœ“ Multi-level approval workflows with configurable routing
+    âœ“ Task assignment and work queue management
+    âœ“ Internal file tracking for physical file management
+    âœ“ Document classification and security controls
+    âœ“ Full-text search and metadata indexing
+    âœ“ Retention policy enforcement and archiving
+    âœ“ Integration with external printing services
+    âœ“ Audit trail for all document operations
+
+  authors:
+    - "Generated from SIGTAS analysis"
+    - "Moldova SRS collaboration"
+    - "GovStack TA-RDM Initiative"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Workflow BB"
+    - "Messaging BB"
+    - "Digital Registries BB"
+    - "Information Mediator BB"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+# =============================================================================
+# DOMAIN DEFINITION
+# =============================================================================
+
+domains:
+  - name: "document_management"
+    code: "DM"
+    display_name: "Document Management"
+    description: |
+      The Document Management domain provides the infrastructure for managing
+      all documents, correspondence, approvals, and tasks within the tax
+      administration system. This domain supports both structured (forms,
+      assessments, notices) and unstructured (scanned documents, letters)
+      content with comprehensive metadata, version control, and lifecycle
+      management.
+
+      Core Functions:
+      1. Document Management - Storage, versioning, classification, retrieval
+      2. Correspondence Management - Inbound/outbound communications
+      3. Approval Workflows - Multi-level approval processes
+      4. Task Management - Work assignment and queue management
+      5. File Tracking - Physical file location and movement
+      6. Template Management - Communication and form templates
+
+      This domain was synthesized from:
+      - SIGTAS DOCUMENT schema (8+ tables): Complete document lifecycle
+      - SIGTAS FORMLETTER schema (6+ tables): Letter templates and generation
+      - SIGTAS APPROVAL schema (5+ tables): Multi-level approval chains
+      - SIGTAS TASK_ROLE schema (4+ tables): Task and role management
+      - SIGTAS IRD_FILE_MANAGEMENT schema (5+ tables): Physical file tracking
+      - Tax Capabilities: Modern document management and knowledge management
+
+    business_owner: "Director of Operations"
+    technical_owner: "Enterprise Architecture Team"
+
+    dependencies:
+      - "party_management"        # Document subjects and recipients
+      - "registration"            # Tax accounts and taxpayer context
+      - "filing_assessment"       # Returns and assessments generating documents
+      - "accounting"              # Financial documents and statements
+      - "payment_refund"          # Payment receipts and refund documents
+      - "compliance_control"      # Audit reports, collection notices
+      - "reference_data"          # Document types, task types, roles
+
+    tags:
+      - "document_management"
+      - "workflow"
+      - "correspondence"
+      - "gdpr_relevant"
+      - "high_volume"
+
+    # =========================================================================
+    # SCHEMAS
+    # =========================================================================
+
+    schemas:
+      - schema_name: "document_management"
+        description: |
+          Primary schema containing all document management, correspondence,
+          approval, task, and file tracking tables. Implements comprehensive
+          document lifecycle management with security, versioning, and
+          workflow capabilities.
+
+        # =====================================================================
+        # TABLES
+        # =====================================================================
+
+        tables:
+
+          # ===================================================================
+          # DOCUMENT MANAGEMENT TABLES
+          # ===================================================================
+
+          - name: "document"
+            display_name: "Document"
+            description: |
+              Central document registry containing metadata for all documents
+              in the tax administration system. Documents include both structured
+              content (generated forms, notices, assessments) and unstructured
+              content (scanned documents, uploaded files, correspondence).
+
+              Each document has a unique identifier, type classification,
+              relationship to business entities (taxpayer, tax account, case),
+              lifecycle status, security classification, and retention policy.
+
+              Document Lifecycle:
+              1. DRAFT - Initial creation or ingestion
+              2. UNDER_REVIEW - Being reviewed or processed
+              3. APPROVED - Approved for distribution
+              4. DISTRIBUTED - Sent to recipient(s)
+              5. ACKNOWLEDGED - Receipt confirmed
+              6. ARCHIVED - Moved to long-term storage
+              7. DESTROYED - Deleted per retention policy
+
+              Document Types:
+              - Inbound: Tax returns, applications, correspondence, supporting docs
+              - Outbound: Notices, assessments, letters, certificates
+              - Internal: Audit reports, case files, memos, approvals
+
+              SIGTAS Source: DOCUMENT table with DOC_NO (PK), TAX_TYPE_NO,
+              RECEIVED_DATE, PRINTED_DATE, DOC_TP_START_DATE, DOC_TP_END_DATE,
+              DOC_TP_DUE_DATE, DOC_TP_MONTH, DOC_TP_YEAR, PERSONAL_TEXT,
+              STATE_CHANGE_DATE, STATE_CHANGE_USER, RECEIPT, BATCH_NO,
+              TP_PAYMENT_RATE_NO, DELIVERED_DATE, DISTRIBUTION_FLAG, COMMENTS,
+              RECEIPT_PRINTED, DOC_TP_WEEK, TAX_PAYER_NAME, DOC_INST_MONTH,
+              DOC_INST_YEAR, BANK_RECEIPT_NO, REASON, TRANSACTION_DATE,
+              REFERENCE_NO, EXT_DOC_NO, ENTRY_USER, DOC_TP_PAYMENT_DATE
+
+
+            aspects:
+              - auditable
+              - temporal
+
+            type: "transaction"
+            estimated_rows: "high"  # 5M-50M documents
+            data_classification: "internal"
+
+            columns:
+              - name: "document_id"
+                display_name: "Document ID"
+                type: "bigint"
+                description: "Primary key - unique document identifier"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "document_number"
+                display_name: "Document Number"
+                type: "varchar(50)"
+                description: |
+                  Human-readable document number following organizational
+                  numbering scheme (e.g., DOC-2025-00001234)
+                constraints:
+                  not_null: true
+                  unique: true
+                indexes:
+                  - name: "idx_document_number"
+                    type: "btree"
+
+              - name: "document_type_code"
+                display_name: "Document Type"
+                type: "varchar(50)"
+                description: |
+                  Document classification: TAX_RETURN, ASSESSMENT_NOTICE,
+                  PAYMENT_RECEIPT, REFUND_DECISION, AUDIT_REPORT,
+                  COLLECTION_NOTICE, APPEAL_DECISION, CORRESPONDENCE,
+                  CERTIFICATE, LICENSE, REGISTRATION, APPLICATION,
+                  SUPPORTING_DOCUMENT, INTERNAL_MEMO
+                constraints:
+                  not_null: true
+                reference_data: "ref_document_type"
+                indexes:
+                  - name: "idx_document_type"
+                    type: "btree"
+
+              - name: "document_direction"
+                display_name: "Direction"
+                type: "varchar(20)"
+                description: "INBOUND, OUTBOUND, or INTERNAL"
+                constraints:
+                  not_null: true
+                  check: "document_direction IN ('INBOUND', 'OUTBOUND', 'INTERNAL')"
+
+              - name: "document_status_code"
+                display_name: "Status"
+                type: "varchar(30)"
+                description: |
+                  Current lifecycle status: DRAFT, UNDER_REVIEW, APPROVED,
+                  DISTRIBUTED, ACKNOWLEDGED, ARCHIVED, DESTROYED
+                constraints:
+                  not_null: true
+                  default: "'DRAFT'"
+                reference_data: "ref_document_status"
+                indexes:
+                  - name: "idx_document_status"
+                    type: "btree"
+
+              - name: "document_title"
+                display_name: "Title"
+                type: "varchar(500)"
+                description: "Document title or subject line"
+                constraints:
+                  not_null: true
+                indexes:
+                  - name: "idx_document_title_fts"
+                    type: "gin"
+                    expression: "to_tsvector('english', document_title)"
+
+              - name: "document_description"
+                display_name: "Description"
+                type: "text"
+                description: "Detailed description or summary of document content"
+                indexes:
+                  - name: "idx_document_description_fts"
+                    type: "gin"
+                    expression: "to_tsvector('english', document_description)"
+
+              - name: "party_id"
+                display_name: "Related Party"
+                type: "bigint"
+                description: "Primary party (taxpayer) associated with document"
+                constraints:
+                  foreign_key:
+                    referenced_table: "party_management.party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_document_party"
+                    type: "btree"
+
+              - name: "tax_account_id"
+                display_name: "Tax Account"
+                type: "bigint"
+                description: "Related tax account if applicable"
+                constraints:
+                  foreign_key:
+                    referenced_table: "registration.tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_document_tax_account"
+                    type: "btree"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period"
+                type: "bigint"
+                description: "Related tax period if applicable (for returns, assessments)"
+                constraints:
+                  foreign_key:
+                    referenced_table: "tax_framework.tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "related_case_type"
+                display_name: "Related Case Type"
+                type: "varchar(50)"
+                description: |
+                  Type of case document relates to: AUDIT, COLLECTION,
+                  OBJECTION, REFUND, REGISTRATION, PAYMENT, ASSESSMENT
+
+              - name: "related_case_id"
+                display_name: "Related Case ID"
+                type: "bigint"
+                description: "ID of related case (audit, collection, etc.)"
+
+              - name: "document_date"
+                display_name: "Document Date"
+                type: "date"
+                description: "Official date of the document"
+                constraints:
+                  not_null: true
+                indexes:
+                  - name: "idx_document_date"
+                    type: "btree"
+
+              - name: "received_date"
+                display_name: "Received Date"
+                type: "timestamp with time zone"
+                description: "When document was received (for inbound documents)"
+
+              - name: "distributed_date"
+                display_name: "Distributed Date"
+                type: "timestamp with time zone"
+                description: "When document was distributed (for outbound documents)"
+
+              - name: "due_date"
+                display_name: "Due Date"
+                type: "date"
+                description: "Response or action due date if applicable"
+
+              - name: "acknowledged_date"
+                display_name: "Acknowledged Date"
+                type: "timestamp with time zone"
+                description: "When receipt was acknowledged by recipient"
+
+              - name: "reference_number"
+                display_name: "Reference Number"
+                type: "varchar(100)"
+                description: "External reference number (sender's reference for inbound)"
+                indexes:
+                  - name: "idx_document_reference"
+                    type: "btree"
+
+              - name: "parent_document_id"
+                display_name: "Parent Document"
+                type: "bigint"
+                description: "Parent document if this is a response or related document"
+                constraints:
+                  foreign_key:
+                    referenced_table: "document_management.document"
+                    referenced_column: "document_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "template_id"
+                display_name: "Template"
+                type: "bigint"
+                description: "Template used to generate document (for outbound)"
+                constraints:
+                  foreign_key:
+                    referenced_table: "document_management.communication_template"
+                    referenced_column: "template_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "data_classification"
+                display_name: "Data Classification"
+                type: "varchar(30)"
+                description: |
+                  Security classification: PUBLIC, INTERNAL, CONFIDENTIAL,
+                  RESTRICTED, TAX_SECRET
+                constraints:
+                  not_null: true
+                  default: "'INTERNAL'"
+
+              - name: "contains_pii"
+                display_name: "Contains PII"
+                type: "boolean"
+                description: "Whether document contains personally identifiable information"
+                constraints:
+                  not_null: true
+                  default: false
+                pii: false
+                gdpr_relevant: true
+
+              - name: "retention_period_years"
+                display_name: "Retention Period (Years)"
+                type: "integer"
+                description: "Required retention period per regulations (e.g., 7, 10 years)"
+                constraints:
+                  not_null: true
+                  default: 10
+
+              - name: "eligible_for_destruction_date"
+                display_name: "Eligible for Destruction Date"
+                type: "date"
+                description: "Calculated date when document can be destroyed per retention policy"
+
+              - name: "is_archived"
+                display_name: "Is Archived"
+                type: "boolean"
+                description: "Whether document has been moved to archive storage"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "archive_date"
+                display_name: "Archive Date"
+                type: "date"
+                description: "Date document was archived"
+
+              - name: "archive_location"
+                display_name: "Archive Location"
+                type: "varchar(200)"
+                description: "Physical or logical archive location"
+
+              - name: "is_distributed"
+                display_name: "Is Distributed"
+                type: "boolean"
+                description: "Whether document has been distributed to recipient"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "distribution_channel_code"
+                display_name: "Distribution Channel"
+                type: "varchar(30)"
+                description: |
+                  How document was/will be distributed: ELECTRONIC_PORTAL,
+                  EMAIL, POSTAL_MAIL, HAND_DELIVERY, SMS, FAX, EXTERNAL_PRINTER
+                reference_data: "ref_distribution_channel"
+
+              - name: "batch_number"
+                display_name: "Batch Number"
+                type: "varchar(50)"
+                description: "Batch number for bulk document processing"
+
+              - name: "page_count"
+                display_name: "Page Count"
+                type: "integer"
+                description: "Number of pages in document"
+
+              - name: "language_code"
+                display_name: "Language"
+                type: "char(2)"
+                description: "ISO 639-1 language code (en, ru, ro, etc.)"
+                constraints:
+                  not_null: true
+                  default: "'en'"
+
+              - name: "keywords"
+                display_name: "Keywords"
+                type: "text"
+                description: "Comma-separated keywords for search and classification"
+                indexes:
+                  - name: "idx_document_keywords_fts"
+                    type: "gin"
+                    expression: "to_tsvector('english', keywords)"
+
+              - name: "notes"
+                display_name: "Internal Notes"
+                type: "text"
+                description: "Internal processing notes (not visible to taxpayer)"
+
+              - name: "receipt_printed"
+                display_name: "Receipt Printed"
+                type: "boolean"
+                description: "Whether receipt was printed for inbound document"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "state_changed_by"
+                display_name: "State Changed By"
+                type: "varchar(100)"
+                description: "User who last changed document status"
+
+              - name: "state_changed_date"
+                display_name: "State Changed Date"
+                type: "timestamp with time zone"
+                description: "When document status was last changed"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_document_party_date"
+                columns: ["party_id", "document_date"]
+                type: "btree"
+
+              - name: "idx_document_account_type"
+                columns: ["tax_account_id", "document_type_code"]
+                type: "btree"
+
+              - name: "idx_document_status_date"
+                columns: ["document_status_code", "created_date"]
+                type: "btree"
+
+              - name: "idx_document_archive_eligible"
+                columns: ["is_archived", "eligible_for_destruction_date"]
+                type: "btree"
+                where: "is_archived = false"
+
+            business_rules:
+              - "BR-DM-001: Document number must be unique system-wide"
+              - "BR-DM-002: Inbound documents must have received_date"
+              - "BR-DM-003: Outbound documents must have distributed_date when status = DISTRIBUTED"
+              - "BR-DM-004: Archived documents cannot be modified"
+              - "BR-DM-005: Documents with PII must have data_classification >= CONFIDENTIAL"
+              - "BR-DM-006: Retention period must be >= 5 years per tax law"
+
+          # ===================================================================
+
+          - name: "document_storage"
+            display_name: "Document Storage"
+            description: |
+              Physical or logical storage locations for document files.
+              Supports multiple storage formats (PDF, TIFF, XML, JSON) and
+              storage backends (filesystem, object storage, document management
+              system). Each document can have multiple storage instances
+              (original, compressed, archived).
+
+              Storage Types:
+              - FILE_SYSTEM: Local or network file system
+              - OBJECT_STORAGE: Cloud storage (S3, Azure Blob, etc.)
+              - DATABASE: BLOB in database
+              - DMS: External document management system
+              - EXTERNAL: Third-party system
+
+              SIGTAS Source: DOCUMENT_STORAGE split from DOCUMENT table,
+              handling physical/digital storage locations and formats
+
+            type: "transaction"
+            estimated_rows: "high"  # Multiple storage instances per document
+            data_classification: "internal"
+
+            columns:
+              - name: "document_storage_id"
+                display_name: "Storage ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "document_id"
+                display_name: "Document"
+                type: "bigint"
+                description: "Reference to document"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "document_management.document"
+                    referenced_column: "document_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_docstorage_document"
+                    type: "btree"
+
+              - name: "storage_type_code"
+                display_name: "Storage Type"
+                type: "varchar(30)"
+                description: |
+                  Storage backend: FILE_SYSTEM, OBJECT_STORAGE, DATABASE,
+                  DMS, EXTERNAL
+                constraints:
+                  not_null: true
+                reference_data: "ref_storage_type"
+
+              - name: "storage_location"
+                display_name: "Storage Location"
+                type: "varchar(500)"
+                description: |
+                  Full storage path or URI (e.g., /documents/2025/01/doc123.pdf
+                  or s3://bucket/documents/doc123.pdf)
+                constraints:
+                  not_null: true
+
+              - name: "storage_format"
+                display_name: "Format"
+                type: "varchar(20)"
+                description: "File format: PDF, TIFF, XML, JSON, DOCX, etc."
+                constraints:
+                  not_null: true
+
+              - name: "mime_type"
+                display_name: "MIME Type"
+                type: "varchar(100)"
+                description: "MIME type (application/pdf, image/tiff, etc.)"
+                constraints:
+                  not_null: true
+
+              - name: "file_size_bytes"
+                display_name: "File Size (Bytes)"
+                type: "bigint"
+                description: "Size of stored file in bytes"
+                constraints:
+                  not_null: true
+
+              - name: "file_hash"
+                display_name: "File Hash"
+                type: "varchar(128)"
+                description: "SHA-256 hash for integrity verification"
+                constraints:
+                  not_null: true
+
+              - name: "storage_instance_type"
+                display_name: "Instance Type"
+                type: "varchar(30)"
+                description: "ORIGINAL, COMPRESSED, ARCHIVED, BACKUP, PREVIEW"
+                constraints:
+                  not_null: true
+
+              - name: "is_encrypted"
+                display_name: "Is Encrypted"
+                type: "boolean"
+                description: "Whether file is encrypted at rest"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "encryption_algorithm"
+                display_name: "Encryption Algorithm"
+                type: "varchar(50)"
+                description: "Encryption algorithm used (AES-256, etc.)"
+
+              - name: "is_compressed"
+                display_name: "Is Compressed"
+                type: "boolean"
+                description: "Whether file is compressed"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "compression_algorithm"
+                display_name: "Compression Algorithm"
+                type: "varchar(50)"
+                description: "Compression algorithm (gzip, zip, etc.)"
+
+              - name: "is_accessible"
+                display_name: "Is Accessible"
+                type: "boolean"
+                description: "Whether file is currently accessible (not offline/archived)"
+                constraints:
+                  not_null: true
+                  default: true
+
+              - name: "last_accessed_date"
+                display_name: "Last Accessed Date"
+                type: "timestamp with time zone"
+                description: "When file was last accessed"
+
+              - name: "access_count"
+                display_name: "Access Count"
+                type: "integer"
+                description: "Number of times file has been accessed"
+                constraints:
+                  not_null: true
+                  default: 0
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_docstorage_type_location"
+                columns: ["storage_type_code", "storage_location"]
+                type: "btree"
+
+              - name: "idx_docstorage_hash"
+                columns: ["file_hash"]
+                type: "btree"
+                comment: "For deduplication"
+
+            business_rules:
+              - "BR-DM-020: Each document must have at least one ORIGINAL storage instance"
+              - "BR-DM-021: File hash must be verified on storage and retrieval"
+              - "BR-DM-022: Confidential documents must be encrypted at rest"
+
+          # ===================================================================
+
+          - name: "document_version"
+            display_name: "Document Version"
+            description: |
+              Version history for documents that undergo revisions. Tracks
+              all changes to document content, metadata, or status with
+              complete audit trail. Enables rollback to previous versions
+              and comparison between versions.
+
+              Version Control Triggers:
+              - Content changes (file replacement)
+              - Metadata updates (title, description changes)
+              - Status changes (workflow progression)
+              - Approval/rejection actions
+
+              Each version maintains reference to its storage location,
+              the user who made the change, reason for change, and
+              complete diff from previous version where applicable.
+
+              SIGTAS Source: DOCUMENT_VERSION split from DOCUMENT table,
+              implementing version control and change tracking
+
+            type: "history"
+            estimated_rows: "high"  # Multiple versions per document
+            data_classification: "internal"
+
+            columns:
+              - name: "document_version_id"
+                display_name: "Version ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "document_id"
+                display_name: "Document"
+                type: "bigint"
+                description: "Reference to document"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "document_management.document"
+                    referenced_column: "document_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_docversion_document"
+                    type: "btree"
+
+              - name: "version_number"
+                display_name: "Version Number"
+                type: "integer"
+                description: "Sequential version number (1, 2, 3, ...)"
+                constraints:
+                  not_null: true
+
+              - name: "version_date"
+                display_name: "Version Date"
+                type: "timestamp with time zone"
+                description: "When this version was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "version_type"
+                display_name: "Version Type"
+                type: "varchar(30)"
+                description: |
+                  Type of change: CONTENT_UPDATE, METADATA_UPDATE,
+                  STATUS_CHANGE, APPROVAL, REJECTION, CORRECTION
+                constraints:
+                  not_null: true
+
+              - name: "previous_status"
+                display_name: "Previous Status"
+                type: "varchar(30)"
+                description: "Document status before this version"
+
+              - name: "new_status"
+                display_name: "New Status"
+                type: "varchar(30)"
+                description: "Document status in this version"
+
+              - name: "change_description"
+                display_name: "Change Description"
+                type: "text"
+                description: "Description of what changed in this version"
+                constraints:
+                  not_null: true
+
+              - name: "changed_by_user_id"
+                display_name: "Changed By"
+                type: "varchar(100)"
+                description: "User who created this version"
+                constraints:
+                  not_null: true
+
+              - name: "change_reason"
+                display_name: "Change Reason"
+                type: "text"
+                description: "Business reason for the change"
+
+              - name: "is_current_version"
+                display_name: "Is Current"
+                type: "boolean"
+                description: "Whether this is the current/latest version"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "document_storage_id"
+                display_name: "Storage"
+                type: "bigint"
+                description: "Storage location for this version's content"
+                constraints:
+                  foreign_key:
+                    referenced_table: "document_management.document_storage"
+                    referenced_column: "document_storage_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "metadata_snapshot"
+                display_name: "Metadata Snapshot"
+                type: "jsonb"
+                description: "Complete document metadata as of this version (JSON)"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_docversion_document_number"
+                columns: ["document_id", "version_number"]
+                type: "btree"
+                unique: true
+
+              - name: "idx_docversion_current"
+                columns: ["document_id"]
+                type: "btree"
+                where: "is_current_version = true"
+
+            business_rules:
+              - "BR-DM-030: Each document must have exactly one current version"
+              - "BR-DM-031: Version numbers must be sequential with no gaps"
+              - "BR-DM-032: Cannot delete versions (maintain complete history)"
+
+          # ===================================================================
+          # CORRESPONDENCE MANAGEMENT TABLES
+          # ===================================================================
+
+          - name: "correspondence"
+            display_name: "Correspondence"
+            description: |
+              All correspondence (letters, notices, emails, SMS) sent to or
+              received from taxpayers, representatives, or external parties.
+              Includes both template-based generated correspondence and
+              ad-hoc communications.
+
+              Correspondence Types:
+              - Formal Notices: Assessment notices, collection letters,
+                audit notifications, objection decisions
+              - Informational: Reminders, confirmations, status updates
+              - Requests: Information requests, document requests
+              - Responses: Replies to taxpayer inquiries or applications
+
+              Delivery Channels:
+              - Electronic: Portal, email, SMS
+              - Paper: Postal mail, registered mail, courier
+              - In-person: Hand-delivered at taxpayer service center
+
+              SIGTAS Source: LETTER table from FORMLETTER schema with
+              LETTER_NO (PK), LETTER_TITLE, LETTER_TEXT, START_DATE,
+              TAX_TYPE_NO, relationship to taxpayer and template
+
+            type: "transaction"
+            estimated_rows: "high"  # Millions of correspondence items
+            data_classification: "confidential"
+
+            columns:
+              - name: "correspondence_id"
+                display_name: "Correspondence ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "correspondence_number"
+                display_name: "Correspondence Number"
+                type: "varchar(50)"
+                description: "Unique correspondence reference number"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "document_id"
+                display_name: "Related Document"
+                type: "bigint"
+                description: "Link to document record"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "document_management.document"
+                    referenced_column: "document_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_correspondence_document"
+                    type: "btree"
+
+              - name: "correspondence_type_code"
+                display_name: "Correspondence Type"
+                type: "varchar(50)"
+                description: |
+                  Type: NOTICE, REMINDER, REQUEST, RESPONSE, CONFIRMATION,
+                  NOTIFICATION, LETTER, EMAIL, SMS
+                constraints:
+                  not_null: true
+                reference_data: "ref_correspondence_type"
+
+              - name: "template_id"
+                display_name: "Template"
+                type: "bigint"
+                description: "Template used to generate correspondence"
+                constraints:
+                  foreign_key:
+                    referenced_table: "document_management.communication_template"
+                    referenced_column: "template_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "recipient_party_id"
+                display_name: "Recipient Party"
+                type: "bigint"
+                description: "Primary recipient"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party_management.party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_correspondence_recipient"
+                    type: "btree"
+
+              - name: "recipient_type"
+                display_name: "Recipient Type"
+                type: "varchar(30)"
+                description: "TAXPAYER, REPRESENTATIVE, TAX_AUTHORITY, THIRD_PARTY"
+                constraints:
+                  not_null: true
+
+              - name: "sender_organization"
+                display_name: "Sender Organization"
+                type: "varchar(200)"
+                description: "Sending tax authority or office"
+                constraints:
+                  not_null: true
+
+              - name: "sender_officer_id"
+                display_name: "Sender Officer"
+                type: "bigint"
+                description: "Tax officer sending the correspondence"
+                reference_data: "ref_employee"
+
+              - name: "subject"
+                display_name: "Subject"
+                type: "varchar(500)"
+                description: "Correspondence subject or title"
+                constraints:
+                  not_null: true
+
+              - name: "body_text"
+                display_name: "Body Text"
+                type: "text"
+                description: "Main correspondence content (plain text)"
+                constraints:
+                  not_null: true
+
+              - name: "body_html"
+                display_name: "Body HTML"
+                type: "text"
+                description: "HTML version of correspondence content"
+
+              - name: "language_code"
+                display_name: "Language"
+                type: "char(2)"
+                description: "ISO 639-1 language code"
+                constraints:
+                  not_null: true
+                  default: "'en'"
+
+              - name: "priority_level"
+                display_name: "Priority"
+                type: "varchar(20)"
+                description: "URGENT, HIGH, NORMAL, LOW"
+                constraints:
+                  not_null: true
+                  default: "'NORMAL'"
+
+              - name: "delivery_method_code"
+                display_name: "Delivery Method"
+                type: "varchar(30)"
+                description: |
+                  ELECTRONIC_PORTAL, EMAIL, SMS, POSTAL_MAIL,
+                  REGISTERED_MAIL, COURIER, HAND_DELIVERY
+                constraints:
+                  not_null: true
+                reference_data: "ref_delivery_method"
+
+              - name: "delivery_address"
+                display_name: "Delivery Address"
+                type: "text"
+                description: "Full delivery address (email, postal, etc.)"
+                constraints:
+                  not_null: true
+
+              - name: "scheduled_delivery_date"
+                display_name: "Scheduled Delivery"
+                type: "timestamp with time zone"
+                description: "When correspondence is scheduled to be sent"
+
+              - name: "actual_delivery_date"
+                display_name: "Actual Delivery"
+                type: "timestamp with time zone"
+                description: "When correspondence was actually delivered"
+
+              - name: "delivery_status_code"
+                display_name: "Delivery Status"
+                type: "varchar(30)"
+                description: |
+                  PENDING, SENT, DELIVERED, FAILED, BOUNCED, RETURNED,
+                  ACKNOWLEDGED
+                constraints:
+                  not_null: true
+                  default: "'PENDING'"
+                reference_data: "ref_delivery_status"
+
+              - name: "delivery_confirmation"
+                display_name: "Delivery Confirmation"
+                type: "text"
+                description: "Delivery confirmation details (tracking number, receipt, etc.)"
+
+              - name: "is_read"
+                display_name: "Is Read"
+                type: "boolean"
+                description: "Whether recipient has read the correspondence (electronic only)"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "read_date"
+                display_name: "Read Date"
+                type: "timestamp with time zone"
+                description: "When correspondence was read by recipient"
+
+              - name: "response_required"
+                display_name: "Response Required"
+                type: "boolean"
+                description: "Whether response is required from recipient"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "response_due_date"
+                display_name: "Response Due Date"
+                type: "date"
+                description: "Date by which response is required"
+
+              - name: "response_received_date"
+                display_name: "Response Received"
+                type: "date"
+                description: "Date response was received"
+
+              - name: "attachments_count"
+                display_name: "Attachments Count"
+                type: "integer"
+                description: "Number of attachments included"
+                constraints:
+                  not_null: true
+                  default: 0
+
+              - name: "contains_sensitive_info"
+                display_name: "Contains Sensitive Info"
+                type: "boolean"
+                description: "Whether correspondence contains sensitive/confidential data"
+                constraints:
+                  not_null: true
+                  default: false
+                pii: false
+                gdpr_relevant: true
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_correspondence_recipient_date"
+                columns: ["recipient_party_id", "created_date"]
+                type: "btree"
+
+              - name: "idx_correspondence_delivery_status"
+                columns: ["delivery_status_code", "scheduled_delivery_date"]
+                type: "btree"
+
+              - name: "idx_correspondence_response_due"
+                columns: ["response_required", "response_due_date"]
+                type: "btree"
+                where: "response_required = true AND response_received_date IS NULL"
+
+            business_rules:
+              - "BR-DM-040: Correspondence must have either body_text or body_html"
+              - "BR-DM-041: If response_required = true, response_due_date must be set"
+              - "BR-DM-042: Cannot modify correspondence after delivery"
+              - "BR-DM-043: Sensitive correspondence must use secure delivery methods"
+
+          # ===================================================================
+
+          - name: "communication_template"
+            display_name: "Communication Template"
+            description: |
+              Reusable templates for generating correspondence, notices,
+              letters, and other communications. Templates support dynamic
+              content through placeholders, conditional sections, and
+              data merging. Version controlled to maintain template history.
+
+              Template Features:
+              - Placeholders: {TAXPAYER_NAME}, {TAX_AMOUNT}, {DUE_DATE}
+              - Conditional sections: IF-THEN-ELSE logic
+              - Multiple languages: Translations for each template
+              - Multiple formats: Plain text, HTML, PDF layouts
+              - Approval workflow: Templates require approval before use
+
+              Common Templates:
+              - Assessment notices (various assessment types)
+              - Collection letters (reminder series)
+              - Refund decisions (approval/rejection)
+              - Audit notifications
+              - Registration certificates
+              - Tax clearance certificates
+
+              SIGTAS Source: LETTER_TEMPLATE from FORMLETTER schema,
+              supporting template management and versioning
+
+            type: "master"
+            estimated_rows: "low"  # Hundreds of templates
+            data_classification: "internal"
+
+            columns:
+              - name: "template_id"
+                display_name: "Template ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "template_code"
+                display_name: "Template Code"
+                type: "varchar(50)"
+                description: |
+                  Unique template identifier (e.g., ASSESS_NOTICE_01,
+                  COLL_REMINDER_FINAL)
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "template_name"
+                display_name: "Template Name"
+                type: "varchar(200)"
+                description: "Descriptive template name"
+                constraints:
+                  not_null: true
+
+              - name: "template_type_code"
+                display_name: "Template Type"
+                type: "varchar(50)"
+                description: |
+                  Type: NOTICE, LETTER, CERTIFICATE, REPORT, FORM,
+                  EMAIL, SMS, NOTIFICATION
+                constraints:
+                  not_null: true
+                reference_data: "ref_template_type"
+
+              - name: "template_category"
+                display_name: "Category"
+                type: "varchar(50)"
+                description: |
+                  Functional category: ASSESSMENT, COLLECTION, REGISTRATION,
+                  REFUND, AUDIT, OBJECTION, GENERAL
+                constraints:
+                  not_null: true
+
+              - name: "version_number"
+                display_name: "Version"
+                type: "integer"
+                description: "Template version number"
+                constraints:
+                  not_null: true
+                  default: 1
+
+              - name: "language_code"
+                display_name: "Language"
+                type: "char(2)"
+                description: "Primary language of template"
+                constraints:
+                  not_null: true
+                  default: "'en'"
+
+              - name: "subject_template"
+                display_name: "Subject Template"
+                type: "varchar(500)"
+                description: "Subject line template with placeholders"
+                constraints:
+                  not_null: true
+
+              - name: "body_template_text"
+                display_name: "Body Template (Text)"
+                type: "text"
+                description: "Plain text template body with placeholders"
+                constraints:
+                  not_null: true
+
+              - name: "body_template_html"
+                display_name: "Body Template (HTML)"
+                type: "text"
+                description: "HTML template body with placeholders and styling"
+
+              - name: "placeholders"
+                display_name: "Placeholders"
+                type: "jsonb"
+                description: |
+                  JSON array of placeholder definitions with names, types,
+                  and descriptions (e.g., [{name: "TAXPAYER_NAME", type: "string"}])
+
+              - name: "template_status_code"
+                display_name: "Status"
+                type: "varchar(20)"
+                description: "DRAFT, UNDER_REVIEW, APPROVED, ACTIVE, DEPRECATED"
+                constraints:
+                  not_null: true
+                  default: "'DRAFT'"
+                reference_data: "ref_template_status"
+
+              - name: "is_active"
+                display_name: "Is Active"
+                type: "boolean"
+                description: "Whether template is currently active for use"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "effective_from_date"
+                display_name: "Effective From"
+                type: "date"
+                description: "Date from which template is effective"
+
+              - name: "effective_to_date"
+                display_name: "Effective To"
+                type: "date"
+                description: "Date until which template is effective"
+
+              - name: "approved_by"
+                display_name: "Approved By"
+                type: "bigint"
+                description: "Officer who approved template"
+                reference_data: "ref_employee"
+
+              - name: "approval_date"
+                display_name: "Approval Date"
+                type: "date"
+                description: "Date template was approved"
+
+              - name: "usage_count"
+                display_name: "Usage Count"
+                type: "integer"
+                description: "Number of times template has been used"
+                constraints:
+                  not_null: true
+                  default: 0
+
+              - name: "last_used_date"
+                display_name: "Last Used Date"
+                type: "timestamp with time zone"
+                description: "When template was last used"
+
+              - name: "notes"
+                display_name: "Notes"
+                type: "text"
+                description: "Template usage notes and guidelines"
+
+              # Temporal tracking
+              - name: "valid_from"
+                display_name: "Valid From"
+                type: "date"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                display_name: "Valid To"
+                type: "date"
+
+              - name: "is_current"
+                display_name: "Is Current"
+                type: "boolean"
+                constraints:
+                  not_null: true
+                  default: true
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_template_code_version"
+                columns: ["template_code", "version_number"]
+                type: "btree"
+
+              - name: "idx_template_active"
+                columns: ["is_active", "template_type_code"]
+                type: "btree"
+                where: "is_active = true"
+
+            business_rules:
+              - "BR-DM-050: Only approved templates can be set to active"
+              - "BR-DM-051: Only one version of template can be active at a time"
+              - "BR-DM-052: Cannot delete templates that have been used"
+
+          # ===================================================================
+          # APPROVAL WORKFLOW TABLES
+          # ===================================================================
+
+          - name: "approval_workflow"
+            display_name: "Approval Workflow"
+            description: |
+              Definition of approval workflows including approval chains,
+              required positions/roles, and sequencing. Workflows can be
+              configured for different document types, transaction types,
+              and approval scenarios (amount thresholds, risk levels, etc.).
+
+              Workflow Types:
+              - Sequential: Must approve in order (Level 1 â†’ Level 2 â†’ Level 3)
+              - Parallel: All approvers at same level (any can approve)
+              - Conditional: Routing based on conditions (amount, risk, etc.)
+              - Escalation: Auto-escalate if not approved within timeframe
+
+              Common Approval Scenarios:
+              - Refund approvals (amount-based thresholds)
+              - Assessment adjustments
+              - Penalty waivers
+              - Collection write-offs
+              - Document publication
+              - Policy changes
+
+              SIGTAS Source: APPROVAL from APPROVAL schema with support
+              for position-based and role-based approval chains
+
+            type: "master"
+            estimated_rows: "low"  # Dozens to hundreds of workflows
+            data_classification: "internal"
+
+            columns:
+              - name: "workflow_id"
+                display_name: "Workflow ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "workflow_code"
+                display_name: "Workflow Code"
+                type: "varchar(50)"
+                description: "Unique workflow identifier (e.g., REFUND_APPROVAL_L3)"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "workflow_name"
+                display_name: "Workflow Name"
+                type: "varchar(200)"
+                description: "Descriptive workflow name"
+                constraints:
+                  not_null: true
+
+              - name: "workflow_type"
+                display_name: "Workflow Type"
+                type: "varchar(30)"
+                description: "SEQUENTIAL, PARALLEL, CONDITIONAL, ESCALATION"
+                constraints:
+                  not_null: true
+
+              - name: "applies_to_entity_type"
+                display_name: "Applies To Entity"
+                type: "varchar(50)"
+                description: |
+                  Entity type requiring approval: DOCUMENT, REFUND,
+                  ASSESSMENT, PAYMENT, COLLECTION_ACTION, POLICY
+                constraints:
+                  not_null: true
+
+              - name: "applies_to_document_type_code"
+                display_name: "Applies To Document Type"
+                type: "varchar(50)"
+                description: "Specific document type if entity is DOCUMENT"
+                reference_data: "ref_document_type"
+
+              - name: "trigger_condition"
+                display_name: "Trigger Condition"
+                type: "text"
+                description: |
+                  Condition expression for when workflow applies
+                  (e.g., "amount > 10000" or "risk_level = 'HIGH'")
+
+              - name: "approval_levels_count"
+                display_name: "Approval Levels"
+                type: "integer"
+                description: "Number of approval levels in workflow"
+                constraints:
+                  not_null: true
+
+              - name: "is_active"
+                display_name: "Is Active"
+                type: "boolean"
+                description: "Whether workflow is currently active"
+                constraints:
+                  not_null: true
+                  default: true
+
+              - name: "requires_all_approvers"
+                display_name: "Requires All Approvers"
+                type: "boolean"
+                description: |
+                  Whether all approvers must approve (true) or any single
+                  approver is sufficient (false)
+                constraints:
+                  not_null: true
+                  default: true
+
+              - name: "auto_escalate_after_hours"
+                display_name: "Auto-Escalate After (Hours)"
+                type: "integer"
+                description: "Hours after which to auto-escalate if not approved"
+
+              - name: "escalation_workflow_id"
+                display_name: "Escalation Workflow"
+                type: "bigint"
+                description: "Workflow to escalate to if not approved in time"
+                constraints:
+                  foreign_key:
+                    referenced_table: "document_management.approval_workflow"
+                    referenced_column: "workflow_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "description"
+                display_name: "Description"
+                type: "text"
+                description: "Detailed workflow description and usage notes"
+
+              # Temporal tracking
+              - name: "valid_from"
+                display_name: "Valid From"
+                type: "date"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                display_name: "Valid To"
+                type: "date"
+
+              - name: "is_current"
+                display_name: "Is Current"
+                type: "boolean"
+                constraints:
+                  not_null: true
+                  default: true
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            business_rules:
+              - "BR-DM-060: Workflow must have at least one approval step"
+              - "BR-DM-061: Cannot delete workflow that has active approval records"
+
+          # ===================================================================
+
+          - name: "approval_step"
+            display_name: "Approval Step"
+            description: |
+              Individual steps within an approval workflow, defining the
+              sequence, required positions/roles, and approval criteria
+              for each level of approval.
+
+              Each step specifies:
+              - Order/sequence in workflow
+              - Required position or role (e.g., SUPERVISOR, MANAGER, DIRECTOR)
+              - Approval authority limits (e.g., max refund amount)
+              - Delegation rules (can delegate to alternate?)
+              - Timeout/SLA (hours to approve)
+
+              SIGTAS Source: APPROVAL_ORDER from APPROVAL schema defining
+              sequential approval steps with position requirements
+
+            type: "master"
+            estimated_rows: "medium"  # Multiple steps per workflow
+            data_classification: "internal"
+
+            columns:
+              - name: "approval_step_id"
+                display_name: "Approval Step ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "workflow_id"
+                display_name: "Workflow"
+                type: "bigint"
+                description: "Parent workflow"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "document_management.approval_workflow"
+                    referenced_column: "workflow_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_approval_step_workflow"
+                    type: "btree"
+
+              - name: "step_sequence"
+                display_name: "Step Sequence"
+                type: "integer"
+                description: "Order of this step in workflow (1, 2, 3, ...)"
+                constraints:
+                  not_null: true
+
+              - name: "step_name"
+                display_name: "Step Name"
+                type: "varchar(200)"
+                description: "Name of approval step (e.g., 'Supervisor Review')"
+                constraints:
+                  not_null: true
+
+              - name: "required_position_code"
+                display_name: "Required Position"
+                type: "varchar(50)"
+                description: |
+                  Position code required for this approval (SUPERVISOR,
+                  MANAGER, DIRECTOR, COMMISSIONER)
+                reference_data: "ref_position"
+
+              - name: "required_role_code"
+                display_name: "Required Role"
+                type: "varchar(50)"
+                description: |
+                  Alternatively, role code required (REFUND_APPROVER,
+                  ASSESSMENT_REVIEWER, etc.)
+                reference_data: "ref_user_role"
+
+              - name: "approval_authority_limit"
+                display_name: "Authority Limit"
+                type: "decimal(19,2)"
+                description: "Maximum amount this position can approve"
+
+              - name: "can_delegate"
+                display_name: "Can Delegate"
+                type: "boolean"
+                description: "Whether this approver can delegate to alternate"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "requires_comments"
+                display_name: "Requires Comments"
+                type: "boolean"
+                description: "Whether approver must provide comments"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "requires_signature"
+                display_name: "Requires Signature"
+                type: "boolean"
+                description: "Whether digital/physical signature is required"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "approval_timeout_hours"
+                display_name: "Timeout (Hours)"
+                type: "integer"
+                description: "SLA hours for this approval step"
+
+              - name: "escalation_position_code"
+                display_name: "Escalation Position"
+                type: "varchar(50)"
+                description: "Position to escalate to if timeout exceeded"
+                reference_data: "ref_position"
+
+              - name: "is_optional"
+                display_name: "Is Optional"
+                type: "boolean"
+                description: "Whether this step can be skipped under certain conditions"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "skip_condition"
+                display_name: "Skip Condition"
+                type: "text"
+                description: "Condition expression for when step can be skipped"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_approval_step_workflow_seq"
+                columns: ["workflow_id", "step_sequence"]
+                type: "btree"
+                unique: true
+
+            business_rules:
+              - "BR-DM-070: Step sequence must be sequential with no gaps"
+              - "BR-DM-071: Must specify either required_position or required_role"
+              - "BR-DM-072: Authority limit increases with higher positions"
+
+          # ===================================================================
+
+          - name: "approval_record"
+            display_name: "Approval Record"
+            description: |
+              Actual approval instances tracking the progress of documents
+              or transactions through approval workflows. Each record
+              represents one item going through approval process with
+              complete status tracking.
+
+              Approval Process:
+              1. INITIATED - Approval request created
+              2. PENDING - Awaiting approver action
+              3. UNDER_REVIEW - Being reviewed by approver
+              4. APPROVED - Approved by all required approvers
+              5. REJECTED - Rejected by any approver
+              6. WITHDRAWN - Withdrawn by submitter
+              7. EXPIRED - Expired due to timeout
+              8. ESCALATED - Escalated to higher authority
+
+              SIGTAS Source: RECORD_APPROVAL from APPROVAL schema tracking
+              individual approval instances with dates and outcomes
+
+            type: "transaction"
+            estimated_rows: "high"  # Millions of approval records
+            data_classification: "internal"
+
+            columns:
+              - name: "approval_record_id"
+                display_name: "Approval Record ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "approval_number"
+                display_name: "Approval Number"
+                type: "varchar(50)"
+                description: "Unique approval reference number"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "workflow_id"
+                display_name: "Workflow"
+                type: "bigint"
+                description: "Workflow being followed"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "document_management.approval_workflow"
+                    referenced_column: "workflow_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_approval_record_workflow"
+                    type: "btree"
+
+              - name: "entity_type"
+                display_name: "Entity Type"
+                type: "varchar(50)"
+                description: "Type of entity being approved (DOCUMENT, REFUND, etc.)"
+                constraints:
+                  not_null: true
+
+              - name: "entity_id"
+                display_name: "Entity ID"
+                type: "bigint"
+                description: "ID of entity being approved"
+                constraints:
+                  not_null: true
+
+              - name: "document_id"
+                display_name: "Related Document"
+                type: "bigint"
+                description: "Document requiring approval (if applicable)"
+                constraints:
+                  foreign_key:
+                    referenced_table: "document_management.document"
+                    referenced_column: "document_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "approval_status_code"
+                display_name: "Approval Status"
+                type: "varchar(30)"
+                description: |
+                  Current status: INITIATED, PENDING, UNDER_REVIEW,
+                  APPROVED, REJECTED, WITHDRAWN, EXPIRED, ESCALATED
+                constraints:
+                  not_null: true
+                  default: "'INITIATED'"
+                reference_data: "ref_approval_status"
+                indexes:
+                  - name: "idx_approval_record_status"
+                    type: "btree"
+
+              - name: "current_step_id"
+                display_name: "Current Step"
+                type: "bigint"
+                description: "Current approval step in workflow"
+                constraints:
+                  foreign_key:
+                    referenced_table: "document_management.approval_step"
+                    referenced_column: "approval_step_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "current_approver_user_id"
+                display_name: "Current Approver"
+                type: "varchar(100)"
+                description: "User ID of current approver"
+                reference_data: "ref_employee"
+
+              - name: "submitter_user_id"
+                display_name: "Submitter"
+                type: "varchar(100)"
+                description: "User who submitted for approval"
+                constraints:
+                  not_null: true
+
+              - name: "submission_date"
+                display_name: "Submission Date"
+                type: "timestamp with time zone"
+                description: "When submitted for approval"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "submission_comments"
+                display_name: "Submission Comments"
+                type: "text"
+                description: "Comments from submitter"
+
+              - name: "priority_level"
+                display_name: "Priority"
+                type: "varchar(20)"
+                description: "URGENT, HIGH, NORMAL, LOW"
+                constraints:
+                  not_null: true
+                  default: "'NORMAL'"
+
+              - name: "due_date"
+                display_name: "Due Date"
+                type: "timestamp with time zone"
+                description: "When approval is due (based on SLA)"
+
+              - name: "completed_date"
+                display_name: "Completed Date"
+                type: "timestamp with time zone"
+                description: "When approval was completed (approved or rejected)"
+
+              - name: "completion_duration_hours"
+                display_name: "Duration (Hours)"
+                type: "numeric(10,2)"
+                description: "Total hours from submission to completion"
+
+              - name: "final_decision"
+                display_name: "Final Decision"
+                type: "varchar(20)"
+                description: "APPROVED or REJECTED"
+
+              - name: "final_decision_date"
+                display_name: "Final Decision Date"
+                type: "timestamp with time zone"
+                description: "When final decision was made"
+
+              - name: "final_approver_user_id"
+                display_name: "Final Approver"
+                type: "varchar(100)"
+                description: "User who made final approval decision"
+                reference_data: "ref_employee"
+
+              - name: "is_escalated"
+                display_name: "Is Escalated"
+                type: "boolean"
+                description: "Whether approval was escalated"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "escalation_date"
+                display_name: "Escalation Date"
+                type: "timestamp with time zone"
+                description: "When approval was escalated"
+
+              - name: "escalation_reason"
+                display_name: "Escalation Reason"
+                type: "text"
+                description: "Reason for escalation"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_approval_record_entity"
+                columns: ["entity_type", "entity_id"]
+                type: "btree"
+
+              - name: "idx_approval_record_approver"
+                columns: ["current_approver_user_id", "approval_status_code"]
+                type: "btree"
+                where: "approval_status_code IN ('PENDING', 'UNDER_REVIEW')"
+
+              - name: "idx_approval_record_due"
+                columns: ["due_date"]
+                type: "btree"
+                where: "approval_status_code IN ('PENDING', 'UNDER_REVIEW')"
+
+            business_rules:
+              - "BR-DM-080: Approval record can only be in one active step at a time"
+              - "BR-DM-081: Cannot withdraw approval after final decision made"
+              - "BR-DM-082: Auto-escalate if due_date exceeded"
+
+          # ===================================================================
+
+          - name: "approval_action"
+            display_name: "Approval Action"
+            description: |
+              Individual approval actions taken by approvers at each step
+              of the approval workflow. Provides complete audit trail of
+              who approved/rejected, when, and why.
+
+              Each action records:
+              - Approver identity and role
+              - Action taken (APPROVE, REJECT, SEND_BACK, DELEGATE)
+              - Decision date and timestamp
+              - Comments and rationale
+              - Digital signature (if applicable)
+              - Supporting documents
+
+              SIGTAS Source: Derived from APPROVAL schema tracking
+              individual approver actions in approval chains
+
+            type: "transaction"
+            estimated_rows: "high"  # Multiple actions per approval record
+            data_classification: "internal"
+
+            columns:
+              - name: "approval_action_id"
+                display_name: "Action ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "approval_record_id"
+                display_name: "Approval Record"
+                type: "bigint"
+                description: "Parent approval record"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "document_management.approval_record"
+                    referenced_column: "approval_record_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_approval_action_record"
+                    type: "btree"
+
+              - name: "approval_step_id"
+                display_name: "Approval Step"
+                type: "bigint"
+                description: "Workflow step for this action"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "document_management.approval_step"
+                    referenced_column: "approval_step_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "approver_user_id"
+                display_name: "Approver"
+                type: "varchar(100)"
+                description: "User who performed action"
+                constraints:
+                  not_null: true
+                reference_data: "ref_employee"
+
+              - name: "approver_position_code"
+                display_name: "Approver Position"
+                type: "varchar(50)"
+                description: "Position of approver"
+                constraints:
+                  not_null: true
+                reference_data: "ref_position"
+
+              - name: "approver_role_code"
+                display_name: "Approver Role"
+                type: "varchar(50)"
+                description: "Role of approver"
+                reference_data: "ref_user_role"
+
+              - name: "action_type"
+                display_name: "Action Type"
+                type: "varchar(20)"
+                description: "APPROVE, REJECT, SEND_BACK, DELEGATE, WITHDRAW"
+                constraints:
+                  not_null: true
+
+              - name: "action_date"
+                display_name: "Action Date"
+                type: "timestamp with time zone"
+                description: "When action was performed"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "action_comments"
+                display_name: "Comments"
+                type: "text"
+                description: "Approver's comments and rationale"
+
+              - name: "rejection_reason_code"
+                display_name: "Rejection Reason"
+                type: "varchar(50)"
+                description: "Standardized reason code if rejected"
+                reference_data: "ref_rejection_reason"
+
+              - name: "delegated_to_user_id"
+                display_name: "Delegated To"
+                type: "varchar(100)"
+                description: "User to whom approval was delegated"
+                reference_data: "ref_employee"
+
+              - name: "has_digital_signature"
+                display_name: "Has Digital Signature"
+                type: "boolean"
+                description: "Whether action includes digital signature"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "signature_data"
+                display_name: "Signature Data"
+                type: "text"
+                description: "Digital signature data (encrypted)"
+                security_classification: "confidential"
+
+              - name: "signature_certificate"
+                display_name: "Signature Certificate"
+                type: "text"
+                description: "X.509 certificate used for signature"
+
+              - name: "ip_address"
+                display_name: "IP Address"
+                type: "inet"
+                description: "IP address from which action was performed"
+
+              - name: "user_agent"
+                display_name: "User Agent"
+                type: "varchar(500)"
+                description: "Browser/application used"
+
+              - name: "duration_at_step_hours"
+                display_name: "Duration at Step (Hours)"
+                type: "numeric(10,2)"
+                description: "Hours spent at this step before action"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_approval_action_approver_date"
+                columns: ["approver_user_id", "action_date"]
+                type: "btree"
+
+              - name: "idx_approval_action_record_step"
+                columns: ["approval_record_id", "approval_step_id"]
+                type: "btree"
+
+            business_rules:
+              - "BR-DM-090: Cannot modify or delete approval actions (immutable audit trail)"
+              - "BR-DM-091: Approver must have required position/role for step"
+              - "BR-DM-092: Digital signature required for high-value approvals"
+
+          # ===================================================================
+          # TASK MANAGEMENT TABLES
+          # ===================================================================
+
+          - name: "task"
+            display_name: "Task"
+            description: |
+              Work tasks assigned to tax administration staff. Tasks can be
+              created automatically by the system (workflow-driven) or
+              manually by supervisors. Each task has a type, priority,
+              due date, and assigned employee(s).
+
+              Task Types:
+              - REVIEW_DOCUMENT: Review and process document
+              - REVIEW_RETURN: Review tax return
+              - PROCESS_REFUND: Process refund request
+              - CONDUCT_AUDIT: Conduct audit
+              - COLLECTION_ACTION: Take collection action
+              - RESPOND_TO_INQUIRY: Respond to taxpayer inquiry
+              - APPROVE_REQUEST: Approve request
+              - FOLLOW_UP: Follow up on pending item
+
+              Task Lifecycle:
+              1. CREATED - Task created
+              2. ASSIGNED - Assigned to employee
+              3. ACCEPTED - Employee accepted task
+              4. IN_PROGRESS - Work in progress
+              5. ON_HOLD - Temporarily suspended
+              6. COMPLETED - Task completed
+              7. CANCELLED - Task cancelled
+
+              SIGTAS Source: SIGTAS_TASK from TASK_ROLE schema with
+              SIGTAS_TASK_NO (PK), SIGTAS_TASK_DESC, SIGTAS_TASK_COM
+
+            type: "transaction"
+            estimated_rows: "high"  # Hundreds of thousands of tasks
+            data_classification: "internal"
+
+            columns:
+              - name: "task_id"
+                display_name: "Task ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "task_number"
+                display_name: "Task Number"
+                type: "varchar(50)"
+                description: "Unique task reference number"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "task_type_code"
+                display_name: "Task Type"
+                type: "varchar(50)"
+                description: |
+                  Type: REVIEW_DOCUMENT, REVIEW_RETURN, PROCESS_REFUND,
+                  CONDUCT_AUDIT, COLLECTION_ACTION, RESPOND_TO_INQUIRY,
+                  APPROVE_REQUEST, FOLLOW_UP
+                constraints:
+                  not_null: true
+                reference_data: "ref_task_type"
+                indexes:
+                  - name: "idx_task_type"
+                    type: "btree"
+
+              - name: "task_title"
+                display_name: "Task Title"
+                type: "varchar(500)"
+                description: "Brief task title"
+                constraints:
+                  not_null: true
+
+              - name: "task_description"
+                display_name: "Description"
+                type: "text"
+                description: "Detailed task description and instructions"
+                constraints:
+                  not_null: true
+
+              - name: "task_status_code"
+                display_name: "Status"
+                type: "varchar(30)"
+                description: |
+                  Status: CREATED, ASSIGNED, ACCEPTED, IN_PROGRESS,
+                  ON_HOLD, COMPLETED, CANCELLED
+                constraints:
+                  not_null: true
+                  default: "'CREATED'"
+                reference_data: "ref_task_status"
+                indexes:
+                  - name: "idx_task_status"
+                    type: "btree"
+
+              - name: "priority_level"
+                display_name: "Priority"
+                type: "varchar(20)"
+                description: "URGENT, HIGH, NORMAL, LOW"
+                constraints:
+                  not_null: true
+                  default: "'NORMAL'"
+
+              - name: "related_entity_type"
+                display_name: "Related Entity Type"
+                type: "varchar(50)"
+                description: |
+                  Type of related entity: DOCUMENT, RETURN, ASSESSMENT,
+                  PAYMENT, AUDIT_CASE, COLLECTION_CASE, OBJECTION
+
+              - name: "related_entity_id"
+                display_name: "Related Entity ID"
+                type: "bigint"
+                description: "ID of related entity"
+
+              - name: "party_id"
+                display_name: "Related Party"
+                type: "bigint"
+                description: "Taxpayer or party related to task"
+                constraints:
+                  foreign_key:
+                    referenced_table: "party_management.party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_task_party"
+                    type: "btree"
+
+              - name: "created_by_user_id"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "User who created task"
+                constraints:
+                  not_null: true
+                reference_data: "ref_employee"
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "When task was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "assigned_to_user_id"
+                display_name: "Assigned To"
+                type: "varchar(100)"
+                description: "User to whom task is assigned"
+                reference_data: "ref_employee"
+                indexes:
+                  - name: "idx_task_assigned"
+                    type: "btree"
+
+              - name: "assigned_to_role_code"
+                display_name: "Assigned To Role"
+                type: "varchar(50)"
+                description: "Role to which task is assigned (if not specific user)"
+                reference_data: "ref_user_role"
+
+              - name: "assigned_date"
+                display_name: "Assigned Date"
+                type: "timestamp with time zone"
+                description: "When task was assigned"
+
+              - name: "accepted_date"
+                display_name: "Accepted Date"
+                type: "timestamp with time zone"
+                description: "When assignee accepted task"
+
+              - name: "due_date"
+                display_name: "Due Date"
+                type: "date"
+                description: "Date by which task must be completed"
+                constraints:
+                  not_null: true
+                indexes:
+                  - name: "idx_task_due_date"
+                    type: "btree"
+
+              - name: "estimated_hours"
+                display_name: "Estimated Hours"
+                type: "numeric(10,2)"
+                description: "Estimated hours to complete task"
+
+              - name: "actual_hours"
+                display_name: "Actual Hours"
+                type: "numeric(10,2)"
+                description: "Actual hours spent on task"
+
+              - name: "start_date"
+                display_name: "Start Date"
+                type: "timestamp with time zone"
+                description: "When work on task began"
+
+              - name: "completed_date"
+                display_name: "Completed Date"
+                type: "timestamp with time zone"
+                description: "When task was completed"
+
+              - name: "completion_comments"
+                display_name: "Completion Comments"
+                type: "text"
+                description: "Comments upon task completion"
+
+              - name: "is_overdue"
+                display_name: "Is Overdue"
+                type: "boolean"
+                description: "Whether task is past due date"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "overdue_days"
+                display_name: "Overdue Days"
+                type: "integer"
+                description: "Number of days overdue"
+
+              - name: "on_hold_reason"
+                display_name: "On Hold Reason"
+                type: "text"
+                description: "Reason task is on hold"
+
+              - name: "cancelled_reason"
+                display_name: "Cancelled Reason"
+                type: "text"
+                description: "Reason task was cancelled"
+
+              # Standard audit columns (partial - created columns above)
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_task_assigned_status"
+                columns: ["assigned_to_user_id", "task_status_code"]
+                type: "btree"
+
+              - name: "idx_task_status_due"
+                columns: ["task_status_code", "due_date"]
+                type: "btree"
+
+              - name: "idx_task_priority_due"
+                columns: ["priority_level", "due_date"]
+                type: "btree"
+                where: "task_status_code IN ('ASSIGNED', 'ACCEPTED', 'IN_PROGRESS')"
+
+            business_rules:
+              - "BR-DM-100: Task must be assigned to user or role"
+              - "BR-DM-101: Cannot complete task without completion_comments"
+              - "BR-DM-102: Auto-flag as overdue if past due_date"
+
+          # ===================================================================
+
+          - name: "task_assignment"
+            display_name: "Task Assignment"
+            description: |
+              Assignment history for tasks, tracking all assignments,
+              reassignments, and delegations. Provides complete audit trail
+              of task ownership and responsibility changes.
+
+              Assignment Types:
+              - INITIAL: First assignment
+              - REASSIGNMENT: Task reassigned to different employee
+              - DELEGATION: Temporarily delegated
+              - ESCALATION: Escalated to supervisor/manager
+              - RETURNED: Returned to original assignee
+
+              SIGTAS Source: Derived from TASK_ROLE schema tracking
+              task-employee relationships with temporal tracking
+
+            type: "transaction"
+            estimated_rows: "high"  # Multiple assignments per task
+            data_classification: "internal"
+
+            columns:
+              - name: "task_assignment_id"
+                display_name: "Assignment ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "task_id"
+                display_name: "Task"
+                type: "bigint"
+                description: "Task being assigned"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "document_management.task"
+                    referenced_column: "task_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_task_assignment_task"
+                    type: "btree"
+
+              - name: "assignment_type"
+                display_name: "Assignment Type"
+                type: "varchar(30)"
+                description: |
+                  Type: INITIAL, REASSIGNMENT, DELEGATION, ESCALATION,
+                  RETURNED
+                constraints:
+                  not_null: true
+
+              - name: "assigned_to_user_id"
+                display_name: "Assigned To"
+                type: "varchar(100)"
+                description: "User to whom task is assigned"
+                constraints:
+                  not_null: true
+                reference_data: "ref_employee"
+                indexes:
+                  - name: "idx_task_assignment_user"
+                    type: "btree"
+
+              - name: "assigned_by_user_id"
+                display_name: "Assigned By"
+                type: "varchar(100)"
+                description: "User who made the assignment"
+                constraints:
+                  not_null: true
+                reference_data: "ref_employee"
+
+              - name: "assignment_date"
+                display_name: "Assignment Date"
+                type: "timestamp with time zone"
+                description: "When assignment was made"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "assignment_reason"
+                display_name: "Assignment Reason"
+                type: "text"
+                description: "Reason for assignment/reassignment"
+
+              - name: "is_current_assignment"
+                display_name: "Is Current"
+                type: "boolean"
+                description: "Whether this is the current active assignment"
+                constraints:
+                  not_null: true
+                  default: true
+
+              - name: "unassignment_date"
+                display_name: "Unassignment Date"
+                type: "timestamp with time zone"
+                description: "When assignment ended (if applicable)"
+
+              - name: "unassignment_reason"
+                display_name: "Unassignment Reason"
+                type: "text"
+                description: "Reason assignment ended"
+
+              # Standard audit columns (partial)
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_task_assignment_current"
+                columns: ["task_id"]
+                type: "btree"
+                unique: true
+                where: "is_current_assignment = true"
+
+              - name: "idx_task_assignment_user_date"
+                columns: ["assigned_to_user_id", "assignment_date"]
+                type: "btree"
+
+            business_rules:
+              - "BR-DM-110: Each task can have only one current assignment"
+              - "BR-DM-111: Cannot reassign completed or cancelled tasks"
+
+          # ===================================================================
+          # FILE TRACKING TABLES (Physical File Management)
+          # ===================================================================
+
+          - name: "internal_file"
+            display_name: "Internal File"
+            description: |
+              Physical file folders and internal file management for cases,
+              taxpayers, and transactions requiring physical document
+              storage. Tracks file creation, location, movement, and status.
+
+              File Types:
+              - TAXPAYER_FILE: Main taxpayer file folder
+              - CASE_FILE: Audit, collection, or objection case file
+              - TAX_PERIOD_FILE: Returns and assessments for specific period
+              - CORRESPONDENCE_FILE: Correspondence and communications
+              - LEGAL_FILE: Legal proceedings and court cases
+
+              File Status:
+              - ACTIVE: Currently in use
+              - STORED: In storage/archive
+              - CHECKED_OUT: Checked out to officer
+              - IN_TRANSIT: Being moved between locations
+              - DESTROYED: Destroyed per retention policy
+
+              SIGTAS Source: IRD_FILE from IRD_FILE_MANAGEMENT schema
+              with IRD_FILE_NO (PK), TAX_TYPE_NO, IRD_FILE_YEAR,
+              OLD_FILE_NO, relationship to tax centre
+
+            type: "master"
+            estimated_rows: "medium"  # Hundreds of thousands of files
+            data_classification: "confidential"
+
+            columns:
+              - name: "file_id"
+                display_name: "File ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "file_number"
+                display_name: "File Number"
+                type: "varchar(50)"
+                description: "Unique physical file number"
+                constraints:
+                  not_null: true
+                  unique: true
+                indexes:
+                  - name: "idx_internal_file_number"
+                    type: "btree"
+
+              - name: "old_file_number"
+                display_name: "Old File Number"
+                type: "varchar(50)"
+                description: "Previous/legacy file number if migrated"
+
+              - name: "file_type_code"
+                display_name: "File Type"
+                type: "varchar(50)"
+                description: |
+                  Type: TAXPAYER_FILE, CASE_FILE, TAX_PERIOD_FILE,
+                  CORRESPONDENCE_FILE, LEGAL_FILE
+                constraints:
+                  not_null: true
+                reference_data: "ref_file_type"
+
+              - name: "file_title"
+                display_name: "File Title"
+                type: "varchar(500)"
+                description: "Descriptive file title"
+                constraints:
+                  not_null: true
+
+              - name: "party_id"
+                display_name: "Related Party"
+                type: "bigint"
+                description: "Taxpayer associated with file"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party_management.party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_internal_file_party"
+                    type: "btree"
+
+              - name: "tax_account_id"
+                display_name: "Tax Account"
+                type: "bigint"
+                description: "Related tax account if applicable"
+                constraints:
+                  foreign_key:
+                    referenced_table: "registration.tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "file_year"
+                display_name: "File Year"
+                type: "integer"
+                description: "Year for which file was created"
+                constraints:
+                  not_null: true
+
+              - name: "related_case_type"
+                display_name: "Related Case Type"
+                type: "varchar(50)"
+                description: "AUDIT, COLLECTION, OBJECTION, etc."
+
+              - name: "related_case_id"
+                display_name: "Related Case ID"
+                type: "bigint"
+                description: "ID of related case if file is case-specific"
+
+              - name: "file_status_code"
+                display_name: "File Status"
+                type: "varchar(30)"
+                description: |
+                  Status: ACTIVE, STORED, CHECKED_OUT, IN_TRANSIT,
+                  DESTROYED
+                constraints:
+                  not_null: true
+                  default: "'ACTIVE'"
+                reference_data: "ref_file_status"
+                indexes:
+                  - name: "idx_internal_file_status"
+                    type: "btree"
+
+              - name: "current_location_code"
+                display_name: "Current Location"
+                type: "varchar(100)"
+                description: "Current physical location of file"
+                constraints:
+                  not_null: true
+                reference_data: "ref_file_location"
+
+              - name: "storage_box_number"
+                display_name: "Storage Box Number"
+                type: "varchar(50)"
+                description: "Storage box if file is archived"
+
+              - name: "shelf_location"
+                display_name: "Shelf Location"
+                type: "varchar(100)"
+                description: "Specific shelf or location in storage"
+
+              - name: "checked_out_to_user_id"
+                display_name: "Checked Out To"
+                type: "varchar(100)"
+                description: "User who currently has file checked out"
+                reference_data: "ref_employee"
+
+              - name: "checkout_date"
+                display_name: "Checkout Date"
+                type: "timestamp with time zone"
+                description: "When file was checked out"
+
+              - name: "expected_return_date"
+                display_name: "Expected Return Date"
+                type: "date"
+                description: "Date by which file should be returned"
+
+              - name: "actual_return_date"
+                display_name: "Actual Return Date"
+                type: "timestamp with time zone"
+                description: "When file was actually returned"
+
+              - name: "is_overdue"
+                display_name: "Is Overdue"
+                type: "boolean"
+                description: "Whether checked-out file is overdue"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "contains_sensitive_documents"
+                display_name: "Contains Sensitive Documents"
+                type: "boolean"
+                description: "Whether file contains confidential/sensitive documents"
+                constraints:
+                  not_null: true
+                  default: false
+                pii: false
+                gdpr_relevant: true
+
+              - name: "destruction_eligible_date"
+                display_name: "Eligible for Destruction"
+                type: "date"
+                description: "Date when file can be destroyed per retention policy"
+
+              - name: "destruction_date"
+                display_name: "Destruction Date"
+                type: "date"
+                description: "Date file was destroyed"
+
+              - name: "destruction_approved_by"
+                display_name: "Destruction Approved By"
+                type: "varchar(100)"
+                description: "Officer who approved file destruction"
+                reference_data: "ref_employee"
+
+              - name: "notes"
+                display_name: "Notes"
+                type: "text"
+                description: "File handling notes and special instructions"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_internal_file_location"
+                columns: ["current_location_code", "file_status_code"]
+                type: "btree"
+
+              - name: "idx_internal_file_checkout"
+                columns: ["checked_out_to_user_id"]
+                type: "btree"
+                where: "file_status_code = 'CHECKED_OUT'"
+
+              - name: "idx_internal_file_overdue"
+                columns: ["expected_return_date"]
+                type: "btree"
+                where: "is_overdue = true"
+
+            business_rules:
+              - "BR-DM-120: File can only be checked out to one user at a time"
+              - "BR-DM-121: Cannot destroy files before destruction_eligible_date"
+              - "BR-DM-122: File status must be CHECKED_OUT if checked_out_to_user_id is set"
+
+          # ===================================================================
+
+          - name: "file_movement_log"
+            display_name: "File Movement Log"
+            description: |
+              Complete audit trail of all physical file movements including
+              checkouts, returns, transfers between locations, exits from
+              and returns to tax centre, and storage movements.
+
+              Movement Types:
+              - CHECKOUT: File checked out to officer
+              - RETURN: File returned from officer
+              - TRANSFER: Moved between locations
+              - EXIT: Taken out of tax centre premises
+              - REENTRY: Returned to tax centre
+              - STORAGE: Moved to archive storage
+              - RETRIEVAL: Retrieved from storage
+              - DESTRUCTION: File destroyed
+
+              Provides complete chain of custody for physical files,
+              critical for security, compliance, and audit purposes.
+
+              SIGTAS Source: FILE_MOVEMENT from IRD_FILE_MANAGEMENT
+              schema tracking all file location changes and custody
+
+            type: "transaction"
+            estimated_rows: "high"  # Millions of movement records
+            data_classification: "internal"
+
+            columns:
+              - name: "movement_log_id"
+                display_name: "Movement Log ID"
+                type: "bigint"
+                description: "Primary key"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "file_id"
+                display_name: "File"
+                type: "bigint"
+                description: "File being moved"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "document_management.internal_file"
+                    referenced_column: "file_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexes:
+                  - name: "idx_file_movement_file"
+                    type: "btree"
+
+              - name: "movement_type"
+                display_name: "Movement Type"
+                type: "varchar(30)"
+                description: |
+                  Type: CHECKOUT, RETURN, TRANSFER, EXIT, REENTRY,
+                  STORAGE, RETRIEVAL, DESTRUCTION
+                constraints:
+                  not_null: true
+
+              - name: "movement_date"
+                display_name: "Movement Date"
+                type: "timestamp with time zone"
+                description: "When movement occurred"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+                indexes:
+                  - name: "idx_file_movement_date"
+                    type: "btree"
+
+              - name: "from_location_code"
+                display_name: "From Location"
+                type: "varchar(100)"
+                description: "Location file moved from"
+                reference_data: "ref_file_location"
+
+              - name: "to_location_code"
+                display_name: "To Location"
+                type: "varchar(100)"
+                description: "Location file moved to"
+                constraints:
+                  not_null: true
+                reference_data: "ref_file_location"
+
+              - name: "moved_by_user_id"
+                display_name: "Moved By"
+                type: "varchar(100)"
+                description: "User who performed the movement"
+                constraints:
+                  not_null: true
+                reference_data: "ref_employee"
+
+              - name: "received_by_user_id"
+                display_name: "Received By"
+                type: "varchar(100)"
+                description: "User who received the file"
+                reference_data: "ref_employee"
+
+              - name: "movement_reason"
+                display_name: "Movement Reason"
+                type: "text"
+                description: "Reason for file movement"
+                constraints:
+                  not_null: true
+
+              - name: "expected_return_date"
+                display_name: "Expected Return Date"
+                type: "date"
+                description: "Expected return date for checkouts/exits"
+
+              - name: "actual_return_date"
+                display_name: "Actual Return Date"
+                type: "timestamp with time zone"
+                description: "Actual return date"
+
+              - name: "is_external_exit"
+                display_name: "Is External Exit"
+                type: "boolean"
+                description: "Whether file left tax centre premises"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "exit_authorization"
+                display_name: "Exit Authorization"
+                type: "varchar(100)"
+                description: "Authorization number/reference for external exits"
+
+              - name: "authorized_by_user_id"
+                display_name: "Authorized By"
+                type: "varchar(100)"
+                description: "Supervisor who authorized exit"
+                reference_data: "ref_employee"
+
+              - name: "movement_notes"
+                display_name: "Notes"
+                type: "text"
+                description: "Additional notes about movement"
+
+              # Standard audit columns (partial)
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_file_movement_file_date"
+                columns: ["file_id", "movement_date"]
+                type: "btree"
+
+              - name: "idx_file_movement_user"
+                columns: ["moved_by_user_id", "movement_date"]
+                type: "btree"
+
+              - name: "idx_file_movement_location"
+                columns: ["to_location_code", "movement_date"]
+                type: "btree"
+
+            business_rules:
+              - "BR-DM-130: Every file movement must be logged"
+              - "BR-DM-131: External exits require supervisor authorization"
+              - "BR-DM-132: Cannot modify historical movement records"
+
+# =============================================================================
+# BUSINESS RULES
+# =============================================================================
+
+business_rules:
+  - id: "BR-DM-001"
+    domain: "document_management"
+    name: "Unique Document Number"
+    description: |
+      Document numbers must be unique across the entire system and follow
+      the organizational numbering scheme (e.g., DOC-YYYY-NNNNNNNN).
+    severity: "CRITICAL"
+    type: "constraint"
+    affected_tables:
+      - "document"
+    validation_query: |
+      SELECT document_number, COUNT(*) as duplicate_count
+      FROM document_management.document
+      GROUP BY document_number
+      HAVING COUNT(*) > 1
+    enforcement: "database"
+
+  - id: "BR-DM-002"
+    domain: "document_management"
+    name: "Inbound Document Received Date"
+    description: |
+      All inbound documents must have a received_date populated when
+      document_status is not DRAFT.
+    severity: "HIGH"
+    type: "validation"
+    affected_tables:
+      - "document"
+    validation_query: |
+      SELECT document_id, document_number
+      FROM document_management.document
+      WHERE document_direction = 'INBOUND'
+        AND document_status_code != 'DRAFT'
+        AND received_date IS NULL
+    enforcement: "application"
+
+  - id: "BR-DM-020"
+    domain: "document_management"
+    name: "Original Storage Instance Required"
+    description: |
+      Each document must have at least one storage instance with
+      storage_instance_type = 'ORIGINAL'.
+    severity: "CRITICAL"
+    type: "constraint"
+    affected_tables:
+      - "document"
+      - "document_storage"
+    validation_query: |
+      SELECT d.document_id, d.document_number
+      FROM document_management.document d
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM document_management.document_storage ds
+        WHERE ds.document_id = d.document_id
+          AND ds.storage_instance_type = 'ORIGINAL'
+      )
+    enforcement: "application"
+
+  - id: "BR-DM-060"
+    domain: "document_management"
+    name: "Workflow Must Have Approval Steps"
+    description: |
+      Every approval workflow must have at least one approval step defined.
+    severity: "HIGH"
+    type: "constraint"
+    affected_tables:
+      - "approval_workflow"
+      - "approval_step"
+    validation_query: |
+      SELECT w.workflow_id, w.workflow_code
+      FROM document_management.approval_workflow w
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM document_management.approval_step s
+        WHERE s.workflow_id = w.workflow_id
+      )
+    enforcement: "application"
+
+  - id: "BR-DM-100"
+    domain: "document_management"
+    name: "Task Assignment Required"
+    description: |
+      Every task must be assigned to either a specific user or a role.
+      At least one of assigned_to_user_id or assigned_to_role_code must
+      be populated for tasks not in CREATED status.
+    severity: "HIGH"
+    type: "validation"
+    affected_tables:
+      - "task"
+    validation_query: |
+      SELECT task_id, task_number
+      FROM document_management.task
+      WHERE task_status_code != 'CREATED'
+        AND assigned_to_user_id IS NULL
+        AND assigned_to_role_code IS NULL
+    enforcement: "application"
+
+  - id: "BR-DM-120"
+    domain: "document_management"
+    name: "Single File Checkout"
+    description: |
+      A physical file can only be checked out to one user at a time.
+      File status must be CHECKED_OUT when checked_out_to_user_id is set.
+    severity: "CRITICAL"
+    type: "constraint"
+    affected_tables:
+      - "internal_file"
+    validation_query: |
+      SELECT file_id, file_number
+      FROM document_management.internal_file
+      WHERE (checked_out_to_user_id IS NOT NULL
+             AND file_status_code != 'CHECKED_OUT')
+         OR (checked_out_to_user_id IS NULL
+             AND file_status_code = 'CHECKED_OUT')
+    enforcement: "database"
+
+# =============================================================================
+# END OF DOCUMENT MANAGEMENT DOMAIN
+# =============================================================================

@@ -1,0 +1,403 @@
+# ==============================================================================
+# Malta L3 Warehouse Model: dim_assessment_type
+# Step 10c: Reference & Analytical Dimensions
+# ==============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Purpose: Assessment type classification dimension for fact_assessment
+# ==============================================================================
+
+dimension:
+  name: "dim_assessment_type"
+  schema: "warehouse"
+  display_name: "Assessment Type Dimension"
+  description: |
+    Classification dimension for tax assessments. Distinguishes between
+    self-assessments (from taxpayer returns), tax authority assessments
+    (administrative, estimated, jeopardy), and amended assessments.
+    
+    Critical for analyzing assessment processing workloads, compliance
+    patterns, and audit effectiveness.
+    
+  scd_type: 1
+  scd_type_description: "Type 1 - Overwrite on change (reference data rarely changes)"
+  
+  natural_key: ["assessment_type_code"]
+  surrogate_key: "assessment_type_key"
+  
+  grain: "One row per assessment type"
+  estimated_rows: 20
+  
+  source_system:
+    primary_table: "reference.ref_assessment_type"
+    
+  refresh_frequency: "Annual (or on legislative changes)"
+  
+  # ============================================================================
+  # COLUMNS
+  # ============================================================================
+  columns:
+    # --------------------------------------------------------------------------
+    # Surrogate Key
+    # --------------------------------------------------------------------------
+    - name: "assessment_type_key"
+      display_name: "Assessment Type Key"
+      data_type: "INT"
+      nullable: false
+      description: "Surrogate key for assessment type dimension"
+      constraints:
+        primary_key: true
+        auto_increment: true
+
+    # --------------------------------------------------------------------------
+    # Natural Key & Names
+    # --------------------------------------------------------------------------
+    - name: "assessment_type_code"
+      display_name: "Assessment Type Code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Short code for assessment type"
+      constraints:
+        unique: true
+      examples: ["SELF", "AMENDED_SELF", "ADMIN", "ESTIMATED", "JEOPARDY"]
+      
+    - name: "assessment_type_name"
+      display_name: "Assessment Type Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Full name of the assessment type"
+      examples: ["Self Assessment", "Administrative Assessment", "Estimated Assessment"]
+      
+    - name: "assessment_type_name_mt"
+      display_name: "Assessment Type Name (Maltese)"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Assessment type name in Maltese"
+      examples: ["Awtovalutazzjoni", "Valutazzjoni Amministrattiva", "Valutazzjoni Stmata"]
+      
+    - name: "assessment_type_description"
+      display_name: "Assessment Type Description"
+      data_type: "VARCHAR(500)"
+      nullable: true
+      description: "Detailed description of when this assessment type is used"
+
+    # --------------------------------------------------------------------------
+    # Classification
+    # --------------------------------------------------------------------------
+    - name: "assessment_category"
+      display_name: "Assessment Category"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "High-level category: SELF_ASSESSED or TAX_AUTHORITY_ASSESSED"
+      constraints:
+        check: "assessment_category IN ('SELF_ASSESSED', 'TAX_AUTHORITY_ASSESSED')"
+      examples: ["SELF_ASSESSED", "TAX_AUTHORITY_ASSESSED"]
+      
+    - name: "assessment_category_name"
+      display_name: "Assessment Category Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Display name for assessment category"
+      examples: ["Self Assessed", "Tax Authority Assessed"]
+      
+    - name: "assessment_initiator"
+      display_name: "Initiator"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Who initiates this assessment type"
+      constraints:
+        check: "assessment_initiator IN ('TAXPAYER', 'TAX_AUTHORITY', 'SYSTEM')"
+      examples: ["TAXPAYER", "TAX_AUTHORITY", "SYSTEM"]
+
+    # --------------------------------------------------------------------------
+    # Behavior Flags
+    # --------------------------------------------------------------------------
+    - name: "is_self_assessed"
+      display_name: "Self Assessed"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether assessment originates from taxpayer return"
+      
+    - name: "requires_return"
+      display_name: "Requires Return"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether a tax return is required for this assessment type"
+      
+    - name: "requires_review"
+      display_name: "Requires Review"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether assessment requires officer review before finalization"
+      
+    - name: "is_appealable"
+      display_name: "Appealable"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether taxpayer can appeal this assessment type"
+      
+    - name: "generates_penalty"
+      display_name: "Generates Penalty"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this assessment type typically generates penalties"
+      
+    - name: "generates_interest"
+      display_name: "Generates Interest"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this assessment type typically generates interest"
+      
+    - name: "allows_objection"
+      display_name: "Allows Objection"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether formal objection can be filed against this assessment"
+
+    # --------------------------------------------------------------------------
+    # Appeal & Time Limits
+    # --------------------------------------------------------------------------
+    - name: "appeal_period_days"
+      display_name: "Appeal Period (Days)"
+      data_type: "INT"
+      nullable: true
+      description: "Number of days allowed for filing an appeal (typically 30)"
+      
+    - name: "objection_period_days"
+      display_name: "Objection Period (Days)"
+      data_type: "INT"
+      nullable: true
+      description: "Number of days allowed for filing an objection"
+
+    # --------------------------------------------------------------------------
+    # Display
+    # --------------------------------------------------------------------------
+    - name: "sort_order"
+      display_name: "Sort Order"
+      data_type: "INT"
+      nullable: false
+      description: "Display sort order"
+      
+    - name: "is_active"
+      display_name: "Active Flag"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether assessment type is currently in use"
+
+    # --------------------------------------------------------------------------
+    # ETL Metadata
+    # --------------------------------------------------------------------------
+    - name: "etl_batch_id"
+      display_name: "ETL Batch ID"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for audit trail"
+      
+    - name: "etl_load_timestamp"
+      display_name: "ETL Load Timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when record was loaded"
+
+  # ============================================================================
+  # INDEXES
+  # ============================================================================
+  indexes:
+    - name: "pk_dim_assessment_type"
+      columns: ["assessment_type_key"]
+      primary: true
+      
+    - name: "uk_dim_assessment_type_code"
+      columns: ["assessment_type_code"]
+      unique: true
+      
+    - name: "idx_dim_assessment_category"
+      columns: ["assessment_category"]
+      description: "Support queries by assessment category"
+
+  # ============================================================================
+  # REFERENCE DATA
+  # ============================================================================
+  reference_data:
+    # Self-Assessed Types
+    - code: "SELF"
+      name: "Self Assessment"
+      name_mt: "Awtovalutazzjoni"
+      category: "SELF_ASSESSED"
+      initiator: "TAXPAYER"
+      is_self: true
+      requires_return: true
+      requires_review: false
+      description: "Assessment created from taxpayer's submitted return"
+      sort_order: 10
+      
+    - code: "AMENDED_SELF"
+      name: "Amended Self Assessment"
+      name_mt: "Awtovalutazzjoni Emendata"
+      category: "SELF_ASSESSED"
+      initiator: "TAXPAYER"
+      is_self: true
+      requires_return: true
+      requires_review: false
+      description: "Taxpayer-initiated correction of a previous self-assessment"
+      sort_order: 20
+      
+    # Tax Authority Assessed Types
+    - code: "ADMIN"
+      name: "Administrative Assessment"
+      name_mt: "Valutazzjoni Amministrattiva"
+      category: "TAX_AUTHORITY_ASSESSED"
+      initiator: "TAX_AUTHORITY"
+      is_self: false
+      requires_return: false
+      requires_review: true
+      generates_penalty: false
+      description: "Assessment raised by tax authority based on available information"
+      appeal_period_days: 30
+      sort_order: 30
+      
+    - code: "ESTIMATED"
+      name: "Estimated Assessment"
+      name_mt: "Valutazzjoni Stmata"
+      category: "TAX_AUTHORITY_ASSESSED"
+      initiator: "TAX_AUTHORITY"
+      is_self: false
+      requires_return: false
+      requires_review: true
+      generates_penalty: true
+      generates_interest: true
+      description: "Best judgment assessment when taxpayer fails to file or provide information"
+      appeal_period_days: 30
+      sort_order: 40
+      
+    - code: "JEOPARDY"
+      name: "Jeopardy Assessment"
+      name_mt: "Valutazzjoni ta' Periklu"
+      category: "TAX_AUTHORITY_ASSESSED"
+      initiator: "TAX_AUTHORITY"
+      is_self: false
+      requires_return: false
+      requires_review: true
+      generates_penalty: true
+      generates_interest: true
+      description: "Emergency assessment when collection is in jeopardy (e.g., taxpayer leaving jurisdiction)"
+      appeal_period_days: 14
+      sort_order: 50
+      
+    - code: "ADDITIONAL"
+      name: "Additional Assessment"
+      name_mt: "Valutazzjoni Addizzjonali"
+      category: "TAX_AUTHORITY_ASSESSED"
+      initiator: "TAX_AUTHORITY"
+      is_self: false
+      requires_return: false
+      requires_review: true
+      generates_penalty: true
+      generates_interest: true
+      description: "Additional tax assessed following audit or discovery of understatement"
+      appeal_period_days: 30
+      sort_order: 60
+      
+    - code: "PROTECTIVE"
+      name: "Protective Assessment"
+      name_mt: "Valutazzjoni Protettiva"
+      category: "TAX_AUTHORITY_ASSESSED"
+      initiator: "TAX_AUTHORITY"
+      is_self: false
+      requires_return: false
+      requires_review: true
+      generates_penalty: false
+      generates_interest: false
+      description: "Assessment raised to preserve statute of limitations"
+      appeal_period_days: 30
+      sort_order: 70
+      
+    - code: "PROVISIONAL"
+      name: "Provisional Assessment"
+      name_mt: "Valutazzjoni Provviżorja"
+      category: "SELF_ASSESSED"
+      initiator: "TAXPAYER"
+      is_self: true
+      requires_return: true
+      requires_review: false
+      generates_penalty: false
+      description: "Preliminary assessment pending final determination"
+      sort_order: 80
+      
+    - code: "FINAL"
+      name: "Final Assessment"
+      name_mt: "Valutazzjoni Finali"
+      category: "TAX_AUTHORITY_ASSESSED"
+      initiator: "TAX_AUTHORITY"
+      is_self: false
+      requires_return: false
+      requires_review: true
+      generates_penalty: false
+      description: "Final determination of tax liability after review"
+      appeal_period_days: 30
+      sort_order: 90
+      
+    - code: "AUDIT"
+      name: "Audit Assessment"
+      name_mt: "Valutazzjoni tal-Awditjar"
+      category: "TAX_AUTHORITY_ASSESSED"
+      initiator: "TAX_AUTHORITY"
+      is_self: false
+      requires_return: false
+      requires_review: true
+      generates_penalty: true
+      generates_interest: true
+      description: "Assessment resulting from audit examination"
+      appeal_period_days: 30
+      sort_order: 100
+      
+    - code: "BJA"
+      name: "Best Judgment Assessment"
+      name_mt: "Valutazzjoni tal-Aħjar Ġudizzju"
+      category: "TAX_AUTHORITY_ASSESSED"
+      initiator: "SYSTEM"
+      is_self: false
+      requires_return: false
+      requires_review: true
+      generates_penalty: true
+      generates_interest: true
+      description: "Automatic assessment for chronic non-filers"
+      appeal_period_days: 30
+      sort_order: 110
+
+  # ============================================================================
+  # USAGE NOTES
+  # ============================================================================
+  usage_notes:
+    fact_tables:
+      - fact_assessment: "Primary dimension for assessment analysis"
+      
+    common_queries:
+      - name: "Self vs Authority Assessments"
+        pattern: "GROUP BY assessment_category"
+        
+      - name: "Assessment Type Distribution"
+        pattern: "GROUP BY assessment_type_name"
+        
+      - name: "Appealable Assessment Volume"
+        pattern: "WHERE is_appealable = true GROUP BY assessment_type_name"
+        
+    analysis_patterns:
+      - name: "Compliance Indicator"
+        description: "High ratio of SELF to authority assessments indicates good compliance"
+        
+      - name: "Audit Effectiveness"
+        description: "Track AUDIT and ADDITIONAL assessments as percentage of total"
+        
+      - name: "Non-Filer Analysis"
+        description: "Monitor ESTIMATED and BJA assessments to identify chronic non-filers"
+
+# ==============================================================================
+# END OF SPECIFICATION
+# ==============================================================================

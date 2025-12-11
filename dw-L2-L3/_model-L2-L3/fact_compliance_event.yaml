@@ -1,0 +1,729 @@
+# =============================================================================
+# Malta L3 Warehouse: fact_compliance_event Fact Table
+# =============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Phase: C - L3 Warehouse Model Development
+# Step: 11c - Compliance & Risk Facts
+# =============================================================================
+
+fact_table:
+  name: "fact_compliance_event"
+  schema: "warehouse"
+  description: |
+    Factless fact table tracking all compliance events.
+    Each row represents a single compliance event occurrence.
+    Used for coverage analysis, intervention correlation, and 
+    measuring compliance intervention effectiveness.
+    
+    Key characteristics:
+    - No true numeric measures (factless)
+    - event_count = 1 for aggregation convenience
+    - Answers "what happened" not "how much"
+    - Supports coverage and correlation analysis
+    
+  fact_type: "FACTLESS"
+  grain: "One row per compliance event"
+  
+  business_context:
+    domain: "Compliance & Control"
+    primary_use: "Coverage analysis, intervention effectiveness, event correlation"
+    usage_pattern: "Medium read volume for compliance dashboards and risk management"
+    refresh: "Daily incremental based on L2 event_date"
+    philosophy: |
+      Aligned with OECD Compliance Risk Management approach.
+      Focus on:
+      - Measuring intervention coverage across taxpayer segments
+      - Correlating interventions with voluntary compliance improvement
+      - Tracking resolution rates and times
+      - Identifying repeat offenders and patterns
+    
+  estimated_volume:
+    initial_rows: 2000000
+    annual_growth_rows: 400000
+    average_daily_inserts: 1500
+    note: "Volume increases with compliance program maturity"
+
+  # ===========================================================================
+  # DIMENSION FOREIGN KEYS
+  # ===========================================================================
+  dimension_keys:
+    - name: "party_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_party"
+      description: "Taxpayer involved in the compliance event"
+      
+    - name: "tax_type_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_tax_type"
+      description: "Tax type if event is tax-specific (NULL for general events)"
+      default_value: -1
+      note: "NULL mapped to Unknown (-1) tax type"
+      
+    - name: "tax_period_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_tax_period"
+      description: "Tax period if event is period-specific"
+      default_value: -1
+      note: "NULL mapped to Unknown (-1) tax period"
+      
+    - name: "registration_key"
+      data_type: "BIGINT"
+      nullable: true
+      dimension: "dim_registration"
+      description: "Registration status at time of event"
+      default_value: -1
+      
+    - name: "geography_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_geography"
+      description: "Taxpayer location at time of event"
+      default_value: -1
+      
+    - name: "compliance_status_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_compliance_status"
+      description: "Compliance status classification at event time"
+      
+    - name: "risk_category_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_risk_category"
+      description: "Risk category at time of event"
+      default_value: -1
+      note: "NULL mapped to Unknown (-1) risk category"
+
+  # ===========================================================================
+  # ROLE-PLAYING DATE KEYS
+  # ===========================================================================
+  date_keys:
+    - name: "event_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Event Date"
+      description: "Date the compliance event occurred/was detected"
+      format: "YYYYMMDD smart key"
+      source: "compliance_event.event_date"
+      
+    - name: "due_date_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Due Date"
+      description: "Related due date (e.g., filing due date for late filing event)"
+      format: "YYYYMMDD smart key"
+      source: "compliance_event.related_due_date"
+      default_value: -1
+      note: "NULL mapped to Unknown (-1) date"
+      
+    - name: "resolution_date_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Resolution Date"
+      description: "Date event was resolved (NULL if still open)"
+      format: "YYYYMMDD smart key"
+      source: "compliance_event.resolution_date"
+      default_value: -1
+
+  # ===========================================================================
+  # DEGENERATE DIMENSIONS
+  # ===========================================================================
+  degenerate_dimensions:
+    - name: "event_source_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "L2 compliance_event_id - primary key from source"
+      source: "compliance_control.compliance_event.compliance_event_id"
+      role: "PRIMARY_KEY"
+      
+    - name: "event_reference"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "Business reference number for the event"
+      source: "compliance_event.event_reference_number"
+      example: "CE-2024-001234"
+      
+    - name: "event_type_code"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "Type of compliance event"
+      source: "compliance_event.event_type_code"
+      allowed_values:
+        - "LATE_FILING"
+        - "NON_FILING"
+        - "FILING_REMINDER"
+        - "FILING_NOTICE"
+        - "FILING_RESOLVED"
+        - "LATE_PAYMENT"
+        - "NON_PAYMENT"
+        - "PAYMENT_REMINDER"
+        - "PAYMENT_DEMAND"
+        - "PAYMENT_PLAN"
+        - "REG_ANOMALY"
+        - "THRESHOLD_BREACH"
+        - "UNREG_ACTIVITY"
+        - "REG_VERIFICATION"
+        - "AUDIT_SELECTION"
+        - "AUDIT_START"
+        - "AUDIT_COMPLETE"
+        - "AUDIT_ADJUSTMENT"
+        - "COLLECTION_START"
+        - "GARNISHMENT"
+        - "LIEN_FILED"
+        - "SEIZURE"
+        - "VOLUNTARY_DISCLOSURE"
+        - "SELF_CORRECTION"
+        - "PAYMENT_AGREEMENT"
+        - "APPEALS_FILED"
+        
+    - name: "event_type_name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Display name for the event type"
+      source: "Derived from event_type_code reference"
+      examples:
+        - "Late Filing Detected"
+        - "Non-Filing Detected"
+        - "Filing Reminder Sent"
+        - "Audit Selection Made"
+        - "Voluntary Disclosure Received"
+      
+    - name: "event_category_code"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "High-level event category"
+      source: "compliance_event.event_category_code"
+      allowed_values:
+        - "FILING"
+        - "PAYMENT"
+        - "REGISTRATION"
+        - "AUDIT"
+        - "COLLECTION"
+        - "TAXPAYER_INITIATED"
+      
+    - name: "event_subcategory_code"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "Detailed event subcategory"
+      source: "compliance_event.event_subcategory_code"
+      allowed_values:
+        - "DETECTION"
+        - "REMINDER"
+        - "NOTICE"
+        - "DEMAND"
+        - "ENFORCEMENT"
+        - "RESOLUTION"
+        - "VOLUNTARY"
+      
+    - name: "event_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Current status of the event"
+      source: "compliance_event.event_status_code"
+      allowed_values:
+        - "OPEN"
+        - "IN_PROGRESS"
+        - "RESOLVED"
+        - "ESCALATED"
+        - "CANCELLED"
+        
+    - name: "resolution_code"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "How the event was resolved (NULL if not resolved)"
+      source: "compliance_event.resolution_code"
+      allowed_values:
+        - "TAXPAYER_ACTION"
+        - "ENFORCEMENT"
+        - "WAIVED"
+        - "EXPIRED"
+        - "MERGED"
+        - "WRITE_OFF"
+        - "ADMINISTRATIVE"
+        
+    - name: "initiated_by"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Who/what initiated the event"
+      source: "compliance_event.initiated_by"
+      allowed_values:
+        - "SYSTEM"
+        - "OFFICER"
+        - "TAXPAYER"
+        - "THIRD_PARTY"
+        
+    - name: "assigned_unit"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Organizational unit assigned to handle the event"
+      source: "compliance_event.assigned_unit_code"
+      examples:
+        - "Compliance Division"
+        - "Large Taxpayer Office"
+        - "Audit Unit"
+        - "Collection Unit"
+        - "Customer Service"
+        
+    - name: "case_id"
+      data_type: "BIGINT"
+      nullable: true
+      description: "Related case ID if event is part of a case"
+      source: "compliance_event.case_id"
+
+  # ===========================================================================
+  # ADDITIVE MEASURES (Convenience for Factless Fact)
+  # ===========================================================================
+  measures_additive:
+    - name: "event_count"
+      data_type: "SMALLINT"
+      nullable: false
+      default_value: 1
+      description: |
+        Always equals 1 - enables COUNT via SUM in BI tools.
+        This is a factless fact table convenience pattern.
+        Usage: SUM(event_count) = COUNT(*) of events
+      aggregation: "SUM"
+      unit: "count"
+
+  # ===========================================================================
+  # SEMI-ADDITIVE MEASURES (Time-based, point-in-time)
+  # ===========================================================================
+  measures_semi_additive:
+    - name: "days_to_resolution"
+      data_type: "INT"
+      nullable: true
+      description: "Days from event occurrence to resolution"
+      source: "DATEDIFF(resolution_date, event_date)"
+      aggregation: "AVG"
+      note: "NULL if not yet resolved"
+      
+    - name: "days_overdue"
+      data_type: "INT"
+      nullable: true
+      description: "Days overdue at time of event (for late events)"
+      source: "DATEDIFF(event_date, related_due_date)"
+      aggregation: "AVG"
+      note: "NULL if not a lateness-related event"
+
+  # ===========================================================================
+  # FLAGS
+  # ===========================================================================
+  flags:
+    - name: "is_resolved"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Whether the event has been resolved"
+      derivation: "event_status_code = 'RESOLVED'"
+      
+    - name: "is_escalated"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Whether the event was escalated to higher action"
+      derivation: "event_status_code = 'ESCALATED'"
+      
+    - name: "is_voluntary_compliance"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Whether taxpayer self-corrected without enforcement"
+      derivation: "resolution_code = 'TAXPAYER_ACTION' OR initiated_by = 'TAXPAYER'"
+      note: "Key metric for OECD CRM approach - voluntary compliance is the goal"
+      
+    - name: "is_repeat_event"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Whether same event type occurred for same taxpayer before"
+      derivation: "Calculated during ETL - check prior events for party"
+      
+    - name: "resulted_in_penalty"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Whether the event resulted in a penalty assessment"
+      derivation: "compliance_event.penalty_assessed_flag"
+      
+    - name: "resulted_in_audit"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Whether the event led to audit selection"
+      derivation: "compliance_event.audit_triggered_flag"
+
+  # ===========================================================================
+  # ETL METADATA
+  # ===========================================================================
+  metadata:
+    - name: "etl_batch_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for lineage tracking"
+      
+    - name: "etl_load_timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "When record was loaded into warehouse"
+      
+    - name: "source_system"
+      data_type: "VARCHAR(50)"
+      nullable: false
+      description: "Source system identifier"
+      allowed_values: ["MTCA_COMPLIANCE", "MTCA_AUDIT", "MTCA_COLLECTION"]
+
+  # ===========================================================================
+  # INDEXES
+  # ===========================================================================
+  indexes:
+    - name: "pk_fact_compliance_event"
+      columns: ["event_source_id"]
+      primary: true
+      description: "Primary key on source system ID"
+      
+    - name: "idx_fact_compliance_party_date"
+      columns: ["party_key", "event_date_key"]
+      description: "Party-centric queries with date"
+      
+    - name: "idx_fact_compliance_type_date"
+      columns: ["event_type_code", "event_date_key"]
+      description: "Event type analysis over time"
+      
+    - name: "idx_fact_compliance_category_date"
+      columns: ["event_category_code", "event_date_key"]
+      description: "Category-level analysis"
+      
+    - name: "idx_fact_compliance_status"
+      columns: ["compliance_status_key", "event_date_key"]
+      description: "Compliance status analysis"
+      
+    - name: "idx_fact_compliance_risk"
+      columns: ["risk_category_key", "event_date_key"]
+      description: "Risk-based analysis"
+      
+    - name: "idx_fact_compliance_open"
+      columns: ["is_resolved", "event_date_key"]
+      description: "Open event queries"
+      condition: "is_resolved = FALSE"
+
+  # ===========================================================================
+  # PARTITIONING STRATEGY
+  # ===========================================================================
+  partitioning:
+    enabled: true
+    strategy: "RANGE"
+    column: "event_date_key"
+    interval: "MONTHLY"
+    description: "Partition by event month (YYYYMM from date_key)"
+    retention_months: 84  # 7 years online
+    archive_strategy: "Move to cold storage after retention"
+
+  # ===========================================================================
+  # EVENT TYPE REFERENCE DATA
+  # ===========================================================================
+  event_type_reference:
+    filing:
+      - code: "LATE_FILING"
+        name: "Late Filing Detected"
+        name_mt: "Fajl Tard Identifikat"
+        category: "FILING"
+        subcategory: "DETECTION"
+        severity: 3
+        
+      - code: "NON_FILING"
+        name: "Non-Filing Detected"
+        name_mt: "Nuqqas ta' Fajljar Identifikat"
+        category: "FILING"
+        subcategory: "DETECTION"
+        severity: 4
+        
+      - code: "FILING_REMINDER"
+        name: "Filing Reminder Sent"
+        name_mt: "Tfakkira ta' Fajljar Mibgħuta"
+        category: "FILING"
+        subcategory: "REMINDER"
+        severity: 2
+        
+      - code: "FILING_NOTICE"
+        name: "Filing Notice Issued"
+        name_mt: "Avviż ta' Fajljar Maħruġ"
+        category: "FILING"
+        subcategory: "NOTICE"
+        severity: 3
+        
+    payment:
+      - code: "LATE_PAYMENT"
+        name: "Late Payment Detected"
+        name_mt: "Ħlas Tard Identifikat"
+        category: "PAYMENT"
+        subcategory: "DETECTION"
+        severity: 3
+        
+      - code: "NON_PAYMENT"
+        name: "Non-Payment Detected"
+        name_mt: "Nuqqas ta' Ħlas Identifikat"
+        category: "PAYMENT"
+        subcategory: "DETECTION"
+        severity: 4
+        
+      - code: "PAYMENT_REMINDER"
+        name: "Payment Reminder Sent"
+        name_mt: "Tfakkira ta' Ħlas Mibgħuta"
+        category: "PAYMENT"
+        subcategory: "REMINDER"
+        severity: 2
+        
+      - code: "PAYMENT_DEMAND"
+        name: "Payment Demand Issued"
+        name_mt: "Talba ta' Ħlas Maħruġa"
+        category: "PAYMENT"
+        subcategory: "DEMAND"
+        severity: 4
+        
+    registration:
+      - code: "REG_ANOMALY"
+        name: "Registration Anomaly"
+        name_mt: "Anomalija ta' Reġistrazzjoni"
+        category: "REGISTRATION"
+        subcategory: "DETECTION"
+        severity: 3
+        
+      - code: "THRESHOLD_BREACH"
+        name: "VAT Threshold Breach"
+        name_mt: "Ksur tal-Limitu tal-VAT"
+        category: "REGISTRATION"
+        subcategory: "DETECTION"
+        severity: 4
+        
+    audit:
+      - code: "AUDIT_SELECTION"
+        name: "Selected for Audit"
+        name_mt: "Magħżul għall-Awditjar"
+        category: "AUDIT"
+        subcategory: "DETECTION"
+        severity: 4
+        
+      - code: "AUDIT_START"
+        name: "Audit Started"
+        name_mt: "Awditjar Mibdi"
+        category: "AUDIT"
+        subcategory: "ENFORCEMENT"
+        severity: 4
+        
+      - code: "AUDIT_COMPLETE"
+        name: "Audit Completed"
+        name_mt: "Awditjar Lest"
+        category: "AUDIT"
+        subcategory: "RESOLUTION"
+        severity: 4
+        
+    collection:
+      - code: "COLLECTION_START"
+        name: "Collection Action Started"
+        name_mt: "Azzjoni ta' Ġbir Mibdija"
+        category: "COLLECTION"
+        subcategory: "ENFORCEMENT"
+        severity: 4
+        
+      - code: "GARNISHMENT"
+        name: "Garnishment Issued"
+        name_mt: "Qbid Maħruġ"
+        category: "COLLECTION"
+        subcategory: "ENFORCEMENT"
+        severity: 5
+        
+      - code: "LIEN_FILED"
+        name: "Tax Lien Filed"
+        name_mt: "Garanzija ta' Taxxa Mressqa"
+        category: "COLLECTION"
+        subcategory: "ENFORCEMENT"
+        severity: 5
+        
+    taxpayer_initiated:
+      - code: "VOLUNTARY_DISCLOSURE"
+        name: "Voluntary Disclosure Received"
+        name_mt: "Dikjarazzjoni Volontarja Riċevuta"
+        category: "TAXPAYER_INITIATED"
+        subcategory: "VOLUNTARY"
+        severity: 2
+        
+      - code: "SELF_CORRECTION"
+        name: "Self-Correction Filed"
+        name_mt: "Korrezzjoni Awtomatika Mressqa"
+        category: "TAXPAYER_INITIATED"
+        subcategory: "VOLUNTARY"
+        severity: 2
+
+  # ===========================================================================
+  # SOURCE MAPPING
+  # ===========================================================================
+  source_mapping:
+    primary_table: "compliance_control.compliance_event"
+    alias: "ce"
+    
+    joins:
+      - table: "warehouse.dim_party"
+        alias: "dp"
+        type: "INNER"
+        condition: "ce.party_id = dp.party_source_id AND dp.is_current_flag = TRUE"
+        
+      - table: "warehouse.dim_tax_type"
+        alias: "dtt"
+        type: "LEFT"
+        condition: "ce.tax_type_code = dtt.tax_type_code"
+        
+      - table: "warehouse.dim_compliance_status"
+        alias: "dcs"
+        type: "INNER"
+        condition: "ce.compliance_status_code = dcs.compliance_status_code"
+        
+      - table: "warehouse.dim_risk_category"
+        alias: "drc"
+        type: "LEFT"
+        condition: "ce.risk_category_code = drc.risk_category_code"
+        
+      - table: "warehouse.dim_date"
+        alias: "dd_event"
+        type: "INNER"
+        condition: "DATE_FORMAT(ce.event_date, '%Y%m%d') = dd_event.date_key"
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+  business_rules:
+    - rule_id: "FCE_001"
+      description: "Event count must equal 1 (factless fact pattern)"
+      validation_sql: |
+        SELECT COUNT(*) AS violations
+        FROM warehouse.fact_compliance_event
+        WHERE event_count != 1
+      expected_result: "0"
+      severity: "CRITICAL"
+      
+    - rule_id: "FCE_002"
+      description: "Resolution date must be >= event date"
+      validation_sql: |
+        SELECT COUNT(*) AS violations
+        FROM warehouse.fact_compliance_event
+        WHERE resolution_date_key IS NOT NULL
+          AND resolution_date_key != -1
+          AND resolution_date_key < event_date_key
+      expected_result: "0"
+      severity: "ERROR"
+      
+    - rule_id: "FCE_003"
+      description: "Resolved events must have resolution date"
+      validation_sql: |
+        SELECT COUNT(*) AS violations
+        FROM warehouse.fact_compliance_event
+        WHERE is_resolved = TRUE
+          AND (resolution_date_key IS NULL OR resolution_date_key = -1)
+      expected_result: "0"
+      severity: "ERROR"
+      
+    - rule_id: "FCE_004"
+      description: "Voluntary compliance implies resolved"
+      validation_sql: |
+        SELECT COUNT(*) AS violations
+        FROM warehouse.fact_compliance_event
+        WHERE is_voluntary_compliance = TRUE
+          AND is_resolved = FALSE
+      expected_result: "0"
+      severity: "WARNING"
+      
+    - rule_id: "FCE_005"
+      description: "All dimension keys must be valid"
+      validation_sql: |
+        SELECT 'party' AS dimension, COUNT(*) AS missing
+        FROM warehouse.fact_compliance_event fce
+        WHERE NOT EXISTS (SELECT 1 FROM warehouse.dim_party dp WHERE dp.party_key = fce.party_key)
+        UNION ALL
+        SELECT 'compliance_status', COUNT(*)
+        FROM warehouse.fact_compliance_event fce
+        WHERE NOT EXISTS (SELECT 1 FROM warehouse.dim_compliance_status dcs 
+                         WHERE dcs.compliance_status_key = fce.compliance_status_key)
+      expected_result: "All counts = 0"
+      severity: "CRITICAL"
+
+  # ===========================================================================
+  # SAMPLE QUERIES
+  # ===========================================================================
+  sample_queries:
+    - name: "Compliance Event Coverage"
+      description: "What percentage of high-risk taxpayers received interventions?"
+      sql: |
+        SELECT 
+            drc.risk_level_name,
+            dp.segment_name,
+            COUNT(DISTINCT dp.party_key) AS total_in_segment,
+            COUNT(DISTINCT fce.party_key) AS received_intervention,
+            ROUND(100.0 * COUNT(DISTINCT fce.party_key) / 
+                  NULLIF(COUNT(DISTINCT dp.party_key), 0), 2) AS coverage_pct
+        FROM warehouse.dim_party dp
+        JOIN warehouse.dim_risk_category drc 
+            ON dp.current_risk_category_key = drc.risk_category_key
+        LEFT JOIN warehouse.fact_compliance_event fce 
+            ON dp.party_key = fce.party_key
+            AND fce.event_date_key >= 20240101
+        WHERE dp.is_current_flag = TRUE
+          AND drc.risk_level >= 4  -- High and Very High
+        GROUP BY drc.risk_level_name, dp.segment_name
+        ORDER BY drc.risk_level DESC;
+        
+    - name: "Voluntary Compliance Rate"
+      description: "What percentage of events resolved through voluntary taxpayer action?"
+      sql: |
+        SELECT 
+            fce.event_category_code,
+            fce.event_type_name,
+            SUM(fce.event_count) AS total_events,
+            SUM(CASE WHEN fce.is_resolved THEN 1 ELSE 0 END) AS resolved_count,
+            SUM(CASE WHEN fce.is_voluntary_compliance THEN 1 ELSE 0 END) AS voluntary_count,
+            ROUND(100.0 * SUM(CASE WHEN fce.is_voluntary_compliance THEN 1 ELSE 0 END) / 
+                  NULLIF(SUM(fce.event_count), 0), 2) AS voluntary_rate_pct
+        FROM warehouse.fact_compliance_event fce
+        GROUP BY fce.event_category_code, fce.event_type_name
+        ORDER BY voluntary_rate_pct DESC;
+        
+    - name: "Event Resolution Time"
+      description: "Average days to resolution by event type"
+      sql: |
+        SELECT 
+            fce.event_category_code,
+            fce.event_type_name,
+            SUM(fce.event_count) AS total_events,
+            SUM(CASE WHEN fce.is_resolved THEN 1 ELSE 0 END) AS resolved_count,
+            AVG(fce.days_to_resolution) AS avg_days_to_resolve,
+            MIN(fce.days_to_resolution) AS min_days,
+            MAX(fce.days_to_resolution) AS max_days
+        FROM warehouse.fact_compliance_event fce
+        WHERE fce.is_resolved = TRUE
+        GROUP BY fce.event_category_code, fce.event_type_name
+        ORDER BY avg_days_to_resolve DESC;
+        
+    - name: "Repeat Offender Analysis"
+      description: "Identify taxpayers with repeated compliance events"
+      sql: |
+        SELECT 
+            dp.tin,
+            dp.party_name,
+            dp.segment_name,
+            COUNT(*) AS total_events,
+            SUM(CASE WHEN fce.is_repeat_event THEN 1 ELSE 0 END) AS repeat_events,
+            COUNT(DISTINCT fce.event_type_code) AS distinct_event_types
+        FROM warehouse.fact_compliance_event fce
+        JOIN warehouse.dim_party dp ON fce.party_key = dp.party_key
+        WHERE dp.is_current_flag = TRUE
+          AND fce.event_date_key >= 20230101
+        GROUP BY dp.tin, dp.party_name, dp.segment_name
+        HAVING COUNT(*) > 5
+        ORDER BY total_events DESC
+        LIMIT 100;

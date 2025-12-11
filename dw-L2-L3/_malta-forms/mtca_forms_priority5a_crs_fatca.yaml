@@ -1,0 +1,3054 @@
+# ============================================================================
+# MTCA Forms - Priority 5A: Automatic Exchange of Financial Account Information
+# Forms: CRS Report, FATCA Report, CRS/FATCA Registration, Nil Returns
+# Version: 1.0
+# Date: 2025-12-08
+# Purpose: ORS Database Schema Design and Exchange of Information Support
+# Standard: OECD XSD v2.0 for CRS and FATCA
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # CRS Report: Common Reporting Standard
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "CRS_REPORT"
+        form_name_en: "Common Reporting Standard Report"
+        form_name_mt: "Rapport dwar l-Istandard Komuni ta' Rappurtar"
+        version: "2024"
+        effective_from: "2017-01-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive 2014/107/EU (DAC2)"
+        subsidiary_legislation:
+          - "S.L.123.127 - Cooperation with Other Jurisdictions on Tax Matters Regulations"
+          - "LN 313/2015 - CRS Implementation Rules"
+        administering_authority: "CFR"
+        tax_type: "Exchange of Information"
+        taxpayer_category: "Reporting Financial Institution"
+        filing_frequency: "Annual"
+        filing_deadline: "June 30 following calendar year end"
+        submission_method: "Mandatory XML (>100 accounts) / Excel (â‰¤100 accounts)"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: "urn:oecd:ties:crs:v2"
+        schema_version: "2.0"
+        exchange_partner: "OECD/EU Member States"
+        source_url: "https://cfr.gov.mt/en/eoi/Pages/CRS.aspx"
+        notes: |
+          Malta implements OECD Common Reporting Standard via DAC2. Reporting 
+          Financial Institutions must report financial account information for 
+          non-resident account holders. XML mandatory for >100 accounts; Excel 
+          permitted for â‰¤100 accounts (CFR converts to XML). Covers depository, 
+          custodial, cash value insurance, and annuity accounts.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Message Header
+        # ----------------------------------------------------------------------
+        - section_id: "MESSAGE_HEADER"
+          section_name: "Message Header"
+          section_description: "CRS XML message identification and routing information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "crs:CRS_OECD/crs:MessageSpec"
+          fields:
+            - field_id: "sending_country"
+              field_code: "SendingCompanyIN"
+              field_name_en: "Sending Country Code"
+              field_name_mt: "KodiÄ‹i tal-PajjiÅ¼ li JibgÄ§at"
+              field_description: "ISO 3166-1 alpha-2 code of sending jurisdiction (Malta = MT)"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:SendingCompanyIN"
+              validation_rules:
+                - rule_id: "CRS_001"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO 3166-1 alpha-2 country code"
+                  rule_expression: "^[A-Z]{2}$"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "SendingCompanyIN"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_messages"
+                column: "sending_country"
+              ors_mapping:
+                table: "mtca_ors.crs_messages"
+                column: "sending_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "receiving_country"
+              field_code: "ReceivingCountry"
+              field_name_en: "Receiving Country Code"
+              field_name_mt: "KodiÄ‹i tal-PajjiÅ¼ li JirÄ‹ievi"
+              field_description: "ISO 3166-1 alpha-2 code of receiving jurisdiction"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReceivingCountry"
+              validation_rules:
+                - rule_id: "CRS_002"
+                  rule_type: "codelist"
+                  rule_description: "Must be CRS participating jurisdiction"
+                  rule_expression: "IN(crs_partner_jurisdictions)"
+                  error_message_en: "Not a CRS partner jurisdiction"
+                  error_message_mt: "Mhux Ä¡urisdizzjoni sieÄ§ba tal-CRS"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "crs_partner_jurisdictions"
+              oecd_element_ref: "ReceivingCountry"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_messages"
+                column: "receiving_country"
+              ors_mapping:
+                table: "mtca_ors.crs_messages"
+                column: "receiving_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "message_type"
+              field_code: "MessageType"
+              field_name_en: "Message Type"
+              field_name_mt: "Tip ta' MessaÄ¡Ä¡"
+              field_description: "Type of CRS message being transmitted"
+              data_type: "CODE"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "CRS"
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:MessageType"
+              validation_rules: []
+              allowed_values:
+                - code: "CRS"
+                  description_en: "Common Reporting Standard"
+              reference_table: null
+              oecd_element_ref: "MessageType"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_messages"
+                column: "message_type"
+              ors_mapping:
+                table: "mtca_ors.crs_messages"
+                column: "message_type"
+                data_type: "String"
+
+            - field_id: "message_ref_id"
+              field_code: "MessageRefId"
+              field_name_en: "Message Reference ID"
+              field_name_mt: "ID ta' Referenza tal-MessaÄ¡Ä¡"
+              field_description: "Unique identifier for this message transmission"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:MessageRefId"
+              validation_rules:
+                - rule_id: "CRS_003"
+                  rule_type: "uniqueness"
+                  rule_description: "Must be unique per sending FI"
+                  rule_expression: "UNIQUE(fi_tin, message_ref_id)"
+                  error_message_en: "Duplicate message reference ID"
+                  error_message_mt: "ID ta' referenza tal-messaÄ¡Ä¡ duplikat"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MessageRefId"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_messages"
+                column: "message_ref_id"
+              ors_mapping:
+                table: "mtca_ors.crs_messages"
+                column: "message_ref_id"
+                data_type: "String"
+
+            - field_id: "message_type_indic"
+              field_code: "MessageTypeIndic"
+              field_name_en: "Message Type Indicator"
+              field_name_mt: "Indikatur tat-Tip ta' MessaÄ¡Ä¡"
+              field_description: "Indicates new data, corrected data, or no data"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:MessageTypeIndic"
+              validation_rules: []
+              allowed_values:
+                - code: "CRS701"
+                  description_en: "New data"
+                - code: "CRS702"
+                  description_en: "Corrected data"
+                - code: "CRS703"
+                  description_en: "No data (nil return)"
+              reference_table: "crs_message_type_indicators"
+              oecd_element_ref: "MessageTypeIndic"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_messages"
+                column: "message_type_indic"
+              ors_mapping:
+                table: "mtca_ors.crs_messages"
+                column: "message_type_indic"
+                data_type: "String"
+
+            - field_id: "reporting_period"
+              field_code: "ReportingPeriod"
+              field_name_en: "Reporting Period"
+              field_name_mt: "Perjodu ta' Rappurtar"
+              field_description: "Calendar year for which data is reported"
+              data_type: "DATE"
+              format: "YYYY-12-31"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingPeriod"
+              validation_rules:
+                - rule_id: "CRS_004"
+                  rule_type: "date_range"
+                  rule_description: "Must be year-end date of completed calendar year"
+                  rule_expression: "ReportingPeriod <= current_year - 1"
+                  error_message_en: "Reporting period must be for a completed year"
+                  error_message_mt: "Il-perjodu ta' rappurtar irid ikun gÄ§al sena kompluta"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "ReportingPeriod"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_messages"
+                column: "reporting_period"
+              ors_mapping:
+                table: "mtca_ors.crs_messages"
+                column: "reporting_period"
+                data_type: "Date"
+
+            - field_id: "timestamp"
+              field_code: "Timestamp"
+              field_name_en: "Timestamp"
+              field_name_mt: "Marka tal-Ä¦in"
+              field_description: "Date and time when message was created"
+              data_type: "DATETIME"
+              format: "YYYY-MM-DDTHH:MM:SSZ"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "CURRENT_TIMESTAMP()"
+              xml_element: "crs:Timestamp"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Timestamp"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_messages"
+                column: "timestamp"
+              ors_mapping:
+                table: "mtca_ors.crs_messages"
+                column: "timestamp"
+                data_type: "DateTime"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Reporting FI Information
+        # ----------------------------------------------------------------------
+        - section_id: "REPORTING_FI"
+          section_name: "Reporting Financial Institution"
+          section_description: "Information about the FI submitting the CRS report"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "crs:CrsBody/crs:ReportingFI"
+          fields:
+            - field_id: "fi_res_country_code"
+              field_code: "ResCountryCode"
+              field_name_en: "FI Residence Country"
+              field_name_mt: "PajjiÅ¼ ta' Residenza tal-FI"
+              field_description: "Country of tax residence of the Reporting FI"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:ResCountryCode"
+              validation_rules:
+                - rule_id: "CRS_010"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO country code"
+                  rule_expression: "^[A-Z]{2}$"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "ResCountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_reporting_fi"
+                column: "res_country"
+              ors_mapping:
+                table: "mtca_ors.crs_reporting_fi"
+                column: "res_country_code"
+                data_type: "FixedString(2)"
+
+            - field_id: "fi_tin"
+              field_code: "TIN"
+              field_name_en: "FI Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa tal-FI"
+              field_description: "Malta TIN of the Reporting Financial Institution"
+              data_type: "TIN"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:TIN"
+              validation_rules:
+                - rule_id: "CRS_011"
+                  rule_type: "pattern"
+                  rule_description: "Valid Malta TIN format"
+                  rule_expression: "^[0-9]{7,8}[A-Z]$|^[0-9]{9}$"
+                  error_message_en: "Invalid Malta TIN format"
+                  error_message_mt: "Format tat-TIN ta' Malta mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TIN"
+              cross_form_reference: "CRS_REGISTRATION.fi_tin"
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_reporting_fi"
+                column: "tin"
+              ors_mapping:
+                table: "mtca_ors.crs_reporting_fi"
+                column: "fi_tin"
+                data_type: "String"
+
+            - field_id: "fi_name"
+              field_code: "Name"
+              field_name_en: "FI Name"
+              field_name_mt: "Isem tal-FI"
+              field_description: "Legal name of the Reporting Financial Institution"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:Name"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Name"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_reporting_fi"
+                column: "fi_name"
+              ors_mapping:
+                table: "mtca_ors.crs_reporting_fi"
+                column: "fi_name"
+                data_type: "String"
+
+            - field_id: "fi_address_type"
+              field_code: "AddressType"
+              field_name_en: "Address Type"
+              field_name_mt: "Tip ta' Indirizz"
+              field_description: "Type of address (legal, business, registered office)"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: "OECD303"
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:Address/@legalAddressType"
+              validation_rules: []
+              allowed_values:
+                - code: "OECD301"
+                  description_en: "Residential or business address"
+                - code: "OECD302"
+                  description_en: "Residential address"
+                - code: "OECD303"
+                  description_en: "Business address"
+                - code: "OECD304"
+                  description_en: "Registered office"
+                - code: "OECD305"
+                  description_en: "Unspecified"
+              reference_table: "oecd_address_types"
+              oecd_element_ref: "AddressType"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_reporting_fi"
+                column: "address_type"
+              ors_mapping:
+                table: "mtca_ors.crs_reporting_fi"
+                column: "address_type"
+                data_type: "String"
+
+            - field_id: "fi_address_street"
+              field_code: "Street"
+              field_name_en: "Street Address"
+              field_name_mt: "Indirizz tat-Triq"
+              field_description: "Street name and number"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:Address/crs:Street"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Street"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_reporting_fi"
+                column: "address_street"
+              ors_mapping:
+                table: "mtca_ors.crs_reporting_fi"
+                column: "address_street"
+                data_type: "String"
+
+            - field_id: "fi_address_city"
+              field_code: "City"
+              field_name_en: "City"
+              field_name_mt: "Belt"
+              field_description: "City or town"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:Address/crs:City"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "City"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_reporting_fi"
+                column: "address_city"
+              ors_mapping:
+                table: "mtca_ors.crs_reporting_fi"
+                column: "address_city"
+                data_type: "String"
+
+            - field_id: "fi_address_country"
+              field_code: "CountryCode"
+              field_name_en: "Country"
+              field_name_mt: "PajjiÅ¼"
+              field_description: "ISO country code of FI address"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:Address/crs:CountryCode"
+              validation_rules:
+                - rule_id: "CRS_012"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO country code"
+                  rule_expression: "^[A-Z]{2}$"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "CountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_reporting_fi"
+                column: "address_country"
+              ors_mapping:
+                table: "mtca_ors.crs_reporting_fi"
+                column: "address_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "fi_doc_spec_id"
+              field_code: "DocSpecId"
+              field_name_en: "Document Specification ID"
+              field_name_mt: "ID ta' SpeÄ‹ifikazzjoni tad-Dokument"
+              field_description: "Unique identifier for this FI record within the message"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:DocSpec/stf:DocRefId"
+              validation_rules:
+                - rule_id: "CRS_013"
+                  rule_type: "uniqueness"
+                  rule_description: "Must be unique within message"
+                  rule_expression: "UNIQUE_IN_MESSAGE(doc_spec_id)"
+                  error_message_en: "Duplicate document reference ID"
+                  error_message_mt: "ID ta' referenza tad-dokument duplikat"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "DocRefId"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_reporting_fi"
+                column: "doc_ref_id"
+              ors_mapping:
+                table: "mtca_ors.crs_reporting_fi"
+                column: "doc_ref_id"
+                data_type: "String"
+
+            - field_id: "fi_doc_type_indic"
+              field_code: "DocTypeIndic"
+              field_name_en: "Document Type Indicator"
+              field_name_mt: "Indikatur tat-Tip tad-Dokument"
+              field_description: "Indicates new, corrected, or deleted data"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:DocSpec/stf:DocTypeIndic"
+              validation_rules: []
+              allowed_values:
+                - code: "OECD1"
+                  description_en: "New data"
+                - code: "OECD2"
+                  description_en: "Corrected data"
+                - code: "OECD3"
+                  description_en: "Deletion of data"
+                - code: "OECD0"
+                  description_en: "Resend data (unchanged)"
+              reference_table: "oecd_doc_type_indicators"
+              oecd_element_ref: "DocTypeIndic"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_reporting_fi"
+                column: "doc_type_indic"
+              ors_mapping:
+                table: "mtca_ors.crs_reporting_fi"
+                column: "doc_type_indic"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Account Holder - Individual
+        # ----------------------------------------------------------------------
+        - section_id: "ACCOUNT_HOLDER_INDIVIDUAL"
+          section_name: "Individual Account Holder"
+          section_description: "Information about individual account holders"
+          repeatable: true
+          conditional: true
+          condition_logic: "account_holder_type = 'CRS101'"
+          xml_element: "crs:CrsBody/crs:ReportingGroup/crs:AccountReport/crs:AccountHolder/crs:Individual"
+          fields:
+            - field_id: "ind_res_country_code"
+              field_code: "ResCountryCode"
+              field_name_en: "Residence Country"
+              field_name_mt: "PajjiÅ¼ ta' Residenza"
+              field_description: "Country of tax residence of account holder"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:ResCountryCode"
+              validation_rules:
+                - rule_id: "CRS_020"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO country code"
+                  rule_expression: "^[A-Z]{2}$"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "ResCountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "res_country"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "res_country_code"
+                data_type: "FixedString(2)"
+
+            - field_id: "ind_tin"
+              field_code: "TIN"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "TIN in country of residence"
+              data_type: "TIN"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: "TIN available in residence country"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:TIN"
+              validation_rules:
+                - rule_id: "CRS_021"
+                  rule_type: "pattern"
+                  rule_description: "Country-specific TIN validation"
+                  rule_expression: "VALIDATE_TIN(tin, res_country_code)"
+                  error_message_en: "TIN format invalid for country"
+                  error_message_mt: "Format tat-TIN mhux validu gÄ§al dan il-pajjiÅ¼"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TIN"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "tin"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "tin"
+                data_type: "String"
+
+            - field_id: "ind_tin_issued_by"
+              field_code: "TIN_IssuedBy"
+              field_name_en: "TIN Issuing Country"
+              field_name_mt: "PajjiÅ¼ li Ä¦areÄ¡ it-TIN"
+              field_description: "Country that issued the TIN"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:TIN/@issuedBy"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "TIN/@issuedBy"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "tin_issued_by"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "tin_issued_by"
+                data_type: "FixedString(2)"
+
+            - field_id: "ind_first_name"
+              field_code: "FirstName"
+              field_name_en: "First Name"
+              field_name_mt: "Isem"
+              field_description: "Account holder's first/given name"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:Name/crs:FirstName"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "FirstName"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "first_name"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "first_name"
+                data_type: "String"
+
+            - field_id: "ind_middle_name"
+              field_code: "MiddleName"
+              field_name_en: "Middle Name"
+              field_name_mt: "Isem tan-Nofs"
+              field_description: "Account holder's middle name(s)"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:Name/crs:MiddleName"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MiddleName"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "middle_name"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "middle_name"
+                data_type: "Nullable(String)"
+
+            - field_id: "ind_last_name"
+              field_code: "LastName"
+              field_name_en: "Last Name"
+              field_name_mt: "Kunjom"
+              field_description: "Account holder's surname/family name"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:Name/crs:LastName"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "LastName"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "last_name"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "last_name"
+                data_type: "String"
+
+            - field_id: "ind_birth_date"
+              field_code: "BirthDate"
+              field_name_en: "Date of Birth"
+              field_name_mt: "Data tat-Twelid"
+              field_description: "Account holder's date of birth"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:BirthInfo/crs:BirthDate"
+              validation_rules:
+                - rule_id: "CRS_022"
+                  rule_type: "date_range"
+                  rule_description: "Birth date must be in the past"
+                  rule_expression: "BirthDate < CURRENT_DATE()"
+                  error_message_en: "Birth date must be in the past"
+                  error_message_mt: "Id-data tat-twelid trid tkun fil-passat"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "BirthDate"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "birth_date"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "birth_date"
+                data_type: "Date"
+
+            - field_id: "ind_birth_city"
+              field_code: "City"
+              field_name_en: "City of Birth"
+              field_name_mt: "Belt tat-Twelid"
+              field_description: "City/town where account holder was born"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:BirthInfo/crs:City"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "BirthInfo/City"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "birth_city"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "birth_city"
+                data_type: "Nullable(String)"
+
+            - field_id: "ind_birth_country"
+              field_code: "CountryInfo"
+              field_name_en: "Country of Birth"
+              field_name_mt: "PajjiÅ¼ tat-Twelid"
+              field_description: "Country where account holder was born"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:BirthInfo/crs:CountryInfo/crs:CountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "BirthInfo/CountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "birth_country"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "birth_country"
+                data_type: "Nullable(FixedString(2))"
+
+            - field_id: "ind_address_street"
+              field_code: "Street"
+              field_name_en: "Street Address"
+              field_name_mt: "Indirizz tat-Triq"
+              field_description: "Account holder's street address"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:Address/crs:Street"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Address/Street"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "address_street"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "address_street"
+                data_type: "String"
+
+            - field_id: "ind_address_city"
+              field_code: "City"
+              field_name_en: "City"
+              field_name_mt: "Belt"
+              field_description: "Account holder's city"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:Address/crs:City"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Address/City"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "address_city"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "address_city"
+                data_type: "String"
+
+            - field_id: "ind_address_country"
+              field_code: "CountryCode"
+              field_name_en: "Country"
+              field_name_mt: "PajjiÅ¼"
+              field_description: "Account holder's country of residence"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Individual/crs:Address/crs:CountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "Address/CountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_account_holders"
+                column: "address_country"
+              ors_mapping:
+                table: "mtca_ors.crs_account_holders"
+                column: "address_country"
+                data_type: "FixedString(2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Account Holder - Entity
+        # ----------------------------------------------------------------------
+        - section_id: "ACCOUNT_HOLDER_ENTITY"
+          section_name: "Entity Account Holder"
+          section_description: "Information about entity account holders"
+          repeatable: true
+          conditional: true
+          condition_logic: "account_holder_type IN ('CRS102', 'CRS103')"
+          xml_element: "crs:CrsBody/crs:ReportingGroup/crs:AccountReport/crs:AccountHolder/crs:Organisation"
+          fields:
+            - field_id: "ent_res_country_code"
+              field_code: "ResCountryCode"
+              field_name_en: "Residence Country"
+              field_name_mt: "PajjiÅ¼ ta' Residenza"
+              field_description: "Country of tax residence of entity"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Organisation/crs:ResCountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "ResCountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_entity_holders"
+                column: "res_country"
+              ors_mapping:
+                table: "mtca_ors.crs_entity_holders"
+                column: "res_country_code"
+                data_type: "FixedString(2)"
+
+            - field_id: "ent_tin"
+              field_code: "TIN"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Entity TIN in country of residence"
+              data_type: "TIN"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: "TIN available"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Organisation/crs:TIN"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TIN"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_entity_holders"
+                column: "tin"
+              ors_mapping:
+                table: "mtca_ors.crs_entity_holders"
+                column: "tin"
+                data_type: "String"
+
+            - field_id: "ent_name"
+              field_code: "Name"
+              field_name_en: "Entity Name"
+              field_name_mt: "Isem tal-EntitÃ "
+              field_description: "Legal name of the entity"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Organisation/crs:Name"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Name"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_entity_holders"
+                column: "entity_name"
+              ors_mapping:
+                table: "mtca_ors.crs_entity_holders"
+                column: "entity_name"
+                data_type: "String"
+
+            - field_id: "ent_crs_status"
+              field_code: "CRSStatus"
+              field_name_en: "CRS Entity Status"
+              field_name_mt: "Status tal-EntitÃ  CRS"
+              field_description: "Entity classification under CRS"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:AccountHolder/crs:AcctHolderType"
+              validation_rules: []
+              allowed_values:
+                - code: "CRS101"
+                  description_en: "Passive NFE - Reportable Person"
+                - code: "CRS102"
+                  description_en: "CRS Reportable Person"
+                - code: "CRS103"
+                  description_en: "Passive NFE - CRS Reportable Person is Controlling Person"
+              reference_table: "crs_account_holder_types"
+              oecd_element_ref: "AcctHolderType"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_entity_holders"
+                column: "crs_status"
+              ors_mapping:
+                table: "mtca_ors.crs_entity_holders"
+                column: "crs_status"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Controlling Person
+        # ----------------------------------------------------------------------
+        - section_id: "CONTROLLING_PERSON"
+          section_name: "Controlling Person"
+          section_description: "Controlling persons of Passive NFEs"
+          repeatable: true
+          conditional: true
+          condition_logic: "account_holder_type = 'CRS103'"
+          xml_element: "crs:CrsBody/crs:ReportingGroup/crs:AccountReport/crs:ControllingPerson"
+          fields:
+            - field_id: "cp_res_country_code"
+              field_code: "ResCountryCode"
+              field_name_en: "Residence Country"
+              field_name_mt: "PajjiÅ¼ ta' Residenza"
+              field_description: "Country of tax residence of controlling person"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ControllingPerson/crs:Individual/crs:ResCountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "ResCountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_controlling_persons"
+                column: "res_country"
+              ors_mapping:
+                table: "mtca_ors.crs_controlling_persons"
+                column: "res_country_code"
+                data_type: "FixedString(2)"
+
+            - field_id: "cp_tin"
+              field_code: "TIN"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "TIN of controlling person"
+              data_type: "TIN"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: "TIN available"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ControllingPerson/crs:Individual/crs:TIN"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TIN"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_controlling_persons"
+                column: "tin"
+              ors_mapping:
+                table: "mtca_ors.crs_controlling_persons"
+                column: "tin"
+                data_type: "String"
+
+            - field_id: "cp_first_name"
+              field_code: "FirstName"
+              field_name_en: "First Name"
+              field_name_mt: "Isem"
+              field_description: "Controlling person's first name"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ControllingPerson/crs:Individual/crs:Name/crs:FirstName"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "FirstName"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_controlling_persons"
+                column: "first_name"
+              ors_mapping:
+                table: "mtca_ors.crs_controlling_persons"
+                column: "first_name"
+                data_type: "String"
+
+            - field_id: "cp_last_name"
+              field_code: "LastName"
+              field_name_en: "Last Name"
+              field_name_mt: "Kunjom"
+              field_description: "Controlling person's surname"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ControllingPerson/crs:Individual/crs:Name/crs:LastName"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "LastName"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_controlling_persons"
+                column: "last_name"
+              ors_mapping:
+                table: "mtca_ors.crs_controlling_persons"
+                column: "last_name"
+                data_type: "String"
+
+            - field_id: "cp_birth_date"
+              field_code: "BirthDate"
+              field_name_en: "Date of Birth"
+              field_name_mt: "Data tat-Twelid"
+              field_description: "Controlling person's date of birth"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ControllingPerson/crs:Individual/crs:BirthInfo/crs:BirthDate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "BirthDate"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_controlling_persons"
+                column: "birth_date"
+              ors_mapping:
+                table: "mtca_ors.crs_controlling_persons"
+                column: "birth_date"
+                data_type: "Date"
+
+            - field_id: "cp_type"
+              field_code: "CtrlgPersonType"
+              field_name_en: "Controlling Person Type"
+              field_name_mt: "Tip ta' Persuna li Tikkontrolla"
+              field_description: "Type of control exercised"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ControllingPerson/crs:CtrlgPersonType"
+              validation_rules: []
+              allowed_values:
+                - code: "CRS801"
+                  description_en: "CP of legal person - ownership"
+                - code: "CRS802"
+                  description_en: "CP of legal person - other means"
+                - code: "CRS803"
+                  description_en: "CP of legal person - senior managing official"
+                - code: "CRS804"
+                  description_en: "CP of legal arrangement - trust - settlor"
+                - code: "CRS805"
+                  description_en: "CP of legal arrangement - trust - trustee"
+                - code: "CRS806"
+                  description_en: "CP of legal arrangement - trust - protector"
+                - code: "CRS807"
+                  description_en: "CP of legal arrangement - trust - beneficiary"
+                - code: "CRS808"
+                  description_en: "CP of legal arrangement - trust - other"
+                - code: "CRS809"
+                  description_en: "CP of legal arrangement - other - settlor-equivalent"
+                - code: "CRS810"
+                  description_en: "CP of legal arrangement - other - trustee-equivalent"
+                - code: "CRS811"
+                  description_en: "CP of legal arrangement - other - protector-equivalent"
+                - code: "CRS812"
+                  description_en: "CP of legal arrangement - other - beneficiary-equivalent"
+                - code: "CRS813"
+                  description_en: "CP of legal arrangement - other - other-equivalent"
+              reference_table: "crs_controlling_person_types"
+              oecd_element_ref: "CtrlgPersonType"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_controlling_persons"
+                column: "cp_type"
+              ors_mapping:
+                table: "mtca_ors.crs_controlling_persons"
+                column: "cp_type"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 6: Account Information
+        # ----------------------------------------------------------------------
+        - section_id: "ACCOUNT_INFO"
+          section_name: "Account Information"
+          section_description: "Financial account details"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "crs:CrsBody/crs:ReportingGroup/crs:AccountReport"
+          fields:
+            - field_id: "account_number"
+              field_code: "AcctNumber"
+              field_name_en: "Account Number"
+              field_name_mt: "Numru tal-Kont"
+              field_description: "Financial account number (IBAN or other)"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:AccountReport/crs:AccountNumber"
+              validation_rules:
+                - rule_id: "CRS_030"
+                  rule_type: "pattern"
+                  rule_description: "IBAN validation if applicable"
+                  rule_expression: "VALIDATE_IBAN(account_number) OR VALID_ACCOUNT_FORMAT(account_number)"
+                  error_message_en: "Invalid account number format"
+                  error_message_mt: "Format tan-numru tal-kont mhux validu"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "AccountNumber"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_accounts"
+                column: "account_number"
+              ors_mapping:
+                table: "mtca_ors.crs_accounts"
+                column: "account_number"
+                data_type: "String"
+
+            - field_id: "account_number_type"
+              field_code: "AcctNumberType"
+              field_name_en: "Account Number Type"
+              field_name_mt: "Tip tan-Numru tal-Kont"
+              field_description: "Type of account identifier"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:AccountReport/crs:AccountNumber/@AcctNumberType"
+              validation_rules: []
+              allowed_values:
+                - code: "OECD601"
+                  description_en: "IBAN"
+                - code: "OECD602"
+                  description_en: "OBAN (Other Bank Account Number)"
+                - code: "OECD603"
+                  description_en: "ISIN"
+                - code: "OECD604"
+                  description_en: "OSIN (Other Security ID)"
+                - code: "OECD605"
+                  description_en: "Other"
+              reference_table: "oecd_account_number_types"
+              oecd_element_ref: "AcctNumberType"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_accounts"
+                column: "account_number_type"
+              ors_mapping:
+                table: "mtca_ors.crs_accounts"
+                column: "account_number_type"
+                data_type: "String"
+
+            - field_id: "account_type"
+              field_code: "AccountType"
+              field_name_en: "Account Type"
+              field_name_mt: "Tip ta' Kont"
+              field_description: "CRS account classification"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:AccountReport/crs:AccountType"
+              validation_rules: []
+              allowed_values:
+                - code: "CRS501"
+                  description_en: "Depository Account"
+                - code: "CRS502"
+                  description_en: "Custodial Account"
+                - code: "CRS503"
+                  description_en: "Cash Value Insurance Contract"
+                - code: "CRS504"
+                  description_en: "Annuity Contract"
+                - code: "CRS505"
+                  description_en: "Debt or Equity Interest in Investment Entity"
+                - code: "CRS506"
+                  description_en: "Other"
+              reference_table: "crs_account_types"
+              oecd_element_ref: "AccountType"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_accounts"
+                column: "account_type"
+              ors_mapping:
+                table: "mtca_ors.crs_accounts"
+                column: "account_type"
+                data_type: "String"
+
+            - field_id: "currency_code"
+              field_code: "CurrCode"
+              field_name_en: "Currency Code"
+              field_name_mt: "KodiÄ‹i tal-Munita"
+              field_description: "ISO 4217 currency code for account"
+              data_type: "CODE"
+              format: "AAA"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:AccountReport/crs:AccountBalance/@currCode"
+              validation_rules:
+                - rule_id: "CRS_031"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO 4217 currency code"
+                  rule_expression: "^[A-Z]{3}$"
+                  error_message_en: "Invalid currency code"
+                  error_message_mt: "KodiÄ‹i tal-munita mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_4217_currency_codes"
+              oecd_element_ref: "currCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_accounts"
+                column: "currency_code"
+              ors_mapping:
+                table: "mtca_ors.crs_accounts"
+                column: "currency_code"
+                data_type: "FixedString(3)"
+
+            - field_id: "account_balance"
+              field_code: "AccountBalance"
+              field_name_en: "Account Balance"
+              field_name_mt: "BilanÄ‹ tal-Kont"
+              field_description: "Year-end account balance or value at closure"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:AccountReport/crs:AccountBalance"
+              validation_rules:
+                - rule_id: "CRS_032"
+                  rule_type: "range"
+                  rule_description: "Balance cannot be negative unless specifically permitted"
+                  rule_expression: "AccountBalance >= 0 OR closed_account = true"
+                  error_message_en: "Account balance cannot be negative"
+                  error_message_mt: "Il-bilanÄ‹ tal-kont ma jistax ikun negattiv"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "AccountBalance"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_accounts"
+                column: "account_balance"
+              ors_mapping:
+                table: "mtca_ors.crs_accounts"
+                column: "account_balance"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "closed_account"
+              field_code: "ClosedAccount"
+              field_name_en: "Closed Account Indicator"
+              field_name_mt: "Indikatur ta' Kont MagÄ§luq"
+              field_description: "Indicates if account was closed during reporting period"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:AccountReport/crs:ClosedAccount"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "ClosedAccount"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_accounts"
+                column: "closed_account"
+              ors_mapping:
+                table: "mtca_ors.crs_accounts"
+                column: "closed_account"
+                data_type: "UInt8"
+
+            - field_id: "dormant_account"
+              field_code: "DormantAccount"
+              field_name_en: "Dormant Account Indicator"
+              field_name_mt: "Indikatur ta' Kont Dormant"
+              field_description: "Indicates if account is dormant"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:AccountReport/crs:DormantAccount"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "DormantAccount"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_accounts"
+                column: "dormant_account"
+              ors_mapping:
+                table: "mtca_ors.crs_accounts"
+                column: "dormant_account"
+                data_type: "UInt8"
+
+        # ----------------------------------------------------------------------
+        # Section 7: Payment Information
+        # ----------------------------------------------------------------------
+        - section_id: "PAYMENT_INFO"
+          section_name: "Payment Information"
+          section_description: "Income and proceeds paid during reporting period"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "crs:CrsBody/crs:ReportingGroup/crs:AccountReport/crs:Payment"
+          fields:
+            - field_id: "payment_type"
+              field_code: "Type"
+              field_name_en: "Payment Type"
+              field_name_mt: "Tip ta' Ä¦las"
+              field_description: "Type of payment/income"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Payment/crs:Type"
+              validation_rules: []
+              allowed_values:
+                - code: "CRS501"
+                  description_en: "Dividends"
+                - code: "CRS502"
+                  description_en: "Interest"
+                - code: "CRS503"
+                  description_en: "Gross Proceeds / Redemptions"
+                - code: "CRS504"
+                  description_en: "Other"
+              reference_table: "crs_payment_types"
+              oecd_element_ref: "Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_payments"
+                column: "payment_type"
+              ors_mapping:
+                table: "mtca_ors.crs_payments"
+                column: "payment_type"
+                data_type: "String"
+
+            - field_id: "payment_amount"
+              field_code: "PaymentAmnt"
+              field_name_en: "Payment Amount"
+              field_name_mt: "Ammont ta' Ä¦las"
+              field_description: "Total amount of payment during reporting period"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Payment/crs:PaymentAmnt"
+              validation_rules:
+                - rule_id: "CRS_040"
+                  rule_type: "range"
+                  rule_description: "Payment amount must be non-negative"
+                  rule_expression: "PaymentAmnt >= 0"
+                  error_message_en: "Payment amount cannot be negative"
+                  error_message_mt: "L-ammont tal-Ä§las ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "PaymentAmnt"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_payments"
+                column: "payment_amount"
+              ors_mapping:
+                table: "mtca_ors.crs_payments"
+                column: "payment_amount"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "payment_currency"
+              field_code: "CurrCode"
+              field_name_en: "Payment Currency"
+              field_name_mt: "Munita tal-Ä¦las"
+              field_description: "Currency of payment amount"
+              data_type: "CODE"
+              format: "AAA"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:Payment/crs:PaymentAmnt/@currCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_4217_currency_codes"
+              oecd_element_ref: "currCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_payments"
+                column: "currency_code"
+              ors_mapping:
+                table: "mtca_ors.crs_payments"
+                column: "currency_code"
+                data_type: "FixedString(3)"
+
+      xml_schema:
+        namespace: "urn:oecd:ties:crs:v2"
+        root_element: "CRS_OECD"
+        schema_version: "2.0"
+        schema_url: "https://www.oecd.org/tax/exchange-of-tax-information/CRS_Schema_v2.0.xsd"
+        supporting_types_namespace: "urn:oecd:ties:stf:v4"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "CRS_REGISTRATION"
+          relationship_type: "prerequisite"
+          relationship_description: "FI must be registered before submitting reports"
+        - form_code: "CRS_NIL_RETURN"
+          relationship_type: "alternative"
+          relationship_description: "Nil return if no reportable accounts"
+        - form_code: "FATCA_REPORT"
+          relationship_type: "related"
+          relationship_description: "FATCA for US persons may overlap"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Annual"
+        partner_authorities: "All CRS participating jurisdictions (100+)"
+        encryption_required: true
+        transmission_protocol: "CCN Mail / Secure FTP"
+
+      submission_workflow:
+        authentication_required: "CFR e-Services credentials"
+        signature_required: false
+        validation_type: "XML Schema validation + Business rules"
+        acknowledgment_type: "Submission receipt with validation status"
+
+  # ==========================================================================
+  # FATCA Report: Foreign Account Tax Compliance Act
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "FATCA_REPORT"
+        form_name_en: "FATCA Report"
+        form_name_mt: "Rapport FATCA"
+        version: "2024"
+        effective_from: "2014-07-01"
+        effective_to: "current"
+        legislative_basis: "US-Malta IGA (Intergovernmental Agreement)"
+        subsidiary_legislation:
+          - "S.L.123.127 - Cooperation with Other Jurisdictions on Tax Matters Regulations"
+          - "LN 352/2014 - FATCA Implementation Rules"
+        administering_authority: "CFR"
+        tax_type: "Exchange of Information"
+        taxpayer_category: "Reporting Financial Institution"
+        filing_frequency: "Annual"
+        filing_deadline: "June 30 following calendar year end"
+        submission_method: "Mandatory XML (>100 accounts) / Excel (â‰¤100 accounts)"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: "urn:oecd:ties:fatca:v2"
+        schema_version: "2.0"
+        exchange_partner: "US Internal Revenue Service (IRS)"
+        source_url: "https://cfr.gov.mt/en/eoi/Pages/FATCA.aspx"
+        notes: |
+          Malta has a Model 1A IGA with the United States. Malta FIs report 
+          US account holder information to CFR, which then exchanges with IRS.
+          Uses OECD FATCA XML schema v2.0. GIIN registration required.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Message Header
+        # ----------------------------------------------------------------------
+        - section_id: "FATCA_MESSAGE_HEADER"
+          section_name: "FATCA Message Header"
+          section_description: "FATCA XML message identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "ftc:FATCA_OECD/ftc:MessageSpec"
+          fields:
+            - field_id: "fatca_sending_country"
+              field_code: "SendingCompanyIN"
+              field_name_en: "Sending Country"
+              field_name_mt: "PajjiÅ¼ li JibgÄ§at"
+              field_description: "Always MT for Malta submissions"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:SendingCompanyIN"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "SendingCompanyIN"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_messages"
+                column: "sending_country"
+              ors_mapping:
+                table: "mtca_ors.fatca_messages"
+                column: "sending_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "fatca_receiving_country"
+              field_code: "ReceivingCountry"
+              field_name_en: "Receiving Country"
+              field_name_mt: "PajjiÅ¼ li JirÄ‹ievi"
+              field_description: "Always US for FATCA"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "US"
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:ReceivingCountry"
+              validation_rules: []
+              allowed_values:
+                - code: "US"
+                  description_en: "United States"
+              reference_table: null
+              oecd_element_ref: "ReceivingCountry"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_messages"
+                column: "receiving_country"
+              ors_mapping:
+                table: "mtca_ors.fatca_messages"
+                column: "receiving_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "fatca_message_type"
+              field_code: "MessageType"
+              field_name_en: "Message Type"
+              field_name_mt: "Tip ta' MessaÄ¡Ä¡"
+              field_description: "Type of FATCA message"
+              data_type: "CODE"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "FATCA"
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:MessageType"
+              validation_rules: []
+              allowed_values:
+                - code: "FATCA"
+                  description_en: "FATCA Report"
+              reference_table: null
+              oecd_element_ref: "MessageType"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_messages"
+                column: "message_type"
+              ors_mapping:
+                table: "mtca_ors.fatca_messages"
+                column: "message_type"
+                data_type: "String"
+
+            - field_id: "fatca_message_type_indic"
+              field_code: "MessageTypeIndic"
+              field_name_en: "Message Type Indicator"
+              field_name_mt: "Indikatur tat-Tip ta' MessaÄ¡Ä¡"
+              field_description: "New data, corrected, or void"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:MessageTypeIndic"
+              validation_rules: []
+              allowed_values:
+                - code: "FATCA1"
+                  description_en: "New data"
+                - code: "FATCA2"
+                  description_en: "Corrected data"
+                - code: "FATCA3"
+                  description_en: "Void"
+                - code: "FATCA4"
+                  description_en: "Amended"
+              reference_table: "fatca_message_type_indicators"
+              oecd_element_ref: "MessageTypeIndic"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_messages"
+                column: "message_type_indic"
+              ors_mapping:
+                table: "mtca_ors.fatca_messages"
+                column: "message_type_indic"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Reporting FI with GIIN
+        # ----------------------------------------------------------------------
+        - section_id: "FATCA_REPORTING_FI"
+          section_name: "FATCA Reporting Financial Institution"
+          section_description: "FI information including GIIN"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "ftc:FATCA/ftc:ReportingFI"
+          fields:
+            - field_id: "fi_giin"
+              field_code: "GIIN"
+              field_name_en: "Global Intermediary Identification Number"
+              field_name_mt: "Numru Globali ta' Identifikazzjoni ta' Intermedjarju"
+              field_description: "IRS-issued GIIN for the reporting FI"
+              data_type: "GIIN"
+              format: "XXXXXX.XXXXX.XX.XXX"
+              max_length: 19
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:ReportingFI/ftc:GIIN"
+              validation_rules:
+                - rule_id: "FATCA_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid GIIN format"
+                  rule_expression: "^[A-Z0-9]{6}\\.[A-Z0-9]{5}\\.[A-Z]{2}\\.[0-9]{3}$"
+                  error_message_en: "Invalid GIIN format"
+                  error_message_mt: "Format tal-GIIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "GIIN"
+              cross_form_reference: "FATCA_REGISTRATION.giin"
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_reporting_fi"
+                column: "giin"
+              ors_mapping:
+                table: "mtca_ors.fatca_reporting_fi"
+                column: "giin"
+                data_type: "FixedString(19)"
+
+            - field_id: "fi_fatca_name"
+              field_code: "Name"
+              field_name_en: "FI Name"
+              field_name_mt: "Isem tal-FI"
+              field_description: "Legal name of reporting FI"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:ReportingFI/ftc:Name"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Name"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_reporting_fi"
+                column: "fi_name"
+              ors_mapping:
+                table: "mtca_ors.fatca_reporting_fi"
+                column: "fi_name"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 3: US Person Account Holder
+        # ----------------------------------------------------------------------
+        - section_id: "US_ACCOUNT_HOLDER"
+          section_name: "US Person Account Holder"
+          section_description: "Information about US person account holders"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "ftc:FATCA/ftc:ReportingGroup/ftc:AccountReport/ftc:AccountHolder"
+          fields:
+            - field_id: "us_tin"
+              field_code: "TIN"
+              field_name_en: "US TIN"
+              field_name_mt: "TIN Amerikan"
+              field_description: "US Taxpayer Identification Number (SSN, ITIN, EIN)"
+              data_type: "TIN"
+              format: null
+              max_length: 11
+              precision: null
+              scale: null
+              required: true
+              required_condition: "US Person"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:AccountHolder/ftc:Individual/ftc:TIN or ftc:AccountHolder/ftc:Organisation/ftc:TIN"
+              validation_rules:
+                - rule_id: "FATCA_010"
+                  rule_type: "pattern"
+                  rule_description: "Valid US TIN format (SSN/ITIN/EIN)"
+                  rule_expression: "^[0-9]{9}$|^[0-9]{2}-[0-9]{7}$|^[0-9]{3}-[0-9]{2}-[0-9]{4}$"
+                  error_message_en: "Invalid US TIN format"
+                  error_message_mt: "Format tat-TIN Amerikan mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TIN"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_account_holders"
+                column: "us_tin"
+              ors_mapping:
+                table: "mtca_ors.fatca_account_holders"
+                column: "us_tin"
+                data_type: "String"
+
+            - field_id: "us_first_name"
+              field_code: "FirstName"
+              field_name_en: "First Name"
+              field_name_mt: "Isem"
+              field_description: "US person's first name"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:Individual/ftc:Name/ftc:FirstName"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "FirstName"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_account_holders"
+                column: "first_name"
+              ors_mapping:
+                table: "mtca_ors.fatca_account_holders"
+                column: "first_name"
+                data_type: "String"
+
+            - field_id: "us_last_name"
+              field_code: "LastName"
+              field_name_en: "Last Name"
+              field_name_mt: "Kunjom"
+              field_description: "US person's surname"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:Individual/ftc:Name/ftc:LastName"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "LastName"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_account_holders"
+                column: "last_name"
+              ors_mapping:
+                table: "mtca_ors.fatca_account_holders"
+                column: "last_name"
+                data_type: "String"
+
+            - field_id: "us_address_country"
+              field_code: "CountryCode"
+              field_name_en: "Address Country"
+              field_name_mt: "PajjiÅ¼ tal-Indirizz"
+              field_description: "Country of US person's address"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "US"
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:Individual/ftc:Address/ftc:CountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "CountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_account_holders"
+                column: "address_country"
+              ors_mapping:
+                table: "mtca_ors.fatca_account_holders"
+                column: "address_country"
+                data_type: "FixedString(2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: FATCA Account Information
+        # ----------------------------------------------------------------------
+        - section_id: "FATCA_ACCOUNT_INFO"
+          section_name: "FATCA Account Information"
+          section_description: "Financial account details for FATCA"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "ftc:FATCA/ftc:ReportingGroup/ftc:AccountReport"
+          fields:
+            - field_id: "fatca_account_number"
+              field_code: "AccountNumber"
+              field_name_en: "Account Number"
+              field_name_mt: "Numru tal-Kont"
+              field_description: "Financial account number"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:AccountReport/ftc:AccountNumber"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "AccountNumber"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_accounts"
+                column: "account_number"
+              ors_mapping:
+                table: "mtca_ors.fatca_accounts"
+                column: "account_number"
+                data_type: "String"
+
+            - field_id: "fatca_account_balance"
+              field_code: "AccountBalance"
+              field_name_en: "Account Balance"
+              field_name_mt: "BilanÄ‹ tal-Kont"
+              field_description: "Year-end account balance in USD"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:AccountReport/ftc:AccountBalance"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "AccountBalance"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_accounts"
+                column: "account_balance"
+              ors_mapping:
+                table: "mtca_ors.fatca_accounts"
+                column: "account_balance"
+                data_type: "Decimal(18,2)"
+
+      xml_schema:
+        namespace: "urn:oecd:ties:fatca:v2"
+        root_element: "FATCA_OECD"
+        schema_version: "2.0"
+        schema_url: "https://www.irs.gov/pub/fatca/FATCA-XML-v2.0.xsd"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "FATCA_REGISTRATION"
+          relationship_type: "prerequisite"
+          relationship_description: "GIIN registration required"
+        - form_code: "FATCA_NIL_RETURN"
+          relationship_type: "alternative"
+          relationship_description: "Nil return if no US accounts"
+        - form_code: "CRS_REPORT"
+          relationship_type: "related"
+          relationship_description: "US persons may also be reported under CRS"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Annual"
+        partner_authorities: "US Internal Revenue Service (IRS)"
+        encryption_required: true
+        transmission_protocol: "IDES (International Data Exchange Service)"
+
+      submission_workflow:
+        authentication_required: "CFR e-Services credentials"
+        signature_required: false
+        validation_type: "XML Schema validation + FATCA business rules"
+        acknowledgment_type: "Submission receipt with IRS transmission status"
+
+  # ==========================================================================
+  # CRS Registration Form
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "CRS_REGISTRATION"
+        form_name_en: "CRS Reporting Financial Institution Registration"
+        form_name_mt: "ReÄ¡istrazzjoni ta' Istituzzjoni Finanzjarja li Tirrapporta CRS"
+        version: "2024"
+        effective_from: "2016-01-01"
+        effective_to: "current"
+        legislative_basis: "S.L.123.127"
+        subsidiary_legislation:
+          - "LN 313/2015 - CRS Implementation Rules"
+        administering_authority: "CFR"
+        tax_type: "Exchange of Information"
+        taxpayer_category: "Financial Institution"
+        filing_frequency: "One-time (with updates)"
+        filing_deadline: "Before first CRS reporting"
+        submission_method: "Electronic"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: null
+        source_url: "https://cfr.gov.mt/en/eoi/Pages/CRS.aspx"
+        notes: |
+          Financial institutions must register with CFR before submitting CRS 
+          reports. Registration captures FI classification, contact details, 
+          and responsible officer information.
+
+      sections:
+        - section_id: "FI_IDENTIFICATION"
+          section_name: "Financial Institution Identification"
+          section_description: "Basic FI identification information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "reg_fi_tin"
+              field_code: "FI_TIN"
+              field_name_en: "FI Tax Identification Number"
+              field_name_mt: "TIN tal-FI"
+              field_description: "Malta TIN of the Financial Institution"
+              data_type: "TIN"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "CRSR_001"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid registered entity"
+                  rule_expression: "EXISTS(taxpayer_registry, tin)"
+                  error_message_en: "TIN not found in taxpayer registry"
+                  error_message_mt: "TIN ma nstabx fir-reÄ¡istru tat-taxpayer"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_fi_registration"
+                column: "fi_tin"
+              ors_mapping:
+                table: "mtca_ors.crs_fi_registration"
+                column: "fi_tin"
+                data_type: "String"
+
+            - field_id: "reg_fi_legal_name"
+              field_code: "LegalName"
+              field_name_en: "Legal Name"
+              field_name_mt: "Isem Legali"
+              field_description: "Registered legal name of FI"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_fi_registration"
+                column: "legal_name"
+              ors_mapping:
+                table: "mtca_ors.crs_fi_registration"
+                column: "legal_name"
+                data_type: "String"
+
+            - field_id: "reg_fi_type"
+              field_code: "FI_Type"
+              field_name_en: "Financial Institution Type"
+              field_name_mt: "Tip ta' Istituzzjoni Finanzjarja"
+              field_description: "CRS classification of the FI"
+              data_type: "CODE"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values:
+                - code: "DEPOSITORY"
+                  description_en: "Depository Institution"
+                - code: "CUSTODIAL"
+                  description_en: "Custodial Institution"
+                - code: "INVESTMENT"
+                  description_en: "Investment Entity"
+                - code: "INSURANCE"
+                  description_en: "Specified Insurance Company"
+              reference_table: "crs_fi_types"
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_fi_registration"
+                column: "fi_type"
+              ors_mapping:
+                table: "mtca_ors.crs_fi_registration"
+                column: "fi_type"
+                data_type: "String"
+
+        - section_id: "RESPONSIBLE_OFFICER"
+          section_name: "Responsible Officer"
+          section_description: "Contact person responsible for CRS compliance"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "ro_name"
+              field_code: "RO_Name"
+              field_name_en: "Responsible Officer Name"
+              field_name_mt: "Isem tal-UffiÄ‹jal Responsabbli"
+              field_description: "Full name of CRS responsible officer"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_fi_registration"
+                column: "ro_name"
+              ors_mapping:
+                table: "mtca_ors.crs_fi_registration"
+                column: "ro_name"
+                data_type: "String"
+
+            - field_id: "ro_email"
+              field_code: "RO_Email"
+              field_name_en: "Email Address"
+              field_name_mt: "Indirizz Elettroniku"
+              field_description: "Email for CRS correspondence"
+              data_type: "EMAIL"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "CRSR_010"
+                  rule_type: "pattern"
+                  rule_description: "Valid email format"
+                  rule_expression: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                  error_message_en: "Invalid email format"
+                  error_message_mt: "Format tal-email mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_fi_registration"
+                column: "ro_email"
+              ors_mapping:
+                table: "mtca_ors.crs_fi_registration"
+                column: "ro_email"
+                data_type: "String"
+
+      xml_schema: null
+      attachments: []
+      related_forms:
+        - form_code: "CRS_REPORT"
+          relationship_type: "enables"
+          relationship_description: "Registration enables CRS reporting"
+
+      submission_workflow:
+        authentication_required: "CFR e-Services credentials"
+        signature_required: true
+        validation_type: "Business rules"
+        acknowledgment_type: "Registration confirmation"
+
+  # ==========================================================================
+  # CRS Nil Return
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "CRS_NIL_RETURN"
+        form_name_en: "CRS Nil Return"
+        form_name_mt: "Dikjarazzjoni CRS Xejn"
+        version: "2024"
+        effective_from: "2017-01-01"
+        effective_to: "current"
+        legislative_basis: "S.L.123.127"
+        subsidiary_legislation: []
+        administering_authority: "CFR"
+        tax_type: "Exchange of Information"
+        taxpayer_category: "Reporting Financial Institution"
+        filing_frequency: "Annual (if no reportable accounts)"
+        filing_deadline: "June 30 following calendar year end"
+        submission_method: "Electronic"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: "urn:oecd:ties:crs:v2"
+        source_url: "https://cfr.gov.mt/en/eoi/Pages/CRS.aspx"
+        notes: |
+          Mandatory nil return when a Reporting FI has no reportable accounts 
+          for the reporting period. Uses CRS703 message type indicator.
+
+      sections:
+        - section_id: "NIL_DECLARATION"
+          section_name: "Nil Declaration"
+          section_description: "Declaration of no reportable accounts"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "crs:CRS_OECD"
+          fields:
+            - field_id: "nil_fi_tin"
+              field_code: "FI_TIN"
+              field_name_en: "FI Tax Identification Number"
+              field_name_mt: "TIN tal-FI"
+              field_description: "TIN of reporting FI"
+              data_type: "TIN"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:ReportingFI/crs:TIN"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TIN"
+              cross_form_reference: "CRS_REGISTRATION.reg_fi_tin"
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_nil_returns"
+                column: "fi_tin"
+              ors_mapping:
+                table: "mtca_ors.crs_nil_returns"
+                column: "fi_tin"
+                data_type: "String"
+
+            - field_id: "nil_reporting_period"
+              field_code: "ReportingPeriod"
+              field_name_en: "Reporting Period"
+              field_name_mt: "Perjodu ta' Rappurtar"
+              field_description: "Calendar year with no reportable accounts"
+              data_type: "DATE"
+              format: "YYYY-12-31"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "crs:MessageSpec/crs:ReportingPeriod"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "ReportingPeriod"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_nil_returns"
+                column: "reporting_period"
+              ors_mapping:
+                table: "mtca_ors.crs_nil_returns"
+                column: "reporting_period"
+                data_type: "Date"
+
+            - field_id: "nil_declaration_text"
+              field_code: "Declaration"
+              field_name_en: "Nil Declaration"
+              field_name_mt: "Dikjarazzjoni Xejn"
+              field_description: "Confirmation of no reportable accounts"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "CRSN_001"
+                  rule_type: "required"
+                  rule_description: "Must confirm nil declaration"
+                  rule_expression: "nil_declaration_text = true"
+                  error_message_en: "Nil declaration must be confirmed"
+                  error_message_mt: "Id-dikjarazzjoni xejn trid tiÄ¡i kkonfermata"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "crs_nil_returns"
+                column: "declared"
+              ors_mapping:
+                table: "mtca_ors.crs_nil_returns"
+                column: "declared"
+                data_type: "UInt8"
+
+      xml_schema:
+        namespace: "urn:oecd:ties:crs:v2"
+        root_element: "CRS_OECD"
+        schema_version: "2.0"
+        schema_url: "https://www.oecd.org/tax/exchange-of-tax-information/CRS_Schema_v2.0.xsd"
+
+      attachments: []
+      related_forms:
+        - form_code: "CRS_REGISTRATION"
+          relationship_type: "prerequisite"
+          relationship_description: "Must be registered to file nil return"
+
+      submission_workflow:
+        authentication_required: "CFR e-Services credentials"
+        signature_required: false
+        validation_type: "Business rules"
+        acknowledgment_type: "Submission receipt"
+
+  # ==========================================================================
+  # FATCA Nil Return
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "FATCA_NIL_RETURN"
+        form_name_en: "FATCA Nil Return"
+        form_name_mt: "Dikjarazzjoni FATCA Xejn"
+        version: "2024"
+        effective_from: "2014-07-01"
+        effective_to: "current"
+        legislative_basis: "US-Malta IGA"
+        subsidiary_legislation: []
+        administering_authority: "CFR"
+        tax_type: "Exchange of Information"
+        taxpayer_category: "Reporting Financial Institution"
+        filing_frequency: "Annual (if no US accounts)"
+        filing_deadline: "June 30 following calendar year end"
+        submission_method: "Electronic"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: "urn:oecd:ties:fatca:v2"
+        source_url: "https://cfr.gov.mt/en/eoi/Pages/FATCA.aspx"
+        notes: |
+          Mandatory nil return when FI has no US reportable accounts.
+          Uses FATCA3 (Void) message type indicator.
+
+      sections:
+        - section_id: "FATCA_NIL_DECLARATION"
+          section_name: "FATCA Nil Declaration"
+          section_description: "Declaration of no US reportable accounts"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "ftc:FATCA_OECD"
+          fields:
+            - field_id: "fatca_nil_giin"
+              field_code: "GIIN"
+              field_name_en: "GIIN"
+              field_name_mt: "GIIN"
+              field_description: "FI's Global Intermediary Identification Number"
+              data_type: "GIIN"
+              format: "XXXXXX.XXXXX.XX.XXX"
+              max_length: 19
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:ReportingFI/ftc:GIIN"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "GIIN"
+              cross_form_reference: "FATCA_REGISTRATION.giin"
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_nil_returns"
+                column: "giin"
+              ors_mapping:
+                table: "mtca_ors.fatca_nil_returns"
+                column: "giin"
+                data_type: "FixedString(19)"
+
+            - field_id: "fatca_nil_reporting_period"
+              field_code: "ReportingPeriod"
+              field_name_en: "Reporting Period"
+              field_name_mt: "Perjodu ta' Rappurtar"
+              field_description: "Calendar year with no US accounts"
+              data_type: "DATE"
+              format: "YYYY-12-31"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ftc:MessageSpec/ftc:ReportingPeriod"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "ReportingPeriod"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "fatca_nil_returns"
+                column: "reporting_period"
+              ors_mapping:
+                table: "mtca_ors.fatca_nil_returns"
+                column: "reporting_period"
+                data_type: "Date"
+
+      xml_schema:
+        namespace: "urn:oecd:ties:fatca:v2"
+        root_element: "FATCA_OECD"
+        schema_version: "2.0"
+        schema_url: "https://www.irs.gov/pub/fatca/FATCA-XML-v2.0.xsd"
+
+      attachments: []
+      related_forms:
+        - form_code: "FATCA_REGISTRATION"
+          relationship_type: "prerequisite"
+          relationship_description: "GIIN required for nil return"
+
+      submission_workflow:
+        authentication_required: "CFR e-Services credentials"
+        signature_required: false
+        validation_type: "Business rules"
+        acknowledgment_type: "Submission receipt"
+
+# ============================================================================
+# Reference Tables for Priority 5A Forms
+# ============================================================================
+reference_tables:
+  crs_account_holder_types:
+    - code: "CRS101"
+      description_en: "Passive NFE with one or more controlling persons that is a Reportable Person"
+    - code: "CRS102"
+      description_en: "CRS Reportable Person"
+    - code: "CRS103"
+      description_en: "Passive NFE that is a CRS Reportable Person"
+
+  crs_account_types:
+    - code: "CRS501"
+      description_en: "Depository Account"
+    - code: "CRS502"
+      description_en: "Custodial Account"
+    - code: "CRS503"
+      description_en: "Cash Value Insurance Contract"
+    - code: "CRS504"
+      description_en: "Annuity Contract"
+    - code: "CRS505"
+      description_en: "Debt or Equity Interest - Investment Entity"
+    - code: "CRS506"
+      description_en: "Other"
+
+  crs_payment_types:
+    - code: "CRS501"
+      description_en: "Dividends"
+    - code: "CRS502"
+      description_en: "Interest"
+    - code: "CRS503"
+      description_en: "Gross Proceeds / Redemptions"
+    - code: "CRS504"
+      description_en: "Other"
+
+  crs_message_type_indicators:
+    - code: "CRS701"
+      description_en: "The message contains new information"
+    - code: "CRS702"
+      description_en: "The message contains corrections"
+    - code: "CRS703"
+      description_en: "The message advises there is no data to report"
+
+  crs_controlling_person_types:
+    - code: "CRS801"
+      description_en: "CP of legal person - ownership"
+    - code: "CRS802"
+      description_en: "CP of legal person - other means"
+    - code: "CRS803"
+      description_en: "CP of legal person - senior managing official"
+    - code: "CRS804"
+      description_en: "CP of legal arrangement (trust) - settlor"
+    - code: "CRS805"
+      description_en: "CP of legal arrangement (trust) - trustee"
+    - code: "CRS806"
+      description_en: "CP of legal arrangement (trust) - protector"
+    - code: "CRS807"
+      description_en: "CP of legal arrangement (trust) - beneficiary"
+    - code: "CRS808"
+      description_en: "CP of legal arrangement (trust) - other"
+    - code: "CRS809"
+      description_en: "CP of legal arrangement (other) - settlor-equivalent"
+    - code: "CRS810"
+      description_en: "CP of legal arrangement (other) - trustee-equivalent"
+    - code: "CRS811"
+      description_en: "CP of legal arrangement (other) - protector-equivalent"
+    - code: "CRS812"
+      description_en: "CP of legal arrangement (other) - beneficiary-equivalent"
+    - code: "CRS813"
+      description_en: "CP of legal arrangement (other) - other-equivalent"
+
+  oecd_doc_type_indicators:
+    - code: "OECD0"
+      description_en: "Resend data"
+    - code: "OECD1"
+      description_en: "New data"
+    - code: "OECD2"
+      description_en: "Corrected data"
+    - code: "OECD3"
+      description_en: "Deletion of data"
+
+  oecd_address_types:
+    - code: "OECD301"
+      description_en: "Residential or business"
+    - code: "OECD302"
+      description_en: "Residential"
+    - code: "OECD303"
+      description_en: "Business"
+    - code: "OECD304"
+      description_en: "Registered office"
+    - code: "OECD305"
+      description_en: "Unspecified"
+
+  oecd_account_number_types:
+    - code: "OECD601"
+      description_en: "IBAN"
+    - code: "OECD602"
+      description_en: "OBAN (Other Bank Account Number)"
+    - code: "OECD603"
+      description_en: "ISIN"
+    - code: "OECD604"
+      description_en: "OSIN (Other Security Identification Number)"
+    - code: "OECD605"
+      description_en: "Other"
+
+  fatca_message_type_indicators:
+    - code: "FATCA1"
+      description_en: "New information"
+    - code: "FATCA2"
+      description_en: "Corrected information"
+    - code: "FATCA3"
+      description_en: "Void (nil return)"
+    - code: "FATCA4"
+      description_en: "Amended information"
+
+  crs_fi_types:
+    - code: "DEPOSITORY"
+      description_en: "Depository Institution"
+    - code: "CUSTODIAL"
+      description_en: "Custodial Institution"
+    - code: "INVESTMENT"
+      description_en: "Investment Entity"
+    - code: "INSURANCE"
+      description_en: "Specified Insurance Company"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  exchange_db:
+    tables:
+      - legacy_table: "crs_messages"
+        ors_table: "mtca_ors.crs_messages"
+        description: "CRS message header records"
+        key_columns:
+          - legacy: "message_id"
+            ors: "message_id"
+        transformation_notes: "Direct migration with data type conversion"
+
+      - legacy_table: "crs_reporting_fi"
+        ors_table: "mtca_ors.crs_reporting_fi"
+        description: "CRS reporting financial institution records"
+        key_columns:
+          - legacy: "fi_id"
+            ors: "fi_id"
+        transformation_notes: "Link to crs_messages via message_id"
+
+      - legacy_table: "crs_account_holders"
+        ors_table: "mtca_ors.crs_account_holders"
+        description: "CRS individual account holder records"
+        key_columns:
+          - legacy: "holder_id"
+            ors: "holder_id"
+        transformation_notes: "Includes both individual and entity holders"
+
+      - legacy_table: "crs_accounts"
+        ors_table: "mtca_ors.crs_accounts"
+        description: "CRS reportable account records"
+        key_columns:
+          - legacy: "account_id"
+            ors: "account_id"
+        transformation_notes: "Currency amounts standardized to original currency"
+
+      - legacy_table: "crs_payments"
+        ors_table: "mtca_ors.crs_payments"
+        description: "CRS payment/income records"
+        key_columns:
+          - legacy: "payment_id"
+            ors: "payment_id"
+        transformation_notes: "Linked to accounts via account_id"
+
+      - legacy_table: "fatca_messages"
+        ors_table: "mtca_ors.fatca_messages"
+        description: "FATCA message header records"
+        key_columns:
+          - legacy: "message_id"
+            ors: "message_id"
+        transformation_notes: "Similar structure to CRS messages"
+
+      - legacy_table: "fatca_accounts"
+        ors_table: "mtca_ors.fatca_accounts"
+        description: "FATCA reportable account records"
+        key_columns:
+          - legacy: "account_id"
+            ors: "account_id"
+        transformation_notes: "US person accounts with GIIN reference"
+
+# ============================================================================
+# Cross-Form Relationships Summary
+# ============================================================================
+form_relationships:
+  exchange_of_information_chain:
+    description: "CRS/FATCA reporting workflow"
+    flow:
+      - source: "CRS_REGISTRATION"
+        target: "CRS_REPORT"
+        relationship: "Registration enables reporting"
+      - source: "CRS_REGISTRATION"
+        target: "CRS_NIL_RETURN"
+        relationship: "Registration enables nil return"
+      - source: "FATCA_REGISTRATION"
+        target: "FATCA_REPORT"
+        relationship: "GIIN enables FATCA reporting"
+      - source: "FATCA_REGISTRATION"
+        target: "FATCA_NIL_RETURN"
+        relationship: "GIIN enables nil return"
+      - source: "CRS_REPORT"
+        target: "FATCA_REPORT"
+        relationship: "US persons may appear in both"

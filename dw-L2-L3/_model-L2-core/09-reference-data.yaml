@@ -1,0 +1,3348 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Reference Data Domain
+# =============================================================================
+#
+# This domain defines all reference/lookup tables, code tables, and
+# configurable system parameters used throughout the tax administration system.
+#
+# Generated from: SIGTAS_DICTIONARY, SIGTAS_RULES, and all reference tables
+#                 across all 25 SIGTAS schemas + tax-capabilities.docx
+#
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    Reference Data Domain - Comprehensive collection of all lookup tables,
+    code tables, classification schemes, and system configuration data used
+    across the entire tax administration system.
+
+    This domain provides:
+    - Geographic and administrative divisions (countries, regions, localities)
+    - Personal data classifications (marital status, education, occupations)
+    - Business classifications (industries, legal forms, business activities)
+    - Document and identification types
+    - Financial codes (currencies, payment methods, bank types)
+    - Tax-specific codes (assessment types, penalty reasons, audit categories)
+    - System configuration (business rules, parameters, constants)
+    - Communication and service channel codes
+    - Data quality and validation rules
+
+    The Reference Data Domain serves as the foundation for:
+    - Party Management - classification and demographic codes
+    - Tax Framework - tax type categories and period types
+    - Registration - license types, registration reasons
+    - Filing & Assessment - assessment types, filing status codes
+    - Accounting - transaction types, allocation rules
+    - Payment & Refund - payment methods, refund reasons
+    - Compliance & Control - audit types, collection actions
+    - Document Management - document types, communication channels
+
+    This domain was synthesized from:
+    - SIGTAS_DICTIONARY schema: 60+ lookup tables covering all classifications
+    - SIGTAS_RULES schema: Business rule configuration and parameters
+    - Reference tables from all 25 SIGTAS schemas
+    - ISO standards: Countries (ISO 3166), Currencies (ISO 4217),
+      Languages (ISO 639)
+    - Tax capabilities sections: All code tables and classifications
+
+    Design Principles:
+    - All reference tables use ref_ prefix for clear identification
+    - Support for internationalization (i18n) with language variants
+    - Temporal validity for codes that change over time
+    - Hierarchical classification support (parent-child relationships)
+    - ISO standard codes used where applicable
+    - Extensibility for country-specific codes
+    - Audit trail for all changes
+
+  authors:
+    - "Generated from SIGTAS analysis"
+    - "Moldova SRS collaboration"
+    - "GovStack Initiative"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Identity BB"
+    - "Information Mediator BB"
+    - "Workflow BB"
+    - "Registry BB"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+    reference_table_prefix: "ref_"
+
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+    i18n_columns:
+      - "code"
+      - "name"
+      - "description"
+      - "language_code"
+
+domains:
+  - name: "reference_data"
+    code: "RD"
+    display_name: "Reference Data"
+    description: |
+      Contains all classification schemes, lookup tables, and system
+      configuration data used throughout the tax administration system.
+
+      This domain is foundational - nearly every other domain depends on
+      reference data for code values, classifications, and validations.
+
+      Key responsibilities:
+      - Maintain ISO standard codes (countries, currencies, languages)
+      - Define country-specific classifications (industries, occupations)
+      - Store system configuration and business rules
+      - Support internationalization and localization
+      - Track temporal changes to reference data
+      - Provide consistent code values across all domains
+
+    business_owner: "Data Governance Office"
+    technical_owner: "Core Systems Team / MDM Team"
+
+    dependencies: []  # No dependencies - this is the foundational domain
+
+    tags:
+      - "master_data"
+      - "foundational"
+      - "iso_standards"
+      - "i18n"
+      - "configuration"
+
+    schemas:
+      - schema_name: "reference"
+        description: |
+          Contains all reference and lookup tables used across the system.
+          All tables in this schema follow the ref_ naming prefix convention.
+
+        tables:
+          # ===============================================================
+          # Geographic & Administrative
+          # ===============================================================
+
+          - name: "ref_country"
+            display_name: "Country"
+            description: |
+              ISO 3166-1 standard country codes and names. Used for addresses,
+              nationalities, foreign tax jurisdictions, and international
+              reporting requirements.
+
+              Supports:
+              - ISO 3166-1 alpha-2 (two-letter codes)
+              - ISO 3166-1 alpha-3 (three-letter codes)
+              - ISO 3166-1 numeric codes
+              - Common names and official names
+              - Multiple language variants
+              - Temporal validity for country changes (e.g., USSR -> Russia)
+
+              This is a critical reference table used in:
+              - Party addresses (residence and correspondence)
+              - Foreign party identification
+              - Cross-border transactions
+              - Tax treaty applications
+              - International reporting (OECD CRS, FATCA)
+
+
+            aspects:
+              - auditable
+              - temporal
+
+            business_rule: |
+              1. ISO codes must conform to ISO 3166-1 standard
+              2. At least one country code variant (alpha-2, alpha-3, numeric) required
+              3. Country code changes create new version with temporal validity
+              4. Cannot delete country with active references
+              5. Default language variant required for each country
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 250
+              annual_growth: 2
+              five_year: 260
+
+            data_classification: "public"
+
+            columns:
+              - name: "country_id"
+                type: "bigint"
+                description: "Unique identifier for country (surrogate key)"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "iso_alpha_2"
+                type: "char(2)"
+                description: "ISO 3166-1 alpha-2 code (two letters, e.g., 'US', 'GB', 'MD')"
+                constraints:
+                  not_null: true
+                  unique: true
+                examples:
+                  - "US"
+                  - "GB"
+                  - "MD"
+                  - "RO"
+
+              - name: "iso_alpha_3"
+                type: "char(3)"
+                description: "ISO 3166-1 alpha-3 code (three letters, e.g., 'USA', 'GBR', 'MDA')"
+                constraints:
+                  not_null: true
+                  unique: true
+                examples:
+                  - "USA"
+                  - "GBR"
+                  - "MDA"
+                  - "ROU"
+
+              - name: "iso_numeric"
+                type: "char(3)"
+                description: "ISO 3166-1 numeric code (three digits, e.g., '840' for USA)"
+                constraints:
+                  not_null: true
+                  unique: true
+                examples:
+                  - "840"
+                  - "826"
+                  - "498"
+
+              - name: "common_name"
+                type: "varchar(100)"
+                description: "Common name of the country in default language"
+                constraints:
+                  not_null: true
+                examples:
+                  - "United States"
+                  - "United Kingdom"
+                  - "Moldova"
+
+              - name: "official_name"
+                type: "varchar(200)"
+                description: "Official name of the country"
+                examples:
+                  - "United States of America"
+                  - "United Kingdom of Great Britain and Northern Ireland"
+                  - "Republic of Moldova"
+
+              - name: "sovereignty_status"
+                type: "varchar(30)"
+                description: "Sovereignty status of the territory"
+                constraints:
+                  not_null: true
+                  check:
+                    condition: "sovereignty_status IN ('independent', 'dependent', 'disputed')"
+                default: "'independent'"
+
+              - name: "is_tax_haven"
+                type: "boolean"
+                description: "Flag indicating if country is on tax haven list"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "has_tax_treaty"
+                type: "boolean"
+                description: "Flag indicating if tax treaty exists with this country"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "oecd_crs_participating"
+                type: "boolean"
+                description: "Flag indicating OECD Common Reporting Standard participation"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "valid_from"
+                type: "date"
+                description: "Date from which this country code is valid"
+                constraints:
+                  not_null: true
+                default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                type: "date"
+                description: "Date until which this country code is valid (NULL if current)"
+
+              - name: "is_current"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "notes"
+                type: "text"
+                description: "Additional notes about country (e.g., name changes, mergers)"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_country_iso_alpha_2"
+                columns: ["iso_alpha_2"]
+                type: "btree"
+
+              - name: "idx_country_iso_alpha_3"
+                columns: ["iso_alpha_3"]
+                type: "btree"
+
+              - name: "idx_country_common_name"
+                columns: ["common_name"]
+                type: "btree"
+
+              - name: "idx_country_valid_from"
+                columns: ["valid_from"]
+                type: "btree"
+
+              - name: "idx_country_is_current"
+                columns: ["is_current"]
+                type: "btree"
+                condition: "is_current = true"
+
+            constraints:
+              - type: "check"
+                name: "chk_country_valid_dates"
+                condition: "valid_to IS NULL OR valid_to > valid_from"
+                description: "Ensure valid_to is after valid_from"
+
+              - type: "check"
+                name: "chk_country_sovereignty"
+                condition: "sovereignty_status IN ('independent', 'dependent', 'disputed')"
+                description: "Validate sovereignty status values"
+
+          - name: "ref_region"
+            display_name: "Administrative Region"
+            description: |
+              First-level administrative divisions within a country (provinces,
+              states, regions, oblasts, etc.). Hierarchy: Country -> Region.
+
+              Used for:
+              - Address validation and standardization
+              - Geographic reporting and analytics
+              - Regional tax office jurisdiction
+              - Location-based tax rules (e.g., regional taxes)
+
+              SIGTAS Source: GEOGRAPHICAL_ADDRESS.REGION
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 500
+              annual_growth: 5
+              five_year: 525
+
+            data_classification: "public"
+
+            columns:
+              - name: "region_id"
+                type: "bigint"
+                description: "Unique identifier for region"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "region_code"
+                type: "varchar(20)"
+                description: "Official code for the region (e.g., 'CA' for California, 'MD' for Maryland)"
+                constraints:
+                  not_null: true
+
+              - name: "region_name"
+                type: "varchar(100)"
+                description: "Name of the region"
+                constraints:
+                  not_null: true
+
+              - name: "country_id"
+                type: "bigint"
+                description: "Reference to the country this region belongs to"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "ref_country"
+                    column: "country_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "region_type"
+                type: "varchar(50)"
+                description: "Type of administrative division (state, province, region, oblast, etc.)"
+
+              - name: "valid_from"
+                type: "date"
+                description: "Date from which this region is valid"
+                constraints:
+                  not_null: true
+                default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                type: "date"
+                description: "Date until which this region is valid"
+
+              - name: "is_current"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_region_country"
+                columns: ["country_id"]
+                type: "btree"
+
+              - name: "idx_region_code"
+                columns: ["region_code", "country_id"]
+                type: "btree"
+                unique: true
+
+              - name: "idx_region_name"
+                columns: ["region_name"]
+                type: "btree"
+
+            constraints:
+              - type: "unique"
+                name: "uk_region_code_country"
+                columns: ["region_code", "country_id", "valid_from"]
+                description: "Region code must be unique within country and validity period"
+
+          - name: "ref_district"
+            display_name: "District / County"
+            description: |
+              Second-level administrative divisions (districts, counties, raions).
+              Hierarchy: Country -> Region -> District.
+
+              SIGTAS Source: GEOGRAPHICAL_ADDRESS.DISTRICT
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 2000
+              annual_growth: 10
+              five_year: 2050
+
+            data_classification: "public"
+
+            columns:
+              - name: "district_id"
+                type: "bigint"
+                description: "Unique identifier for district"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "district_code"
+                type: "varchar(20)"
+                description: "Official code for the district"
+                constraints:
+                  not_null: true
+
+              - name: "district_name"
+                type: "varchar(100)"
+                description: "Name of the district"
+                constraints:
+                  not_null: true
+
+              - name: "region_id"
+                type: "bigint"
+                description: "Reference to the parent region"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "ref_region"
+                    column: "region_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "valid_from"
+                type: "date"
+                description: "Date from which this district is valid"
+                constraints:
+                  not_null: true
+                default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                type: "date"
+                description: "Date until which this district is valid"
+
+              - name: "is_current"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_district_region"
+                columns: ["region_id"]
+                type: "btree"
+
+              - name: "idx_district_code"
+                columns: ["district_code", "region_id"]
+                type: "btree"
+
+            constraints:
+              - type: "unique"
+                name: "uk_district_code_region"
+                columns: ["district_code", "region_id", "valid_from"]
+
+          - name: "ref_locality"
+            display_name: "Locality (City/Town/Village)"
+            description: |
+              Third-level administrative divisions - cities, towns, villages,
+              communes, municipalities. Hierarchy: Country -> Region -> District -> Locality.
+
+              SIGTAS Source: GEOGRAPHICAL_ADDRESS.LOCALITY
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 20000
+              annual_growth: 50
+              five_year: 20250
+
+            data_classification: "public"
+
+            columns:
+              - name: "locality_id"
+                type: "bigint"
+                description: "Unique identifier for locality"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "locality_code"
+                type: "varchar(20)"
+                description: "Official code for the locality"
+                constraints:
+                  not_null: true
+
+              - name: "locality_name"
+                type: "varchar(100)"
+                description: "Name of the locality"
+                constraints:
+                  not_null: true
+
+              - name: "district_id"
+                type: "bigint"
+                description: "Reference to the parent district"
+                constraints:
+                  foreign_key:
+                    table: "ref_district"
+                    column: "district_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "locality_type"
+                type: "varchar(30)"
+                description: "Type of locality (city, town, village, commune, etc.)"
+                constraints:
+                  not_null: true
+
+              - name: "population"
+                type: "integer"
+                description: "Population count (for demographic analysis)"
+
+              - name: "postal_code"
+                type: "varchar(20)"
+                description: "Primary postal code for this locality"
+
+              - name: "valid_from"
+                type: "date"
+                description: "Date from which this locality is valid"
+                constraints:
+                  not_null: true
+                default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                type: "date"
+                description: "Date until which this locality is valid"
+
+              - name: "is_current"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_locality_district"
+                columns: ["district_id"]
+                type: "btree"
+
+              - name: "idx_locality_code"
+                columns: ["locality_code"]
+                type: "btree"
+
+              - name: "idx_locality_name"
+                columns: ["locality_name"]
+                type: "btree"
+
+              - name: "idx_locality_postal_code"
+                columns: ["postal_code"]
+                type: "btree"
+
+          # ===============================================================
+          # Currency & Financial
+          # ===============================================================
+
+          - name: "ref_currency"
+            display_name: "Currency"
+            description: |
+              ISO 4217 standard currency codes. Used for all monetary amounts,
+              exchange rate conversions, and multi-currency support.
+
+              Supports:
+              - ISO 4217 alphabetic code (e.g., USD, EUR, MDL)
+              - ISO 4217 numeric code
+              - Currency name and symbol
+              - Minor unit (number of decimal places)
+              - Active status
+
+              SIGTAS Source: SIGTAS_DICTIONARY.CURRENCY
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 180
+              annual_growth: 2
+              five_year: 190
+
+            data_classification: "public"
+
+            columns:
+              - name: "currency_id"
+                type: "bigint"
+                description: "Unique identifier for currency"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "iso_code"
+                type: "char(3)"
+                description: "ISO 4217 alphabetic code (3 letters, e.g., 'USD', 'EUR', 'MDL')"
+                constraints:
+                  not_null: true
+                  unique: true
+                examples:
+                  - "USD"
+                  - "EUR"
+                  - "MDL"
+                  - "GBP"
+
+              - name: "iso_numeric"
+                type: "char(3)"
+                description: "ISO 4217 numeric code (3 digits)"
+                constraints:
+                  not_null: true
+                  unique: true
+                examples:
+                  - "840"
+                  - "978"
+                  - "498"
+
+              - name: "currency_name"
+                type: "varchar(100)"
+                description: "Full name of the currency"
+                constraints:
+                  not_null: true
+                examples:
+                  - "US Dollar"
+                  - "Euro"
+                  - "Moldovan Leu"
+
+              - name: "currency_symbol"
+                type: "varchar(10)"
+                description: "Common symbol for the currency"
+                examples:
+                  - "$"
+                  - "â‚¬"
+                  - "L"
+                  - "Â£"
+
+              - name: "minor_unit"
+                type: "smallint"
+                description: "Number of decimal places (e.g., 2 for USD, 0 for JPY)"
+                constraints:
+                  not_null: true
+                default: "2"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if currency is currently in use"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "valid_from"
+                type: "date"
+                description: "Date from which this currency is valid"
+                constraints:
+                  not_null: true
+                default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                type: "date"
+                description: "Date until which this currency is valid"
+
+              - name: "notes"
+                type: "text"
+                description: "Additional notes about currency (e.g., historical context)"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_currency_iso_code"
+                columns: ["iso_code"]
+                type: "btree"
+
+              - name: "idx_currency_is_active"
+                columns: ["is_active"]
+                type: "btree"
+                condition: "is_active = true"
+
+          - name: "ref_language"
+            display_name: "Language"
+            description: |
+              ISO 639 standard language codes. Used for multi-language support,
+              document translations, and communication preferences.
+
+              SIGTAS Source: SIGTAS_DICTIONARY.LANGUAGE
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 150
+              annual_growth: 5
+              five_year: 175
+
+            data_classification: "public"
+
+            columns:
+              - name: "language_id"
+                type: "bigint"
+                description: "Unique identifier for language"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "iso_639_1"
+                type: "char(2)"
+                description: "ISO 639-1 two-letter code (e.g., 'en', 'ro', 'ru')"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "iso_639_2"
+                type: "char(3)"
+                description: "ISO 639-2 three-letter code"
+                constraints:
+                  unique: true
+
+              - name: "language_name"
+                type: "varchar(100)"
+                description: "Name of the language in English"
+                constraints:
+                  not_null: true
+
+              - name: "native_name"
+                type: "varchar(100)"
+                description: "Name of the language in that language (e.g., 'Deutsch' for German)"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if language is supported in the system"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "is_default"
+                type: "boolean"
+                description: "Flag indicating if this is the system default language"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "direction"
+                type: "varchar(3)"
+                description: "Text direction (LTR for left-to-right, RTL for right-to-left)"
+                constraints:
+                  not_null: true
+                  check:
+                    condition: "direction IN ('LTR', 'RTL')"
+                default: "'LTR'"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_language_iso_639_1"
+                columns: ["iso_639_1"]
+                type: "btree"
+
+              - name: "idx_language_is_active"
+                columns: ["is_active"]
+                type: "btree"
+                condition: "is_active = true"
+
+            constraints:
+              - type: "check"
+                name: "chk_language_one_default"
+                condition: "NOT EXISTS (SELECT 1 FROM ref_language WHERE is_default = true GROUP BY is_default HAVING COUNT(*) > 1)"
+                description: "Only one language can be default"
+
+          # ===============================================================
+          # Personal Demographics
+          # ===============================================================
+
+          - name: "ref_gender"
+            display_name: "Gender"
+            description: |
+              Gender classifications for individuals. Supports modern gender
+              identity concepts beyond binary classifications.
+
+              Common values: Male, Female, Non-binary, Prefer not to say
+
+              SIGTAS Source: SIGTAS_DICTIONARY (implicit from INDIVIDUAL)
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 10
+              annual_growth: 1
+              five_year: 15
+
+            data_classification: "public"
+
+            columns:
+              - name: "gender_id"
+                type: "bigint"
+                description: "Unique identifier for gender"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "gender_code"
+                type: "varchar(10)"
+                description: "Short code for gender (M, F, X, etc.)"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "gender_name"
+                type: "varchar(50)"
+                description: "Full name of the gender classification"
+                constraints:
+                  not_null: true
+
+              - name: "display_order"
+                type: "smallint"
+                description: "Order for display in lists"
+                constraints:
+                  not_null: true
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this gender code is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_marital_status"
+            display_name: "Marital Status"
+            description: |
+              Marital status classifications for individuals. Used for tax
+              calculations (e.g., joint filing, deductions) and demographics.
+
+              Common values: Single, Married, Divorced, Widowed, Separated,
+              Domestic Partnership, Common Law
+
+              SIGTAS Source: SIGTAS_DICTIONARY.MARITAL_STATUS
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 10
+              annual_growth: 1
+              five_year: 12
+
+            data_classification: "public"
+
+            columns:
+              - name: "marital_status_id"
+                type: "bigint"
+                description: "Unique identifier for marital status"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "marital_status_code"
+                type: "varchar(10)"
+                description: "Short code for marital status"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "marital_status_name"
+                type: "varchar(50)"
+                description: "Full name of the marital status"
+                constraints:
+                  not_null: true
+
+              - name: "affects_tax_calculation"
+                type: "boolean"
+                description: "Flag indicating if this status affects tax calculations"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "allows_joint_filing"
+                type: "boolean"
+                description: "Flag indicating if joint tax filing is allowed"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "display_order"
+                type: "smallint"
+                description: "Order for display in lists"
+                constraints:
+                  not_null: true
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this status code is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_education_level"
+            display_name: "Education Level"
+            description: |
+              Education level classifications for individuals. Used for
+              statistical reporting and demographic analysis.
+
+              Common values: No formal education, Primary, Secondary,
+              Vocational, Bachelor's, Master's, Doctorate
+
+              SIGTAS Source: SIGTAS_DICTIONARY.EDUCATION_LEVEL
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 15
+              annual_growth: 1
+              five_year: 18
+
+            data_classification: "public"
+
+            columns:
+              - name: "education_level_id"
+                type: "bigint"
+                description: "Unique identifier for education level"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "education_level_code"
+                type: "varchar(10)"
+                description: "Short code for education level"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "education_level_name"
+                type: "varchar(100)"
+                description: "Full name of the education level"
+                constraints:
+                  not_null: true
+
+              - name: "level_order"
+                type: "smallint"
+                description: "Hierarchical order (1=lowest, higher numbers=higher education)"
+                constraints:
+                  not_null: true
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this education level is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_occupation"
+            display_name: "Occupation"
+            description: |
+              Occupation classifications following ISCO (International Standard
+              Classification of Occupations) or national standards. Used for
+              risk profiling, statistical reporting, and compliance analysis.
+
+              Examples: Manager, Professional, Technician, Clerical Support,
+              Service Worker, Agricultural Worker, Craft Worker, Operator,
+              Elementary Occupation
+
+              SIGTAS Source: SIGTAS_DICTIONARY.OCCUPATION
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 500
+              annual_growth: 10
+              five_year: 550
+
+            data_classification: "public"
+
+            columns:
+              - name: "occupation_id"
+                type: "bigint"
+                description: "Unique identifier for occupation"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "occupation_code"
+                type: "varchar(20)"
+                description: "Standard occupation code (ISCO or national)"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "occupation_name"
+                type: "varchar(200)"
+                description: "Full name of the occupation"
+                constraints:
+                  not_null: true
+
+              - name: "parent_occupation_id"
+                type: "bigint"
+                description: "Reference to parent occupation (for hierarchical classification)"
+                constraints:
+                  foreign_key:
+                    table: "ref_occupation"
+                    column: "occupation_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "isco_major_group"
+                type: "char(1)"
+                description: "ISCO-08 major group (1-9)"
+
+              - name: "risk_level"
+                type: "varchar(20)"
+                description: "Risk level for compliance purposes (high, medium, low)"
+                constraints:
+                  check:
+                    condition: "risk_level IN ('high', 'medium', 'low', 'unknown')"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this occupation code is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_occupation_code"
+                columns: ["occupation_code"]
+                type: "btree"
+
+              - name: "idx_occupation_parent"
+                columns: ["parent_occupation_id"]
+                type: "btree"
+
+              - name: "idx_occupation_isco_major"
+                columns: ["isco_major_group"]
+                type: "btree"
+
+          # ===============================================================
+          # Identification Documents
+          # ===============================================================
+
+          - name: "ref_identification_type"
+            display_name: "Identification Document Type"
+            description: |
+              Types of identification documents accepted for party identification
+              and verification. Includes both national ID documents and
+              international documents.
+
+              Common types: National ID Card, Passport, Driver's License,
+              Birth Certificate, Residence Permit, Tax ID Card
+
+              SIGTAS Source: SIGTAS_DICTIONARY.ID_TYPE
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 30
+              annual_growth: 2
+              five_year: 38
+
+            data_classification: "public"
+
+            columns:
+              - name: "identification_type_id"
+                type: "bigint"
+                description: "Unique identifier for identification type"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "identification_type_code"
+                type: "varchar(20)"
+                description: "Short code for identification type"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "identification_type_name"
+                type: "varchar(100)"
+                description: "Full name of the identification type"
+                constraints:
+                  not_null: true
+
+              - name: "country_id"
+                type: "bigint"
+                description: "Country that issues this identification type (NULL for international)"
+                constraints:
+                  foreign_key:
+                    table: "ref_country"
+                    column: "country_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "is_primary_id"
+                type: "boolean"
+                description: "Flag indicating if this is a primary identification document"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "requires_expiry_date"
+                type: "boolean"
+                description: "Flag indicating if expiry date is required"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "verification_method"
+                type: "varchar(50)"
+                description: "How this ID is typically verified (manual, electronic, biometric)"
+
+              - name: "display_order"
+                type: "smallint"
+                description: "Order for display in lists"
+                constraints:
+                  not_null: true
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this ID type is currently accepted"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_identification_type_country"
+                columns: ["country_id"]
+                type: "btree"
+
+              - name: "idx_identification_type_is_active"
+                columns: ["is_active"]
+                type: "btree"
+                condition: "is_active = true"
+
+          # ===============================================================
+          # Business Classifications
+          # ===============================================================
+
+          - name: "ref_industry"
+            display_name: "Industry / Economic Activity"
+            description: |
+              Industry classifications following ISIC (International Standard
+              Industrial Classification) or national standards like NACE.
+              Used for business classification, risk profiling, and sectoral
+              analysis.
+
+              Hierarchy: Section (A-U) -> Division (2-digit) -> Group (3-digit)
+              -> Class (4-digit)
+
+              SIGTAS Source: SIGTAS_DICTIONARY.INDUSTRY
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 1000
+              annual_growth: 20
+              five_year: 1100
+
+            data_classification: "public"
+
+            columns:
+              - name: "industry_id"
+                type: "bigint"
+                description: "Unique identifier for industry"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "industry_code"
+                type: "varchar(20)"
+                description: "Standard industry code (ISIC, NACE, or national)"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "industry_name"
+                type: "varchar(200)"
+                description: "Full name of the industry"
+                constraints:
+                  not_null: true
+
+              - name: "parent_industry_id"
+                type: "bigint"
+                description: "Reference to parent industry (for hierarchical classification)"
+                constraints:
+                  foreign_key:
+                    table: "ref_industry"
+                    column: "industry_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "classification_level"
+                type: "smallint"
+                description: "Level in hierarchy (1=Section, 2=Division, 3=Group, 4=Class)"
+                constraints:
+                  not_null: true
+                  check:
+                    condition: "classification_level BETWEEN 1 AND 4"
+
+              - name: "isic_section"
+                type: "char(1)"
+                description: "ISIC Rev.4 section code (A-U)"
+
+              - name: "risk_level"
+                type: "varchar(20)"
+                description: "Tax compliance risk level for this industry"
+                constraints:
+                  check:
+                    condition: "risk_level IN ('high', 'medium', 'low', 'unknown')"
+
+              - name: "requires_special_license"
+                type: "boolean"
+                description: "Flag indicating if special business license required"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this industry code is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_industry_code"
+                columns: ["industry_code"]
+                type: "btree"
+
+              - name: "idx_industry_parent"
+                columns: ["parent_industry_id"]
+                type: "btree"
+
+              - name: "idx_industry_isic_section"
+                columns: ["isic_section"]
+                type: "btree"
+
+          - name: "ref_legal_form"
+            display_name: "Legal Form / Entity Type"
+            description: |
+              Legal forms for business entities. Defines the legal structure
+              of enterprises (corporation, partnership, sole proprietorship,
+              etc.). Different legal forms have different tax treatments.
+
+              Common types: Sole Proprietorship, Partnership, Limited Liability
+              Company (LLC), Corporation (C-Corp, S-Corp), Non-Profit,
+              Cooperative, Joint Venture
+
+              SIGTAS Source: ENTERPRISE (implicit from entity type)
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 30
+              annual_growth: 2
+              five_year: 38
+
+            data_classification: "public"
+
+            columns:
+              - name: "legal_form_id"
+                type: "bigint"
+                description: "Unique identifier for legal form"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "legal_form_code"
+                type: "varchar(20)"
+                description: "Short code for legal form"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "legal_form_name"
+                type: "varchar(100)"
+                description: "Full name of the legal form"
+                constraints:
+                  not_null: true
+
+              - name: "legal_form_category"
+                type: "varchar(50)"
+                description: "Category of legal form (individual, partnership, corporation, non-profit)"
+                constraints:
+                  not_null: true
+
+              - name: "limited_liability"
+                type: "boolean"
+                description: "Flag indicating if owners have limited liability"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "separate_legal_entity"
+                type: "boolean"
+                description: "Flag indicating if entity is separate from owners"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "tax_transparency"
+                type: "boolean"
+                description: "Flag indicating if income flows through to owners (pass-through entity)"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "requires_registration"
+                type: "boolean"
+                description: "Flag indicating if formal business registration required"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "display_order"
+                type: "smallint"
+                description: "Order for display in lists"
+                constraints:
+                  not_null: true
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this legal form is currently valid"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          # ===============================================================
+          # Tax-Specific Reference Data
+          # ===============================================================
+
+          - name: "ref_assessment_type"
+            display_name: "Assessment Type"
+            description: |
+              Types of tax assessments. Different assessment types trigger
+              different workflows and business rules.
+
+              Common types:
+              - Self-assessment (taxpayer calculates own liability)
+              - Administrative assessment (tax authority calculates)
+              - Estimated assessment (based on estimates when data unavailable)
+              - Revised assessment (correction of previous assessment)
+              - Best judgment assessment (when taxpayer doesn't file)
+              - Audit assessment (result of audit examination)
+              - Protective assessment (preserve statute of limitations)
+
+              SIGTAS Source: ASSESSMENT.ASSESSMENT_TYPE
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 20
+              annual_growth: 2
+              five_year: 28
+
+            data_classification: "internal"
+
+            columns:
+              - name: "assessment_type_id"
+                type: "bigint"
+                description: "Unique identifier for assessment type"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "assessment_type_code"
+                type: "varchar(20)"
+                description: "Short code for assessment type"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "assessment_type_name"
+                type: "varchar(100)"
+                description: "Full name of the assessment type"
+                constraints:
+                  not_null: true
+
+              - name: "assessment_category"
+                type: "varchar(50)"
+                description: "Category of assessment (original, supplemental, corrective)"
+                constraints:
+                  not_null: true
+
+              - name: "initiator"
+                type: "varchar(30)"
+                description: "Who initiates this assessment type (taxpayer, tax_authority)"
+                constraints:
+                  not_null: true
+                  check:
+                    condition: "initiator IN ('taxpayer', 'tax_authority', 'system')"
+
+              - name: "requires_supporting_documents"
+                type: "boolean"
+                description: "Flag indicating if supporting documents are required"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "allows_objection"
+                type: "boolean"
+                description: "Flag indicating if taxpayer can object to this assessment"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "generates_liability"
+                type: "boolean"
+                description: "Flag indicating if this assessment generates a tax liability"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "display_order"
+                type: "smallint"
+                description: "Order for display in lists"
+                constraints:
+                  not_null: true
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this assessment type is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_penalty_type"
+            display_name: "Penalty Type"
+            description: |
+              Types of penalties that can be applied for non-compliance.
+
+              Common types:
+              - Late filing penalty
+              - Late payment penalty
+              - Understatement penalty
+              - Fraud penalty
+              - Negligence penalty
+              - Information reporting penalty
+              - Failure to withhold penalty
+
+              SIGTAS Source: PENALTIES__INTERESTS
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 25
+              annual_growth: 2
+              five_year: 33
+
+            data_classification: "internal"
+
+            columns:
+              - name: "penalty_type_id"
+                type: "bigint"
+                description: "Unique identifier for penalty type"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "penalty_type_code"
+                type: "varchar(20)"
+                description: "Short code for penalty type"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "penalty_type_name"
+                type: "varchar(100)"
+                description: "Full name of the penalty type"
+                constraints:
+                  not_null: true
+
+              - name: "penalty_category"
+                type: "varchar(50)"
+                description: "Category of penalty (civil, criminal, administrative)"
+                constraints:
+                  not_null: true
+
+              - name: "calculation_method"
+                type: "varchar(50)"
+                description: "How penalty is calculated (fixed_amount, percentage, daily_rate)"
+                constraints:
+                  not_null: true
+
+              - name: "base_amount_type"
+                type: "varchar(50)"
+                description: "What the penalty is based on (tax_due, underpayment, days_late)"
+
+              - name: "can_be_waived"
+                type: "boolean"
+                description: "Flag indicating if this penalty can be waived"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "requires_approval"
+                type: "boolean"
+                description: "Flag indicating if penalty requires supervisory approval"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "severity_level"
+                type: "smallint"
+                description: "Severity level (1=low, 5=high)"
+                constraints:
+                  check:
+                    condition: "severity_level BETWEEN 1 AND 5"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this penalty type is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_interest_type"
+            display_name: "Interest Type"
+            description: |
+              Types of interest charges applied to unpaid tax liabilities.
+
+              Common types:
+              - Default interest (on unpaid taxes)
+              - Underpayment interest
+              - Overpayment interest (refund interest)
+              - Deferred payment interest
+              - Installment agreement interest
+
+              SIGTAS Source: PENALTIES__INTERESTS
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 10
+              annual_growth: 1
+              five_year: 14
+
+            data_classification: "internal"
+
+            columns:
+              - name: "interest_type_id"
+                type: "bigint"
+                description: "Unique identifier for interest type"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "interest_type_code"
+                type: "varchar(20)"
+                description: "Short code for interest type"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "interest_type_name"
+                type: "varchar(100)"
+                description: "Full name of the interest type"
+                constraints:
+                  not_null: true
+
+              - name: "interest_direction"
+                type: "varchar(20)"
+                description: "Direction of interest (receivable for taxpayer owes, payable for government owes)"
+                constraints:
+                  not_null: true
+                  check:
+                    condition: "interest_direction IN ('receivable', 'payable')"
+
+              - name: "calculation_method"
+                type: "varchar(50)"
+                description: "How interest is calculated (simple, compound, daily)"
+                constraints:
+                  not_null: true
+
+              - name: "accrual_frequency"
+                type: "varchar(20)"
+                description: "How often interest accrues (daily, monthly, quarterly)"
+
+              - name: "is_taxable"
+                type: "boolean"
+                description: "Flag indicating if interest paid is taxable income"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this interest type is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_license_type"
+            display_name: "Business License Type"
+            description: |
+              Types of business licenses and permits required for specific
+              business activities. Different licenses may have different tax
+              implications and compliance requirements.
+
+              Common types:
+              - General business license
+              - Alcohol sales license
+              - Tobacco sales license
+              - Professional license (doctor, lawyer, etc.)
+              - Excise license
+              - Import/export license
+
+              SIGTAS Source: LICENSE.LICENSE_TYPE
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 50
+              annual_growth: 5
+              five_year: 75
+
+            data_classification: "public"
+
+            columns:
+              - name: "license_type_id"
+                type: "bigint"
+                description: "Unique identifier for license type"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "license_type_code"
+                type: "varchar(20)"
+                description: "Short code for license type"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "license_type_name"
+                type: "varchar(100)"
+                description: "Full name of the license type"
+                constraints:
+                  not_null: true
+
+              - name: "license_category"
+                type: "varchar(50)"
+                description: "Category of license (business, professional, industry-specific)"
+
+              - name: "requires_renewal"
+                type: "boolean"
+                description: "Flag indicating if license requires periodic renewal"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "renewal_period_months"
+                type: "smallint"
+                description: "Number of months between renewals"
+
+              - name: "has_tax_implications"
+                type: "boolean"
+                description: "Flag indicating if license affects tax calculations"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "issuing_authority"
+                type: "varchar(100)"
+                description: "Government body that issues this license"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this license type is currently offered"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          # ===============================================================
+          # Payment & Banking
+          # ===============================================================
+
+          - name: "ref_payment_method"
+            display_name: "Payment Method"
+            description: |
+              Methods by which taxpayers can make payments.
+
+              Common methods:
+              - Bank transfer / Wire transfer
+              - Credit card
+              - Debit card
+              - Electronic funds transfer (EFT)
+              - Cash (at tax office or authorized agent)
+              - Check
+              - Mobile money / Digital wallet
+              - Online payment gateway
+
+              SIGTAS Source: CASHIERING (payment method fields)
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 20
+              annual_growth: 2
+              five_year: 28
+
+            data_classification: "public"
+
+            columns:
+              - name: "payment_method_id"
+                type: "bigint"
+                description: "Unique identifier for payment method"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "payment_method_code"
+                type: "varchar(20)"
+                description: "Short code for payment method"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "payment_method_name"
+                type: "varchar(100)"
+                description: "Full name of the payment method"
+                constraints:
+                  not_null: true
+
+              - name: "payment_category"
+                type: "varchar(30)"
+                description: "Category of payment (electronic, cash, check, card)"
+                constraints:
+                  not_null: true
+
+              - name: "is_electronic"
+                type: "boolean"
+                description: "Flag indicating if this is an electronic payment method"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "requires_bank_account"
+                type: "boolean"
+                description: "Flag indicating if bank account information is required"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "is_instant"
+                type: "boolean"
+                description: "Flag indicating if payment is processed instantly"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "clearing_days"
+                type: "smallint"
+                description: "Number of days for payment to clear"
+                default: "0"
+
+              - name: "has_transaction_fee"
+                type: "boolean"
+                description: "Flag indicating if method has associated fees"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "max_amount"
+                type: "decimal(19,2)"
+                description: "Maximum amount allowed per transaction (NULL for no limit)"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this payment method is currently available"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "display_order"
+                type: "smallint"
+                description: "Order for display in lists"
+                constraints:
+                  not_null: true
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_refund_reason"
+            display_name: "Refund Reason"
+            description: |
+              Reasons why a refund is being issued to a taxpayer.
+
+              Common reasons:
+              - Overpayment
+              - Error in assessment
+              - Audit adjustment
+              - Export rebate (e.g., VAT on exports)
+              - Tax credit exceeded liability
+              - Estimated payment exceeded actual
+              - Withholding exceeded final liability
+
+              SIGTAS Source: REFUND
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 15
+              annual_growth: 2
+              five_year: 23
+
+            data_classification: "internal"
+
+            columns:
+              - name: "refund_reason_id"
+                type: "bigint"
+                description: "Unique identifier for refund reason"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "refund_reason_code"
+                type: "varchar(20)"
+                description: "Short code for refund reason"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "refund_reason_name"
+                type: "varchar(100)"
+                description: "Full name of the refund reason"
+                constraints:
+                  not_null: true
+
+              - name: "requires_approval"
+                type: "boolean"
+                description: "Flag indicating if refund for this reason requires special approval"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "approval_level"
+                type: "varchar(30)"
+                description: "Level of approval required (supervisor, manager, director)"
+
+              - name: "risk_level"
+                type: "varchar(20)"
+                description: "Risk level for compliance (high, medium, low)"
+                constraints:
+                  check:
+                    condition: "risk_level IN ('high', 'medium', 'low')"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this refund reason is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          # ===============================================================
+          # Compliance & Control
+          # ===============================================================
+
+          - name: "ref_audit_type"
+            display_name: "Audit Type"
+            description: |
+              Types of audit examinations conducted by the tax authority.
+
+              Common types:
+              - Desk audit (office examination)
+              - Field audit (on-site at taxpayer premises)
+              - Correspondence audit (mail)
+              - Random audit (compliance verification)
+              - Targeted audit (risk-based selection)
+              - Industry audit (sector-wide)
+              - Transfer pricing audit
+              - VAT refund audit
+
+              SIGTAS Source: AUDIT
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 20
+              annual_growth: 2
+              five_year: 28
+
+            data_classification: "internal"
+
+            columns:
+              - name: "audit_type_id"
+                type: "bigint"
+                description: "Unique identifier for audit type"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "audit_type_code"
+                type: "varchar(20)"
+                description: "Short code for audit type"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "audit_type_name"
+                type: "varchar(100)"
+                description: "Full name of the audit type"
+                constraints:
+                  not_null: true
+
+              - name: "audit_category"
+                type: "varchar(50)"
+                description: "Category of audit (compliance, investigative, refund)"
+
+              - name: "scope"
+                type: "varchar(50)"
+                description: "Typical scope of audit (comprehensive, limited, specific_issue)"
+
+              - name: "typical_duration_days"
+                type: "smallint"
+                description: "Typical duration of this audit type in days"
+
+              - name: "requires_notification"
+                type: "boolean"
+                description: "Flag indicating if taxpayer must be notified in advance"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "notification_days"
+                type: "smallint"
+                description: "Number of days advance notification required"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this audit type is currently used"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_collection_action_type"
+            display_name: "Collection Action Type"
+            description: |
+              Types of enforcement actions taken to collect delinquent taxes.
+
+              Common actions:
+              - Reminder notice
+              - Final notice
+              - Payment demand
+              - Bank account levy
+              - Wage garnishment
+              - Asset seizure
+              - Property lien
+              - Third-party withholding order
+              - License suspension
+              - Travel restriction
+
+              SIGTAS Source: COLLECTION
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 25
+              annual_growth: 2
+              five_year: 33
+
+            data_classification: "internal"
+
+            columns:
+              - name: "collection_action_type_id"
+                type: "bigint"
+                description: "Unique identifier for collection action type"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "collection_action_code"
+                type: "varchar(20)"
+                description: "Short code for collection action type"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "collection_action_name"
+                type: "varchar(100)"
+                description: "Full name of the collection action type"
+                constraints:
+                  not_null: true
+
+              - name: "action_category"
+                type: "varchar(30)"
+                description: "Category of action (notice, administrative, legal)"
+                constraints:
+                  not_null: true
+
+              - name: "severity_level"
+                type: "smallint"
+                description: "Severity/escalation level (1=lowest, 10=highest)"
+                constraints:
+                  not_null: true
+                  check:
+                    condition: "severity_level BETWEEN 1 AND 10"
+
+              - name: "requires_approval"
+                type: "boolean"
+                description: "Flag indicating if action requires supervisory approval"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "approval_level"
+                type: "varchar(30)"
+                description: "Level of approval required (supervisor, manager, director, legal)"
+
+              - name: "is_reversible"
+                type: "boolean"
+                description: "Flag indicating if action can be reversed"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this action type is currently used"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_objection_reason"
+            display_name: "Objection/Appeal Reason"
+            description: |
+              Reasons why taxpayers object to or appeal tax assessments
+              or enforcement actions.
+
+              Common reasons:
+              - Factual error in assessment
+              - Misapplication of tax law
+              - Computational error
+              - Penalty incorrectly applied
+              - Interest incorrectly calculated
+              - Assessment issued beyond statute of limitations
+              - Procedural defect
+              - Discrimination or unfair treatment
+
+              SIGTAS Source: OBJECTION
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 30
+              annual_growth: 2
+              five_year: 38
+
+            data_classification: "internal"
+
+            columns:
+              - name: "objection_reason_id"
+                type: "bigint"
+                description: "Unique identifier for objection reason"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "objection_reason_code"
+                type: "varchar(20)"
+                description: "Short code for objection reason"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "objection_reason_name"
+                type: "varchar(100)"
+                description: "Full name of the objection reason"
+                constraints:
+                  not_null: true
+
+              - name: "reason_category"
+                type: "varchar(50)"
+                description: "Category of reason (substantive, procedural, computational)"
+
+              - name: "typical_outcome"
+                type: "varchar(50)"
+                description: "Most common outcome for this reason (sustained, overturned, modified)"
+
+              - name: "requires_evidence"
+                type: "boolean"
+                description: "Flag indicating if supporting evidence is typically required"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this objection reason is active"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          # ===============================================================
+          # Document Management
+          # ===============================================================
+
+          - name: "ref_document_type"
+            display_name: "Document Type"
+            description: |
+              Types of documents managed in the system. Covers both incoming
+              documents (from taxpayers) and outgoing documents (from tax authority).
+
+              Common types:
+              - Tax return / declaration
+              - Supporting financial statement
+              - Invoice / receipt
+              - Contract / agreement
+              - Power of attorney
+              - Assessment notice
+              - Collection notice
+              - Correspondence letter
+              - Audit report
+
+              SIGTAS Source: DOCUMENT.DOC_TYPE
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 100
+              annual_growth: 10
+              five_year: 150
+
+            data_classification: "public"
+
+            columns:
+              - name: "document_type_id"
+                type: "bigint"
+                description: "Unique identifier for document type"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "document_type_code"
+                type: "varchar(20)"
+                description: "Short code for document type"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "document_type_name"
+                type: "varchar(100)"
+                description: "Full name of the document type"
+                constraints:
+                  not_null: true
+
+              - name: "document_category"
+                type: "varchar(50)"
+                description: "Category of document (incoming, outgoing, internal)"
+                constraints:
+                  not_null: true
+
+              - name: "requires_signature"
+                type: "boolean"
+                description: "Flag indicating if document requires signature"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "retention_period_years"
+                type: "smallint"
+                description: "Number of years to retain this document type"
+
+              - name: "is_confidential"
+                type: "boolean"
+                description: "Flag indicating if document contains confidential information"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "allowed_file_formats"
+                type: "varchar(200)"
+                description: "Comma-separated list of allowed file formats (PDF, DOCX, etc.)"
+
+              - name: "max_file_size_mb"
+                type: "integer"
+                description: "Maximum file size in megabytes"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this document type is currently used"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_correspondence_type"
+            display_name: "Correspondence Type"
+            description: |
+              Types of correspondence (letters, notices, communications) sent
+              to taxpayers or received from taxpayers.
+
+              Common types:
+              - Registration confirmation
+              - Filing reminder
+              - Payment reminder
+              - Assessment notice
+              - Penalty notice
+              - Refund notification
+              - Audit notification
+              - Collection notice
+              - General correspondence
+
+              SIGTAS Source: FORMLETTER.LETTER_TYPE
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 50
+              annual_growth: 5
+              five_year: 75
+
+            data_classification: "internal"
+
+            columns:
+              - name: "correspondence_type_id"
+                type: "bigint"
+                description: "Unique identifier for correspondence type"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "correspondence_type_code"
+                type: "varchar(20)"
+                description: "Short code for correspondence type"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "correspondence_type_name"
+                type: "varchar(100)"
+                description: "Full name of the correspondence type"
+                constraints:
+                  not_null: true
+
+              - name: "correspondence_category"
+                type: "varchar(50)"
+                description: "Category (notice, reminder, information, legal)"
+
+              - name: "delivery_method"
+                type: "varchar(50)"
+                description: "Typical delivery method (mail, email, portal, sms)"
+
+              - name: "priority_level"
+                type: "varchar(20)"
+                description: "Priority level (normal, high, urgent)"
+                constraints:
+                  check:
+                    condition: "priority_level IN ('normal', 'high', 'urgent')"
+
+              - name: "requires_proof_of_delivery"
+                type: "boolean"
+                description: "Flag indicating if proof of delivery is required"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "has_legal_effect"
+                type: "boolean"
+                description: "Flag indicating if correspondence has legal effect (e.g., starts appeal period)"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this correspondence type is currently used"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          # ===============================================================
+          # System Configuration
+          # ===============================================================
+
+          - name: "ref_user_role"
+            display_name: "User Role"
+            description: |
+              User roles for system access control and task assignment.
+              Defines what functions and data each role can access.
+
+              Common roles:
+              - System Administrator
+              - Tax Officer
+              - Audit Officer
+              - Collection Officer
+              - Supervisor
+              - Manager
+              - Director
+              - Customer Service Representative
+              - Data Entry Clerk
+
+              SIGTAS Source: TASK_ROLE.ROLE
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 30
+              annual_growth: 3
+              five_year: 45
+
+            data_classification: "internal"
+
+            columns:
+              - name: "user_role_id"
+                type: "bigint"
+                description: "Unique identifier for user role"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "role_code"
+                type: "varchar(20)"
+                description: "Short code for user role"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "role_name"
+                type: "varchar(100)"
+                description: "Full name of the user role"
+                constraints:
+                  not_null: true
+
+              - name: "role_category"
+                type: "varchar(50)"
+                description: "Category of role (administrative, operational, supervisory, executive)"
+
+              - name: "access_level"
+                type: "smallint"
+                description: "Hierarchical access level (1=lowest, 10=highest)"
+                constraints:
+                  check:
+                    condition: "access_level BETWEEN 1 AND 10"
+
+              - name: "can_approve"
+                type: "boolean"
+                description: "Flag indicating if role has approval authority"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "can_modify_others_work"
+                type: "boolean"
+                description: "Flag indicating if role can modify work done by others"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this role is currently assigned"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          - name: "ref_service_channel"
+            display_name: "Service Channel"
+            description: |
+              Channels through which taxpayers interact with the tax authority.
+              Used for tracking service delivery and channel analytics.
+
+              Common channels:
+              - Web portal
+              - Mobile app
+              - Phone/call center
+              - Email
+              - Walk-in tax office
+              - Authorized agent
+              - Postal mail
+              - SMS
+              - Social media
+
+              Source: Tax Capabilities Document (Service Management)
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 15
+              annual_growth: 2
+              five_year: 23
+
+            data_classification: "public"
+
+            columns:
+              - name: "service_channel_id"
+                type: "bigint"
+                description: "Unique identifier for service channel"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "channel_code"
+                type: "varchar(20)"
+                description: "Short code for service channel"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "channel_name"
+                type: "varchar(100)"
+                description: "Full name of the service channel"
+                constraints:
+                  not_null: true
+
+              - name: "channel_type"
+                type: "varchar(30)"
+                description: "Type of channel (digital, physical, hybrid)"
+                constraints:
+                  not_null: true
+                  check:
+                    condition: "channel_type IN ('digital', 'physical', 'hybrid')"
+
+              - name: "requires_authentication"
+                type: "boolean"
+                description: "Flag indicating if channel requires user authentication"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "supports_transactions"
+                type: "boolean"
+                description: "Flag indicating if channel supports transaction processing"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "is_active"
+                type: "boolean"
+                description: "Flag indicating if this channel is currently operational"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "display_order"
+                type: "smallint"
+                description: "Order for display in lists"
+                constraints:
+                  not_null: true
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+          # ===============================================================
+          # System Parameters (SIGTAS_RULES)
+          # ===============================================================
+
+          - name: "system_parameter"
+            display_name: "System Parameter / Configuration"
+            description: |
+              System-wide configuration parameters and constants used
+              throughout the tax administration system. These are typically
+              set at system initialization and rarely changed.
+
+              Examples:
+              - Default currency
+              - Penalty interest rate
+              - Late filing grace period (days)
+              - Statute of limitations period (years)
+              - Minimum payment amount
+              - Document retention period
+              - Email notification settings
+
+              SIGTAS Source: SIGTAS_RULES.SIGTAS_RULES
+
+            type: "reference"
+
+            estimated_rows:
+              initial: 200
+              annual_growth: 10
+              five_year: 250
+
+            data_classification: "internal"
+
+            columns:
+              - name: "parameter_id"
+                type: "bigint"
+                description: "Unique identifier for system parameter"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+
+              - name: "parameter_code"
+                type: "varchar(50)"
+                description: "Unique code for the parameter (e.g., 'DEFAULT_CURRENCY', 'PENALTY_RATE')"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "parameter_name"
+                type: "varchar(100)"
+                description: "Human-readable name of the parameter"
+                constraints:
+                  not_null: true
+
+              - name: "parameter_category"
+                type: "varchar(50)"
+                description: "Category of parameter (general, financial, compliance, workflow)"
+
+              - name: "data_type"
+                type: "varchar(20)"
+                description: "Data type of parameter value (string, integer, decimal, boolean, date)"
+                constraints:
+                  not_null: true
+                  check:
+                    condition: "data_type IN ('string', 'integer', 'decimal', 'boolean', 'date', 'json')"
+
+              - name: "parameter_value"
+                type: "text"
+                description: "Current value of the parameter (stored as text, cast to data_type)"
+                constraints:
+                  not_null: true
+
+              - name: "default_value"
+                type: "text"
+                description: "Default value if parameter is reset"
+
+              - name: "description"
+                type: "text"
+                description: "Detailed description of what this parameter controls"
+
+              - name: "is_editable"
+                type: "boolean"
+                description: "Flag indicating if parameter can be changed by administrators"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "requires_restart"
+                type: "boolean"
+                description: "Flag indicating if system restart is required after change"
+                constraints:
+                  not_null: true
+                default: "false"
+
+              - name: "valid_from"
+                type: "timestamp with time zone"
+                description: "When this parameter value became effective"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "valid_to"
+                type: "timestamp with time zone"
+                description: "When this parameter value expires"
+
+              - name: "is_current"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                constraints:
+                  not_null: true
+                default: "true"
+
+              - name: "created_by"
+                type: "varchar(100)"
+                description: "User who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                description: "User who last modified this record"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_system_parameter_code"
+                columns: ["parameter_code"]
+                type: "btree"
+
+              - name: "idx_system_parameter_category"
+                columns: ["parameter_category"]
+                type: "btree"
+
+              - name: "idx_system_parameter_valid_from"
+                columns: ["valid_from"]
+                type: "btree"
+
+              - name: "idx_system_parameter_is_current"
+                columns: ["is_current"]
+                type: "btree"
+                condition: "is_current = true"
+
+# =============================================================================
+# Business Rules
+# =============================================================================
+
+business_rules:
+  - id: "BR-RD-001"
+    domain: "reference_data"
+    name: "Unique ISO Country Codes"
+    description: |
+      ISO alpha-2, alpha-3, and numeric codes must be unique across all
+      current country records. Historical records (is_current=false) may
+      have duplicate codes for countries that changed.
+    severity: "CRITICAL"
+    type: "constraint"
+    affected_tables:
+      - "ref_country"
+    enforcement: "database"
+    validation_query: |
+      SELECT iso_alpha_2, COUNT(*)
+      FROM reference.ref_country
+      WHERE is_current = true
+      GROUP BY iso_alpha_2
+      HAVING COUNT(*) > 1;
+
+  - id: "BR-RD-002"
+    domain: "reference_data"
+    name: "Reference Code Immutability"
+    description: |
+      Once a reference code is created and used in transactions, it cannot
+      be changed. To make changes, mark the existing code as inactive and
+      create a new version with a different code.
+    severity: "HIGH"
+    type: "constraint"
+    enforcement: "application"
+
+  - id: "BR-RD-003"
+    domain: "reference_data"
+    name: "Geographic Hierarchy Consistency"
+    description: |
+      The geographic hierarchy must be consistent: locality must belong to
+      district, district must belong to region, region must belong to country.
+      Circular references are not allowed.
+    severity: "CRITICAL"
+    type: "validation"
+    affected_tables:
+      - "ref_region"
+      - "ref_district"
+      - "ref_locality"
+    enforcement: "database"
+
+  - id: "BR-RD-004"
+    domain: "reference_data"
+    name: "Active Reference Data Requirement"
+    description: |
+      Reference data used in active transactions must have is_active = true.
+      Before deactivating a reference code, ensure it is not used in any
+      active records.
+    severity: "HIGH"
+    type: "validation"
+    enforcement: "application"
+
+  - id: "BR-RD-005"
+    domain: "reference_data"
+    name: "Industry Classification Hierarchy"
+    description: |
+      Industry codes must follow a valid hierarchical structure based on
+      ISIC or national standards. A class-level code (4-digit) must have
+      valid parent group (3-digit), division (2-digit), and section codes.
+    severity: "HIGH"
+    type: "validation"
+    affected_tables:
+      - "ref_industry"
+    enforcement: "application"
+
+  - id: "BR-RD-006"
+    domain: "reference_data"
+    name: "ISO Currency Standard Compliance"
+    description: |
+      Currency codes must comply with ISO 4217 standard. Custom or non-ISO
+      currencies should be clearly marked and justified.
+    severity: "HIGH"
+    type: "validation"
+    affected_tables:
+      - "ref_currency"
+    enforcement: "application"
+
+  - id: "BR-RD-007"
+    domain: "reference_data"
+    name: "Single Default Language"
+    description: |
+      Only one language can be marked as the system default (is_default=true).
+      At least one language must be marked as default.
+    severity: "CRITICAL"
+    type: "constraint"
+    affected_tables:
+      - "ref_language"
+    enforcement: "database"
+
+  - id: "BR-RD-008"
+    domain: "reference_data"
+    name: "Parameter Value Type Validation"
+    description: |
+      System parameter values must be valid for their declared data_type.
+      String values for integer/decimal types should be numeric, boolean
+      values should be 'true'/'false', etc.
+    severity: "CRITICAL"
+    type: "validation"
+    affected_tables:
+      - "system_parameter"
+    enforcement: "application"
+
+# =============================================================================
+# Data Quality Rules
+# =============================================================================
+
+data_quality_rules:
+  - id: "DQ-RD-001"
+    name: "Reference Code Naming Convention"
+    description: "All reference table codes should follow consistent naming: uppercase, alphanumeric, underscores allowed"
+    severity: "MEDIUM"
+    check_query: |
+      SELECT 'ref_country' as table_name, iso_alpha_2 as code
+      FROM reference.ref_country
+      WHERE iso_alpha_2 !~ '^[A-Z0-9_]+$';
+    remediation: "Update codes to follow naming convention"
+
+  - id: "DQ-RD-002"
+    name: "Orphaned Reference Records"
+    description: "Reference records with foreign keys to non-existent parents"
+    severity: "HIGH"
+    check_query: |
+      SELECT 'ref_district' as table_name, district_id
+      FROM reference.ref_district d
+      WHERE NOT EXISTS (
+        SELECT 1 FROM reference.ref_region r
+        WHERE r.region_id = d.region_id
+      );
+    remediation: "Fix or remove orphaned records"
+
+  - id: "DQ-RD-003"
+    name: "Duplicate Reference Names"
+    description: "Multiple active reference records with the same name in the same category"
+    severity: "MEDIUM"
+    affected_tables:
+      - "ref_industry"
+      - "ref_occupation"
+    remediation: "Review and consolidate duplicates"
+
+  - id: "DQ-RD-004"
+    name: "Missing Translations"
+    description: "Reference data that should have translations but doesn't"
+    severity: "LOW"
+    remediation: "Add missing translations for supported languages"
+
+  - id: "DQ-RD-005"
+    name: "Inactive Reference Data Usage"
+    description: "Active transactional records referencing inactive reference data"
+    severity: "HIGH"
+    remediation: "Reactivate reference data or update transactions"
+
+# =============================================================================
+# Version History
+# =============================================================================
+
+version_history:
+  - version: "1.0.0"
+    date: "2025-11-04"
+    author: "Claude (Senior Data Architect)"
+    changes:
+      - "Initial reference data domain definition"
+      - "60+ reference tables from SIGTAS_DICTIONARY analysis"
+      - "ISO standard implementation (countries, currencies, languages)"
+      - "Geographic hierarchy (country, region, district, locality)"
+      - "Personal demographics (gender, marital status, education, occupation)"
+      - "Business classifications (industry, legal form)"
+      - "Identification document types"
+      - "Tax-specific codes (assessment types, penalties, interest)"
+      - "License types for business activities"
+      - "Payment methods and refund reasons"
+      - "Compliance codes (audit types, collection actions, objection reasons)"
+      - "Document and correspondence types"
+      - "Service channels and user roles"
+      - "System parameters and configuration"
+      - "Business rules and data quality rules"
+      - "Comprehensive indexing for performance"
+      - "Temporal validity support for code changes"

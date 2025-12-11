@@ -1,0 +1,904 @@
+# =============================================================================
+# Tax Administration Reference Data Model - Example Implementation
+# Party Management Domain
+# =============================================================================
+#
+# This file demonstrates how to use the TA-RDM schema to document
+# the Party Management domain.
+#
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    Generic, country-agnostic reference data model for tax administration
+    operational (OLTP) systems. This model supports all core tax administration
+    capabilities as defined in the tax-capabilities specification.
+
+    The model is designed to be:
+    - Country-agnostic (configurable for any jurisdiction)
+    - GovStack-aligned (compatible with GovStack BBs)
+    - Scalable (supports small to large tax administrations)
+    - GDPR-compliant (with proper data protection controls)
+    - Integration-ready (designed for modern API-based integration)
+
+  authors:
+    - "Aare Keeman"
+    - "Moldova SRS Technical Team"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Registration BB"
+    - "Payments BB"
+    - "Workflow BB"
+    - "Messaging BB"
+    - "Information Mediator BB"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+    soft_delete:
+      enabled: false
+      note: "Tax data typically cannot be deleted due to legal requirements"
+
+    internationalization:
+      enabled: true
+      default_language: "en"
+      supported_languages: ["en", "ru", "ro"]
+
+  changelog:
+    - version: "1.0.0"
+      date: "2025-11-04"
+      author: "Aare Keeman"
+      changes:
+        - "Initial model creation"
+        - "Party Management domain complete"
+        - "Integration with TCRM-BB defined"
+
+# =============================================================================
+# DOMAINS
+# =============================================================================
+
+domains:
+  # ---------------------------------------------------------------------------
+  # Party Management Domain
+  # ---------------------------------------------------------------------------
+  - name: "party_management"
+    code: "PM"
+    display_name: "Party Management"
+    description: |
+      Core domain managing all parties (individuals and enterprises) that interact
+      with the tax administration. Implements a flexible party model supporting:
+      - Individual taxpayers (natural persons)
+      - Business taxpayers (legal entities)
+      - Government entities
+      - Representatives and agents
+      - Complex ownership structures
+      - Employment relationships
+      - Family relationships
+
+      This domain serves as the foundation for the Registration domain.
+
+    business_owner: "Registration Department"
+    technical_owner: "Core Systems Team"
+
+    dependencies:
+      - "reference_data"
+
+    tags:
+      - "core"
+      - "master_data"
+      - "gdpr_critical"
+
+    domain_events:
+      - event_name: "PartyCreated"
+        description: "Emitted when a new party is registered"
+        payload_schema: |
+          {
+            "party_id": "bigint",
+            "party_type": "string",
+            "party_name": "string",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "PartyUpdated"
+        description: "Emitted when party information is modified"
+        payload_schema: |
+          {
+            "party_id": "bigint",
+            "changed_fields": ["array"],
+            "timestamp": "datetime"
+          }
+
+      - event_name: "PartyStatusChanged"
+        description: "Emitted when party status changes"
+        payload_schema: |
+          {
+            "party_id": "bigint",
+            "old_status": "string",
+            "new_status": "string",
+            "reason": "string",
+            "timestamp": "datetime"
+          }
+
+    schemas:
+      # ---------------------------------------------------------------------
+      # Party Schema
+      # ---------------------------------------------------------------------
+      - schema_name: "party"
+        description: |
+          Contains all party-related tables including individuals, enterprises,
+          addresses, and relationships.
+
+        owner_role: "party_owner"
+
+        access_roles:
+          - role_name: "registration_officer"
+            permissions: ["SELECT", "INSERT", "UPDATE"]
+
+          - role_name: "taxpayer_service"
+            permissions: ["SELECT"]
+
+          - role_name: "audit_viewer"
+            permissions: ["SELECT"]
+
+        tables:
+          # ---------------------------------------------------------------
+          # Party (Supertype)
+          # ---------------------------------------------------------------
+          - name: "party"
+            display_name: "Party"
+            description: |
+              Supertype entity representing any party that can interact with
+              the tax administration. Uses single-table inheritance with
+              party_type_code as discriminator.
+
+              Key design decisions:
+              - Uses surrogate key (party_id) for performance
+              - Includes UUID for external integration
+              - Supports temporal queries (valid_from/valid_to)
+              - Maintains current flag for easy querying
+              - Full audit trail for compliance
+
+            aspects:
+              - auditable
+              - temporal
+
+            business_rule: |
+              1. Every party must have exactly one current (is_current=true) record
+              2. Historical records must have valid_to populated
+              3. Party cannot be physically deleted (legal requirement)
+              4. Status transitions must follow defined workflow
+              5. party_name must be searchable (full-text index)
+
+            type: "master"
+
+            tags:
+              - "core"
+              - "master_data"
+              - "gdpr_sensitive"
+              - "high_volume"
+
+            estimated_rows:
+              initial: 500000
+              annual_growth: 50000
+              five_year: 750000
+
+            columns:
+              - name: "party_id"
+                display_name: "Party ID"
+                type: "bigint"
+                description: "Unique identifier for the party"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "party_uuid"
+                display_name: "Party UUID"
+                type: "uuid"
+                description: |
+                  Globally unique identifier for external integration.
+                  Used for API references and cross-system correlation.
+                constraints:
+                  unique: true
+                  not_null: true
+                  default: "gen_random_uuid()"
+                indexing:
+                  - type: "btree"
+                    name: "idx_party_uuid"
+                    unique: true
+
+              - name: "party_type_code"
+                display_name: "Party Type"
+                type: "varchar(20)"
+                description: "Discriminator for party subtype"
+                business_name: "Type of Party"
+                constraints:
+                  not_null: true
+                  check: "party_type_code IN ('INDIVIDUAL', 'ENTERPRISE', 'GOVERNMENT')"
+                reference_data: "ref_party_type"
+                examples:
+                  - "INDIVIDUAL"
+                  - "ENTERPRISE"
+                  - "GOVERNMENT"
+                indexing:
+                  - type: "btree"
+                    name: "idx_party_type"
+
+              - name: "party_status_code"
+                display_name: "Party Status"
+                type: "varchar(20)"
+                description: "Current operational status of the party"
+                business_rule: |
+                  Status transitions:
+                  - NULL -> ACTIVE (initial registration)
+                  - ACTIVE -> INACTIVE (temporary suspension)
+                  - ACTIVE -> SUSPENDED (administrative action)
+                  - INACTIVE -> ACTIVE (reactivation)
+                  - ACTIVE/INACTIVE/SUSPENDED -> DECEASED (individuals only)
+                  - ACTIVE/INACTIVE/SUSPENDED -> DISSOLVED (enterprises only)
+                constraints:
+                  not_null: true
+                  default: "'ACTIVE'"
+                reference_data: "ref_party_status"
+                examples:
+                  - "ACTIVE"
+                  - "INACTIVE"
+                  - "SUSPENDED"
+                  - "DECEASED"
+                  - "DISSOLVED"
+
+              - name: "party_name"
+                display_name: "Party Name"
+                type: "varchar(500)"
+                description: "Full name or business name of the party"
+                business_name: "Name"
+                usage_note: |
+                  For individuals: "{last_name}, {first_name} {middle_name}"
+                  For enterprises: Official registered business name
+                constraints:
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_party_name"
+                  - type: "gin"
+                    name: "idx_party_name_fts"
+                    expression: "to_tsvector('english', party_name)"
+                    description: "Full-text search index for name lookups"
+
+              - name: "party_short_name"
+                display_name: "Short Name"
+                type: "varchar(100)"
+                description: "Abbreviated name for display purposes"
+                usage_note: "Used in reports and UI where space is limited"
+
+              - name: "valid_from"
+                display_name: "Valid From"
+                type: "date"
+                description: "Date from which this record version is valid"
+                business_rule: "Cannot be in the future"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_DATE"
+                  check: "valid_from <= CURRENT_DATE"
+
+              - name: "valid_to"
+                display_name: "Valid To"
+                type: "date"
+                description: |
+                  Date until which this record version is valid.
+                  NULL indicates current/active record.
+                business_rule: "Must be greater than valid_from if populated"
+                constraints:
+                  check: "valid_to IS NULL OR valid_to >= valid_from"
+
+              - name: "is_current"
+                display_name: "Is Current"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                business_rule: "Only one record per party_id can have is_current=true"
+                constraints:
+                  not_null: true
+                  default: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_party_is_current"
+                    where: "is_current = true"
+                    description: "Partial index for current records only"
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified this record"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_party_type_status"
+                columns: ["party_type_code", "party_status_code"]
+                type: "btree"
+                description: "Composite index for filtering by type and status"
+                performance_note: "Used by most party listing queries"
+
+              - name: "idx_party_valid_period"
+                columns: ["valid_from", "valid_to"]
+                type: "btree"
+                description: "Support temporal queries"
+                performance_note: "Critical for point-in-time queries"
+
+              - name: "idx_party_created_date"
+                columns: ["created_date"]
+                type: "brin"
+                description: "Block range index for time-series queries"
+                performance_note: "Efficient for large table scans by date range"
+
+            constraints:
+              - name: "chk_party_temporal_consistency"
+                type: "check"
+                condition: "(is_current = true AND valid_to IS NULL) OR (is_current = false AND valid_to IS NOT NULL)"
+                description: "Ensure current records have no end date"
+
+              - name: "uk_party_uuid"
+                type: "unique"
+                columns: ["party_uuid"]
+                description: "Ensure UUID uniqueness"
+
+              - name: "uk_party_current_version"
+                type: "unique"
+                columns: ["party_id", "is_current"]
+                where: "is_current = true"
+                description: "Ensure only one current version per party"
+
+            partitioning:
+              type: "range"
+              column: "created_date"
+              strategy: "yearly"
+              retention: "permanent"
+              note: "Partition by year for manageability, never delete"
+
+            triggers:
+              - name: "trg_party_version_history"
+                timing: "BEFORE"
+                events: ["UPDATE"]
+                for_each: "ROW"
+                condition: "OLD.is_current = true"
+                function: "fn_create_party_version()"
+                description: "Automatically create historical version when updating current record"
+
+              - name: "trg_party_audit"
+                timing: "AFTER"
+                events: ["INSERT", "UPDATE", "DELETE"]
+                for_each: "ROW"
+                function: "fn_audit_log()"
+                description: "Log all changes to audit table"
+
+            row_level_security:
+              enabled: true
+              policy: |
+                -- Users can only see parties they have access to
+                USING (
+                  party_id IN (
+                    SELECT party_id
+                    FROM user_party_access
+                    WHERE user_id = current_setting('app.current_user_id')::bigint
+                  )
+                  OR
+                  current_setting('app.user_role') IN ('ADMIN', 'SUPERVISOR')
+                )
+
+            relationships:
+              - type: "one_to_one"
+                target_table: "individual"
+                source_column: "party_id"
+                target_column: "party_id"
+                cardinality: "1:0..1"
+                description: "A party may be an individual"
+
+              - type: "one_to_one"
+                target_table: "enterprise"
+                source_column: "party_id"
+                target_column: "party_id"
+                cardinality: "1:0..1"
+                description: "A party may be an enterprise"
+
+              - type: "one_to_many"
+                target_table: "party_address"
+                source_column: "party_id"
+                target_column: "party_id"
+                cardinality: "1:N"
+                description: "A party can have multiple addresses"
+
+              - type: "one_to_many"
+                target_table: "party_contact"
+                source_column: "party_id"
+                target_column: "party_id"
+                cardinality: "1:N"
+                description: "A party can have multiple contact methods"
+
+            documentation:
+              examples:
+                - description: "Get all active parties"
+                  query: |
+                    SELECT *
+                    FROM party.party
+                    WHERE is_current = true
+                      AND party_status_code = 'ACTIVE';
+
+                - description: "Point-in-time query (party state on specific date)"
+                  query: |
+                    SELECT *
+                    FROM party.party
+                    WHERE party_id = 12345
+                      AND valid_from <= '2024-01-01'
+                      AND (valid_to IS NULL OR valid_to > '2024-01-01');
+
+                - description: "Full-text search for parties"
+                  query: |
+                    SELECT *
+                    FROM party.party
+                    WHERE to_tsvector('english', party_name) @@ to_tsquery('english', 'Smith');
+
+          # ---------------------------------------------------------------
+          # Individual (Subtype of Party)
+          # ---------------------------------------------------------------
+          - name: "individual"
+            display_name: "Individual"
+            description: |
+              Natural person entity with specific attributes for individuals.
+              Extends the party entity with person-specific information.
+
+            business_rule: |
+              1. Must have valid birth date (not in future, reasonable past)
+              2. TIN must follow country-specific format and checksum
+              3. Cannot have deceased_date without party status = DECEASED
+              4. All PII must be encrypted at rest
+              5. Age must be >= 18 for tax registration (configurable)
+
+            type: "master"
+
+            tags:
+              - "pii_data"
+              - "gdpr_critical"
+              - "encrypted"
+
+            columns:
+              - name: "individual_id"
+                type: "bigint"
+                description: "Primary key, references party.party_id"
+                constraints:
+                  primary_key: true
+                  not_null: true
+
+              - name: "party_id"
+                type: "bigint"
+                description: "Foreign key to parent party record"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "party"
+                    column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "tax_identification_number"
+                display_name: "TIN"
+                type: "varchar(50)"
+                description: "Tax Identification Number (TIN) for this individual"
+                business_name: "Tax ID"
+                business_rule: |
+                  - Must be unique across all individuals
+                  - Format validated by country-specific rules
+                  - Checksum validated (e.g., mod11)
+                  - Cannot be changed once assigned
+                constraints:
+                  unique: true
+                  not_null: true
+                validation:
+                  pattern: "^[0-9]{13}$"
+                  checksum: "mod11"
+                  description: "Moldova format: 13 digits with mod11 checksum"
+                security:
+                  classification: "confidential"
+                  encryption: "AES-256"
+                  masking:
+                    enabled: true
+                    method: "partial"
+                    preserve_format: true
+                  pii: true
+                  gdpr_relevant: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_individual_tin"
+                    unique: true
+
+              - name: "first_name"
+                display_name: "First Name"
+                type: "varchar(100)"
+                description: "First/given name"
+                constraints:
+                  not_null: true
+                security:
+                  classification: "confidential"
+                  encryption: "AES-256"
+                  pii: true
+                  gdpr_relevant: true
+
+              - name: "last_name"
+                display_name: "Last Name"
+                type: "varchar(100)"
+                description: "Last/family name"
+                constraints:
+                  not_null: true
+                security:
+                  classification: "confidential"
+                  encryption: "AES-256"
+                  pii: true
+                  gdpr_relevant: true
+
+              - name: "middle_name"
+                display_name: "Middle Name"
+                type: "varchar(100)"
+                description: "Middle name(s) or patronymic"
+                usage_note: "Common in Eastern European naming conventions"
+                security:
+                  classification: "confidential"
+                  encryption: "AES-256"
+                  pii: true
+
+              - name: "birth_date"
+                display_name: "Date of Birth"
+                type: "date"
+                description: "Date of birth"
+                business_rule: |
+                  - Must be at least 18 years before registration
+                  - Cannot be more than 120 years in the past
+                  - Used for age verification and lifecycle management
+                constraints:
+                  not_null: true
+                  check: "birth_date BETWEEN CURRENT_DATE - INTERVAL '120 years' AND CURRENT_DATE - INTERVAL '18 years'"
+                security:
+                  classification: "confidential"
+                  pii: true
+                  gdpr_relevant: true
+                  masking:
+                    enabled: true
+                    method: "partial"
+                    note: "Show only year in non-production"
+
+              - name: "gender_code"
+                display_name: "Gender"
+                type: "varchar(10)"
+                description: "Gender classification"
+                usage_note: "Only stored if legally required for tax administration"
+                reference_data: "ref_gender"
+                examples: ["M", "F", "X"]
+                security:
+                  classification: "confidential"
+                  pii: true
+
+              - name: "deceased_date"
+                display_name: "Date of Death"
+                type: "date"
+                description: "Date of death, if applicable"
+                business_rule: |
+                  - Triggers estate tax processing
+                  - Triggers account closure workflow
+                  - Must result in party status = DECEASED
+                constraints:
+                  check: "deceased_date IS NULL OR deceased_date >= birth_date"
+
+              - name: "citizenship_country_code"
+                display_name: "Citizenship"
+                type: "char(3)"
+                description: "ISO 3166-1 alpha-3 country code of citizenship"
+                reference_data: "ref_country"
+                examples: ["MDA", "ROU", "USA"]
+
+              - name: "resident_flag"
+                display_name: "Tax Resident"
+                type: "boolean"
+                description: "Tax residence status flag"
+                business_rule: |
+                  Determines tax obligations:
+                  - Residents: taxed on worldwide income
+                  - Non-residents: taxed only on domestic income
+                constraints:
+                  not_null: true
+                  default: true
+
+              - name: "marital_status_code"
+                display_name: "Marital Status"
+                type: "varchar(20)"
+                description: "Marital status (if relevant for tax purposes)"
+                reference_data: "ref_marital_status"
+                examples: ["SINGLE", "MARRIED", "DIVORCED", "WIDOWED"]
+
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+
+            constraints:
+              - name: "chk_individual_deceased_consistency"
+                type: "check"
+                condition: "(deceased_date IS NULL) OR (deceased_date IS NOT NULL AND deceased_date >= birth_date)"
+                description: "Death date must be after birth date"
+
+            relationships:
+              - type: "one_to_one"
+                target_table: "party"
+                source_column: "party_id"
+                target_column: "party_id"
+                cardinality: "1:1"
+                description: "Each individual is a party"
+                referential_integrity: "enforced"
+
+              - type: "one_to_many"
+                target_table: "employment"
+                source_column: "individual_id"
+                target_column: "employee_id"
+                cardinality: "1:N"
+                description: "Individual can have multiple employment records"
+
+              - type: "many_to_many"
+                target_table: "enterprise"
+                via_table: "party_relationship"
+                cardinality: "N:M"
+                description: "Individual can own/control multiple enterprises"
+
+# ... Continue with other tables (enterprise, party_relationship, etc.)
+
+# =============================================================================
+# REFERENCE DATA
+# =============================================================================
+
+reference_data:
+  - name: "ref_party_type"
+    description: "Valid party types in the system"
+    type: "static"
+    schema: "reference"
+    columns:
+      - name: "code"
+        type: "varchar(20)"
+        primary_key: true
+        description: "Party type code"
+      - name: "description"
+        type: "varchar(200)"
+        description: "Human-readable description"
+      - name: "sort_order"
+        type: "integer"
+        description: "Display order"
+    data:
+      - {code: "INDIVIDUAL", description: "Natural person", sort_order: 1}
+      - {code: "ENTERPRISE", description: "Business entity / Legal person", sort_order: 2}
+      - {code: "GOVERNMENT", description: "Government entity", sort_order: 3}
+
+  - name: "ref_party_status"
+    description: "Valid party status values"
+    type: "configurable"
+    schema: "reference"
+    columns:
+      - name: "code"
+        type: "varchar(20)"
+        primary_key: true
+      - name: "description"
+        type: "varchar(200)"
+      - name: "is_active"
+        type: "boolean"
+        description: "Whether this status is considered active"
+      - name: "sort_order"
+        type: "integer"
+    data:
+      - {code: "ACTIVE", description: "Active and operational", is_active: true, sort_order: 1}
+      - {code: "INACTIVE", description: "Inactive but can be reactivated", is_active: false, sort_order: 2}
+      - {code: "SUSPENDED", description: "Temporarily suspended by authority", is_active: false, sort_order: 3}
+      - {code: "DECEASED", description: "Individual deceased", is_active: false, sort_order: 4}
+      - {code: "DISSOLVED", description: "Enterprise dissolved", is_active: false, sort_order: 5}
+
+# =============================================================================
+# BUSINESS RULES
+# =============================================================================
+
+business_rules:
+  - id: "BR-PM-001"
+    domain: "party_management"
+    name: "Party Unique Current Version"
+    description: |
+      Every party must have exactly one current (is_current=true) version
+      at any point in time. This ensures data consistency for temporal queries.
+    severity: "CRITICAL"
+    type: "constraint"
+    affected_tables:
+      - "party"
+    validation_query: |
+      -- Find parties with multiple current versions
+      SELECT party_id, COUNT(*) as current_count
+      FROM party.party
+      WHERE is_current = true
+      GROUP BY party_id
+      HAVING COUNT(*) > 1;
+    enforcement: "database"
+    remediation: "Correct historical data by setting is_current=false for old versions"
+
+  - id: "BR-PM-002"
+    domain: "party_management"
+    name: "Individual Age Requirement"
+    description: |
+      Individuals must be at least 18 years old at the time of tax registration.
+      This is a configurable threshold that may vary by jurisdiction.
+    severity: "HIGH"
+    type: "validation"
+    affected_tables:
+      - "individual"
+    validation_query: |
+      -- Find individuals registered before age 18
+      SELECT individual_id, birth_date, created_date,
+             EXTRACT(YEAR FROM AGE(created_date, birth_date)) as age_at_registration
+      FROM party.individual
+      WHERE EXTRACT(YEAR FROM AGE(created_date, birth_date)) < 18;
+    enforcement: "application"
+    remediation: "Review and correct registration date or birth date"
+
+  - id: "BR-PM-003"
+    domain: "party_management"
+    name: "TIN Uniqueness"
+    description: |
+      Tax Identification Number (TIN) must be globally unique across all
+      parties (both individuals and enterprises). No two parties can have
+      the same TIN.
+    severity: "CRITICAL"
+    type: "constraint"
+    affected_tables:
+      - "individual"
+      - "enterprise"
+    validation_query: |
+      -- Find duplicate TINs
+      SELECT tin, COUNT(*) as occurrences
+      FROM (
+        SELECT tax_identification_number as tin FROM party.individual
+        UNION ALL
+        SELECT tax_identification_number as tin FROM party.enterprise
+      ) all_tins
+      GROUP BY tin
+      HAVING COUNT(*) > 1;
+    enforcement: "database"
+    remediation: "Investigate and reassign TINs to ensure uniqueness"
+
+# =============================================================================
+# DATA QUALITY RULES
+# =============================================================================
+
+data_quality_rules:
+  - id: "DQ-PM-001"
+    table: "party"
+    column: "party_name"
+    dimension: "completeness"
+    checks:
+      - type: "not_null"
+        threshold: 100
+        severity: "CRITICAL"
+        description: "Party name must always be populated"
+
+    monitoring:
+      frequency: "daily"
+      alert_threshold: 99.9
+      notification:
+        - "data-quality-team@example.com"
+
+  - id: "DQ-PM-002"
+    table: "individual"
+    column: "tax_identification_number"
+    dimension: "validity"
+    checks:
+      - type: "format"
+        pattern: "^[0-9]{13}$"
+        threshold: 100
+        severity: "CRITICAL"
+        description: "TIN must match country format"
+
+      - type: "unique"
+        threshold: 100
+        severity: "CRITICAL"
+        description: "TIN must be unique"
+
+    monitoring:
+      frequency: "real_time"
+      alert_threshold: 100
+      notification:
+        - "registration-team@example.com"
+        - "data-quality-team@example.com"
+
+# =============================================================================
+# INTEGRATIONS
+# =============================================================================
+
+integrations:
+  - name: "population_registry_sync"
+    description: "Synchronize individual data with national population registry"
+    external_system: "National Population Registry"
+    tables:
+      - "individual"
+    direction: "bi-directional"
+    frequency: "real-time"
+    method: "api"
+    api_endpoint: "/api/v1/population/events"
+    authentication: "oauth2"
+    data_format: "json"
+    mapping:
+      - source_field: "personal_identification_number"
+        target_field: "tax_identification_number"
+        transformation: "none"
+      - source_field: "given_name"
+        target_field: "first_name"
+        transformation: "none"
+      - source_field: "family_name"
+        target_field: "last_name"
+        transformation: "none"
+    error_handling:
+      retry_policy: "exponential_backoff"
+      dead_letter_queue: "population_sync_dlq"
+      notification:
+        - "integration-team@example.com"
+
+  - name: "business_registry_sync"
+    description: "Synchronize enterprise data with national business registry"
+    external_system: "National Business Registry"
+    tables:
+      - "enterprise"
+      - "party_relationship"
+    direction: "bi-directional"
+    frequency: "daily"
+    method: "api"
+    api_endpoint: "/api/v1/business-registry/sync"
+    authentication: "api_key"
+    data_format: "json"

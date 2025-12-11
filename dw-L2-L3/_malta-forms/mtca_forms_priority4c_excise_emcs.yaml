@@ -1,0 +1,1839 @@
+# ============================================================================
+# MTCA Forms - Priority 4C: Excise Movement and Control System (EMCS)
+# Forms: e-AD, e-SAD, IAAD, AWK/ERC/ECC/ERS Applications
+# Version: 1.0
+# Date: 2025-12-06
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# EU Systems: EMCS, SEED
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # e-AD: Electronic Administrative Document
+  # Duty-suspended EU movement per Directive 2020/262
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "e-AD"
+        form_name_en: "Electronic Administrative Document"
+        form_name_mt: "Dokument Amministrattiv Elettroniku"
+        version: "2024"
+        effective_from: "2010-04-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive (EU) 2020/262"
+        subsidiary_legislation:
+          - "Commission Implementing Regulation (EU) 2022/1636"
+          - "Excise Duty Act Cap. 382"
+          - "S.L.382.01 - Excise Duty Regulations"
+        administering_authority: "MTCA Customs - Excise Section"
+        tax_type: "Excise Duty"
+        taxpayer_category: "Authorised Warehouse Keeper / Registered Consignor"
+        filing_frequency: "Per movement"
+        filing_deadline: "Before movement commences"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "EMCS"
+        eu_system_interface: "Trans-European EMCS"
+        source_url: "https://customs.gov.mt/excise"
+        xml_schema_ref: "EMCS Functional Specifications Phase 4.1"
+        message_types:
+          - "IE801 - e-AD submission"
+          - "IE802 - Reminder message for e-AD"
+          - "IE803 - e-AD notification"
+          - "IE810 - Cancellation of e-AD"
+          - "IE813 - Change of destination"
+          - "IE818 - Report of receipt"
+          - "IE819 - Alert or rejection of e-AD"
+          - "IE829 - Acceptance/rejection by MSA"
+          - "IE837 - Explanation on delay"
+          - "IE839 - Refusal by MSA"
+          - "IE871 - Shortage or excess"
+          - "IE881 - Manual closure request"
+        notes: |
+          Electronic document for movement of excise goods under duty suspension
+          between EU Member States. Covers alcohol, tobacco, and energy products.
+          Replaces paper AAD. ARC (Administrative Reference Code) assigned by
+          EMCS upon validation. Goods must be accompanied by e-AD or fallback
+          document during movement. 5-year retention requirement.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: e-AD Header
+        # ----------------------------------------------------------------------
+        - section_id: "EAD_HEADER"
+          section_name: "e-AD Header"
+          section_description: "Administrative document identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "arc"
+              field_code: "1a"
+              field_name_en: "Administrative Reference Code (ARC)"
+              field_name_mt: "KodiÄ‹i ta' Referenza Amministrattiv"
+              field_description: "Unique identifier assigned by EMCS"
+              data_type: "ARC"
+              format: "YYCCnnnnnnnnnnnnnnnnnC"
+              max_length: 21
+              precision: null
+              scale: null
+              required: true
+              required_condition: "System-generated upon validation"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules:
+                - rule_id: "EAD_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid ARC format"
+                  rule_expression: "^[0-9]{2}[A-Z]{2}[A-Z0-9]{16}[0-9]$"
+                  error_message_en: "Invalid ARC format"
+                  error_message_mt: "Format ARC mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "1a"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "arc"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "arc"
+                data_type: "FixedString(21)"
+
+            - field_id: "sequence_number"
+              field_code: "1b"
+              field_name_en: "Sequence Number"
+              field_name_mt: "Numru tas-Sekwenza"
+              field_description: "Version number of e-AD (incremented on changes)"
+              data_type: "INTEGER"
+              format: "NN"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "1"
+              calculated: true
+              calculation_formula: "AUTO_INCREMENT on IE813"
+              validation_rules:
+                - rule_id: "EAD_002"
+                  rule_type: "range"
+                  rule_description: "Sequence number 1-99"
+                  rule_expression: "sequence_number >= 1 AND sequence_number <= 99"
+                  error_message_en: "Sequence number must be 1-99"
+                  error_message_mt: "Numru tas-sekwenza irid ikun 1-99"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "1b"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "seq_no"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "sequence_number"
+                data_type: "UInt8"
+
+            - field_id: "local_reference_ead"
+              field_code: "1c"
+              field_name_en: "Local Reference Number"
+              field_name_mt: "Numru ta' Referenza Lokali"
+              field_description: "Consignor's unique reference"
+              data_type: "STRING"
+              format: null
+              max_length: 22
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "1c"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "lrn"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "local_reference_number"
+                data_type: "String"
+
+            - field_id: "ead_status"
+              field_code: "Status"
+              field_name_en: "e-AD Status"
+              field_name_mt: "Status tal-e-AD"
+              field_description: "Current status of e-AD"
+              data_type: "CODE"
+              format: "NN"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "01"
+              calculated: true
+              calculation_formula: "Status from EMCS workflow"
+              validation_rules: []
+              allowed_values:
+                - code: "01"
+                  description_en: "Accepted"
+                - code: "02"
+                  description_en: "Delivered"
+                - code: "03"
+                  description_en: "Refused"
+                - code: "04"
+                  description_en: "Partially refused"
+                - code: "05"
+                  description_en: "Diverted"
+                - code: "06"
+                  description_en: "Cancelled"
+                - code: "07"
+                  description_en: "Replaced"
+                - code: "08"
+                  description_en: "Manually closed"
+                - code: "09"
+                  description_en: "Rejected"
+                - code: "10"
+                  description_en: "Exported"
+                - code: "11"
+                  description_en: "Deemed exported"
+                - code: "21"
+                  description_en: "Split"
+              reference_table: "emcs_status_codes"
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "status"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "ead_status"
+                data_type: "FixedString(2)"
+
+            - field_id: "movement_type"
+              field_code: "1d"
+              field_name_en: "Type of Movement"
+              field_name_mt: "Tip ta' Moviment"
+              field_description: "Type of excise movement"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "1"
+                  description_en: "Warehouse to warehouse"
+                - code: "2"
+                  description_en: "Warehouse to registered consignee"
+                - code: "3"
+                  description_en: "Warehouse to exempt organization"
+                - code: "4"
+                  description_en: "Warehouse to export"
+                - code: "5"
+                  description_en: "Import to warehouse"
+                - code: "6"
+                  description_en: "Import to registered consignee"
+                - code: "7"
+                  description_en: "Import to exempt organization"
+                - code: "8"
+                  description_en: "Import to export"
+              reference_table: "emcs_movement_types"
+              eu_data_element: "1d"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "movement_type"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "movement_type"
+                data_type: "FixedString(1)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Consignor (Box 2)
+        # ----------------------------------------------------------------------
+        - section_id: "CONSIGNOR_EXCISE"
+          section_name: "Consignor"
+          section_description: "Details of the consignor"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "consignor_excise_number"
+              field_code: "2a"
+              field_name_en: "Consignor Excise Number"
+              field_name_mt: "Numru tas-Sisa tal-Konsenjatur"
+              field_description: "Unique excise identification number from SEED"
+              data_type: "STRING"
+              format: null
+              max_length: 16
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EAD_010"
+                  rule_type: "lookup"
+                  rule_description: "Must exist in SEED with valid status"
+                  rule_expression: "EXISTS(seed_register.excise_number) AND status = 'VALID'"
+                  error_message_en: "Invalid or suspended excise number"
+                  error_message_mt: "Numru tas-sisa mhux validu jew sospiÅ¼"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "seed_register"
+              eu_data_element: "2a"
+              cross_form_reference: "AWK.excise_number"
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "consignor_excise_no"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "consignor_excise_number"
+                data_type: "String"
+
+            - field_id: "consignor_name_excise"
+              field_code: "2b"
+              field_name_en: "Consignor Name"
+              field_name_mt: "Isem tal-Konsenjatur"
+              field_description: "Legal name of consignor"
+              data_type: "STRING"
+              format: null
+              max_length: 182
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "2b"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "consignor_name"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "consignor_name"
+                data_type: "String"
+
+            - field_id: "dispatch_place"
+              field_code: "2e"
+              field_name_en: "Place of Dispatch"
+              field_name_mt: "Post tad-DispaÄ‹Ä‹"
+              field_description: "Tax warehouse from which goods are dispatched"
+              data_type: "STRING"
+              format: null
+              max_length: 16
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EAD_011"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid tax warehouse in SEED"
+                  rule_expression: "EXISTS(seed_warehouses.warehouse_id)"
+                  error_message_en: "Invalid dispatch warehouse"
+                  error_message_mt: "MaÄ§Å¼en tad-dispaÄ‹Ä‹ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "seed_warehouses"
+              eu_data_element: "2e"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "dispatch_warehouse"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "place_of_dispatch"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Consignee (Box 3)
+        # ----------------------------------------------------------------------
+        - section_id: "CONSIGNEE_EXCISE"
+          section_name: "Consignee"
+          section_description: "Details of the consignee"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "consignee_type"
+              field_code: "3a"
+              field_name_en: "Consignee Type"
+              field_name_mt: "Tip tal-Konsenjatarju"
+              field_description: "Type of excise operator receiving goods"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "1"
+                  description_en: "Authorised Warehouse Keeper"
+                - code: "2"
+                  description_en: "Registered Consignee"
+                - code: "3"
+                  description_en: "Temporary Registered Consignee"
+                - code: "4"
+                  description_en: "Direct delivery"
+                - code: "5"
+                  description_en: "Exempted consignee"
+                - code: "6"
+                  description_en: "Export"
+              reference_table: "emcs_consignee_types"
+              eu_data_element: "3a"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "consignee_type"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "consignee_type"
+                data_type: "FixedString(1)"
+
+            - field_id: "consignee_excise_number"
+              field_code: "3b"
+              field_name_en: "Consignee Excise Number"
+              field_name_mt: "Numru tas-Sisa tal-Konsenjatarju"
+              field_description: "Unique excise identification of consignee"
+              data_type: "STRING"
+              format: null
+              max_length: 16
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Except for export movements"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EAD_020"
+                  rule_type: "lookup"
+                  rule_description: "Must exist in SEED"
+                  rule_expression: "EXISTS(seed_register.excise_number)"
+                  error_message_en: "Consignee excise number not found"
+                  error_message_mt: "Numru tas-sisa tal-konsenjatarju ma nstabx"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "seed_register"
+              eu_data_element: "3b"
+              cross_form_reference: "ERC.excise_number"
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "consignee_excise_no"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "consignee_excise_number"
+                data_type: "Nullable(String)"
+
+            - field_id: "consignee_name_excise"
+              field_code: "3c"
+              field_name_en: "Consignee Name"
+              field_name_mt: "Isem tal-Konsenjatarju"
+              field_description: "Legal name of consignee"
+              data_type: "STRING"
+              format: null
+              max_length: 182
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "3c"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "consignee_name"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "consignee_name"
+                data_type: "String"
+
+            - field_id: "delivery_place"
+              field_code: "3f"
+              field_name_en: "Place of Delivery"
+              field_name_mt: "Post tal-Konsenja"
+              field_description: "Tax warehouse or premises of delivery"
+              data_type: "STRING"
+              format: null
+              max_length: 16
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "seed_warehouses"
+              eu_data_element: "3f"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "delivery_warehouse"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "place_of_delivery"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Transport Details (Box 5)
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSPORT_EXCISE"
+          section_name: "Transport Details"
+          section_description: "Transport and journey information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "transport_mode_excise"
+              field_code: "5a"
+              field_name_en: "Transport Mode"
+              field_name_mt: "Mod ta' Trasport"
+              field_description: "Mode of transport for the movement"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "1"
+                  description_en: "Sea transport"
+                - code: "2"
+                  description_en: "Rail transport"
+                - code: "3"
+                  description_en: "Road transport"
+                - code: "4"
+                  description_en: "Air transport"
+                - code: "5"
+                  description_en: "Postal consignment"
+                - code: "7"
+                  description_en: "Fixed transport installation"
+                - code: "8"
+                  description_en: "Inland waterway"
+              reference_table: "eu_transport_modes"
+              eu_data_element: "5a"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "transport_mode"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "transport_mode"
+                data_type: "FixedString(1)"
+
+            - field_id: "journey_time"
+              field_code: "5b"
+              field_name_en: "Journey Time"
+              field_name_mt: "Ä¦in tal-VjaÄ¡Ä¡"
+              field_description: "Expected duration of journey (days/hours)"
+              data_type: "STRING"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "5b"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "journey_time"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "journey_time"
+                data_type: "String"
+
+            - field_id: "dispatch_date"
+              field_code: "5c"
+              field_name_en: "Date of Dispatch"
+              field_name_mt: "Data tad-DispaÄ‹Ä‹"
+              field_description: "Date and time goods leave dispatch warehouse"
+              data_type: "DATETIME"
+              format: "YYYY-MM-DDTHH:MM:SS"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EAD_030"
+                  rule_type: "date"
+                  rule_description: "Dispatch date cannot be in the past"
+                  rule_expression: "dispatch_date >= CURRENT_DATE"
+                  error_message_en: "Dispatch date cannot be in the past"
+                  error_message_mt: "Data tad-dispaÄ‹Ä‹ ma tistax tkun fil-passat"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "5c"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead"
+                column: "dispatch_date"
+              ors_mapping:
+                table: "mtca_ors.excise_movements"
+                column: "dispatch_datetime"
+                data_type: "DateTime"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Excise Products (Box 6) - Repeatable
+        # ----------------------------------------------------------------------
+        - section_id: "EXCISE_PRODUCTS"
+          section_name: "Excise Products"
+          section_description: "Details of excise goods being moved"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          max_occurrences: 999
+          fields:
+            - field_id: "body_record_number"
+              field_code: "6a"
+              field_name_en: "Body Record Unique Reference"
+              field_name_mt: "Referenza Unika tar-Rekord"
+              field_description: "Sequential item number"
+              data_type: "INTEGER"
+              format: "NNN"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "AUTO_INCREMENT"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "6a"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "item_no"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "item_number"
+                data_type: "UInt16"
+
+            - field_id: "excise_product_code"
+              field_code: "6b"
+              field_name_en: "Excise Product Code"
+              field_name_mt: "KodiÄ‹i tal-Prodott tas-Sisa"
+              field_description: "EU harmonised excise product code"
+              data_type: "CODE"
+              format: "ANNN"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EAD_040"
+                  rule_type: "codelist"
+                  rule_description: "Valid excise product code"
+                  rule_expression: "EXISTS(excise_product_codes.code)"
+                  error_message_en: "Invalid excise product code"
+                  error_message_mt: "KodiÄ‹i tal-prodott tas-sisa mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "B000"
+                  description_en: "Beer"
+                - code: "W200"
+                  description_en: "Still wine and still fermented beverages"
+                - code: "W300"
+                  description_en: "Sparkling wine and sparkling fermented beverages"
+                - code: "I000"
+                  description_en: "Intermediate products"
+                - code: "S200"
+                  description_en: "Ethyl alcohol"
+                - code: "S300"
+                  description_en: "Spirituous beverages"
+                - code: "S400"
+                  description_en: "Partially denatured alcohol"
+                - code: "S500"
+                  description_en: "Other products containing ethyl alcohol"
+                - code: "T200"
+                  description_en: "Cigarettes"
+                - code: "T300"
+                  description_en: "Cigars and cigarillos"
+                - code: "T400"
+                  description_en: "Fine-cut tobacco"
+                - code: "T500"
+                  description_en: "Other smoking tobacco"
+                - code: "E200"
+                  description_en: "Motor fuels - leaded petrol"
+                - code: "E300"
+                  description_en: "Motor fuels - unleaded petrol"
+                - code: "E410"
+                  description_en: "Gas oil for motor use"
+                - code: "E420"
+                  description_en: "Gas oil for heating"
+                - code: "E430"
+                  description_en: "Gas oil - industrial/commercial"
+                - code: "E470"
+                  description_en: "Heavy fuel oil"
+                - code: "E500"
+                  description_en: "LPG and methane"
+                - code: "E600"
+                  description_en: "Kerosene"
+                - code: "E700"
+                  description_en: "Coal and coke"
+                - code: "E800"
+                  description_en: "Electricity"
+                - code: "E910"
+                  description_en: "Biofuels - biodiesel"
+                - code: "E920"
+                  description_en: "Biofuels - bioethanol"
+                - code: "E930"
+                  description_en: "Natural gas"
+              reference_table: "excise_product_codes"
+              eu_data_element: "6b"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "product_code"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "excise_product_code"
+                data_type: "FixedString(4)"
+
+            - field_id: "cn_code_excise"
+              field_code: "6c"
+              field_name_en: "CN Code"
+              field_name_mt: "KodiÄ‹i NK"
+              field_description: "8-digit Combined Nomenclature code"
+              data_type: "CN_CODE"
+              format: "NNNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EAD_041"
+                  rule_type: "pattern"
+                  rule_description: "Must be 8 digits"
+                  rule_expression: "^[0-9]{8}$"
+                  error_message_en: "CN code must be 8 digits"
+                  error_message_mt: "KodiÄ‹i NK irid ikun 8 numri"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taric_cn_codes"
+              eu_data_element: "6c"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "cn_code"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "cn_code"
+                data_type: "FixedString(8)"
+
+            - field_id: "quantity"
+              field_code: "6d"
+              field_name_en: "Quantity"
+              field_name_mt: "KwantitÃ "
+              field_description: "Quantity in excise unit of measure"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 16
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EAD_042"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "quantity > 0"
+                  error_message_en: "Quantity must be positive"
+                  error_message_mt: "KwantitÃ  trid tkun poÅ¼ittiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "6d"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "quantity"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "quantity"
+                data_type: "Decimal(16,3)"
+
+            - field_id: "gross_weight_excise"
+              field_code: "6e"
+              field_name_en: "Gross Weight (kg)"
+              field_name_mt: "PiÅ¼ Gross (kg)"
+              field_description: "Gross weight in kilograms"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 16
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EAD_043"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "gross_weight_excise > 0"
+                  error_message_en: "Gross weight must be positive"
+                  error_message_mt: "PiÅ¼ gross irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "6e"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "gross_weight"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "gross_weight_kg"
+                data_type: "Decimal(16,3)"
+
+            - field_id: "net_weight_excise"
+              field_code: "6f"
+              field_name_en: "Net Weight (kg)"
+              field_name_mt: "PiÅ¼ Nett (kg)"
+              field_description: "Net weight in kilograms"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 16
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "6f"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "net_weight"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "net_weight_kg"
+                data_type: "Decimal(16,3)"
+
+            - field_id: "alcoholic_strength"
+              field_code: "6g"
+              field_name_en: "Alcoholic Strength"
+              field_name_mt: "SaÄ§Ä§a AlkoÄ§olika"
+              field_description: "% vol for alcoholic products"
+              data_type: "DECIMAL"
+              format: "##.##"
+              max_length: null
+              precision: 5
+              scale: 2
+              required: false
+              required_condition: "Required for alcohol products (B, W, I, S codes)"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EAD_044"
+                  rule_type: "range"
+                  rule_description: "Alcoholic strength 0-100%"
+                  rule_expression: "alcoholic_strength >= 0 AND alcoholic_strength <= 100"
+                  error_message_en: "Alcoholic strength must be 0-100%"
+                  error_message_mt: "SaÄ§Ä§a alkoÄ§olika trid tkun 0-100%"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "6g"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "alcohol_strength"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "alcoholic_strength"
+                data_type: "Nullable(Decimal(5,2))"
+
+            - field_id: "degree_plato"
+              field_code: "6h"
+              field_name_en: "Degree Plato"
+              field_name_mt: "Grad Plato"
+              field_description: "Degree Plato for beer"
+              data_type: "DECIMAL"
+              format: "##.##"
+              max_length: null
+              precision: 5
+              scale: 2
+              required: false
+              required_condition: "Required for beer (B000)"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "6h"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "degree_plato"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "degree_plato"
+                data_type: "Nullable(Decimal(5,2))"
+
+            - field_id: "fiscal_mark"
+              field_code: "6i"
+              field_name_en: "Fiscal Mark"
+              field_name_mt: "Marka Fiskali"
+              field_description: "Description of fiscal marks if applicable"
+              data_type: "STRING"
+              format: null
+              max_length: 350
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required for tobacco products"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "6i"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "fiscal_mark"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "fiscal_mark"
+                data_type: "Nullable(String)"
+
+            - field_id: "commercial_description"
+              field_code: "6j"
+              field_name_en: "Commercial Description"
+              field_name_mt: "Deskrizzjoni KummerÄ‹jali"
+              field_description: "Description of goods"
+              data_type: "STRING"
+              format: null
+              max_length: 350
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "6j"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "description"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "commercial_description"
+                data_type: "String"
+
+            - field_id: "brand_name"
+              field_code: "6k"
+              field_name_en: "Brand Name of Products"
+              field_name_mt: "Isem tal-Marka tal-Prodotti"
+              field_description: "Commercial brand name"
+              data_type: "STRING"
+              format: null
+              max_length: 350
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "6k"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_ead_items"
+                column: "brand_name"
+              ors_mapping:
+                table: "mtca_ors.excise_items"
+                column: "brand_name"
+                data_type: "Nullable(String)"
+
+      attachments:
+        - attachment_code: "COMMERCIAL_INVOICE"
+          description_en: "Commercial Invoice"
+          description_mt: "Fattura KummerÄ‹jali"
+          required: true
+          file_types: ["PDF"]
+        - attachment_code: "TRANSPORT_DOC"
+          description_en: "Transport Document"
+          description_mt: "Dokument tat-Trasport"
+          required: true
+          file_types: ["PDF"]
+
+      related_forms:
+        - form_code: "e-SAD"
+          relationship: "Simplified document for duty-paid movements"
+          eu_system: "EMCS"
+        - form_code: "SAD_H1"
+          relationship: "Import declaration for imported excise goods"
+          eu_system: "AIS"
+        - form_code: "SAD_B1"
+          relationship: "Export declaration for export movements"
+          eu_system: "AES"
+
+      eu_system_integration:
+        trans_european_system: "EMCS (Excise Movement and Control System)"
+        message_exchange: "S2S / Portal"
+        interface_specification: "EMCS Phase 4.1 Functional Specifications"
+        connected_systems:
+          - system: "SEED"
+            purpose: "Operator registration validation"
+          - system: "AES"
+            purpose: "Export movements"
+          - system: "AIS"
+            purpose: "Import movements"
+          - system: "UUM&DS"
+            purpose: "Authentication"
+
+      submission_workflow:
+        authentication_required: "UUM&DS / Excise number"
+        signature_required: false
+        guarantee_required: true
+        guarantee_types: ["Bank guarantee per Cap. 382"]
+        payment_integration: false
+        acknowledgment_type: "ARC"
+        processing_stages:
+          - stage: "Draft"
+            description: "e-AD created but not submitted"
+          - stage: "Submitted (IE801)"
+            description: "e-AD submitted to EMCS"
+          - stage: "Validated"
+            description: "ARC assigned, movement can begin"
+          - stage: "In transit"
+            description: "Goods in movement"
+          - stage: "Receipt (IE818)"
+            description: "Report of receipt submitted"
+          - stage: "Closed"
+            description: "Movement completed"
+
+  # ==========================================================================
+  # e-SAD: Electronic Simplified Administrative Document
+  # Duty-paid EU movement per Directive 2020/262
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "e-SAD"
+        form_name_en: "Electronic Simplified Administrative Document"
+        form_name_mt: "Dokument Amministrattiv Simplifikat Elettroniku"
+        version: "2024"
+        effective_from: "2024-02-13"
+        effective_to: "current"
+        legislative_basis: "Council Directive (EU) 2020/262"
+        subsidiary_legislation:
+          - "Commission Implementing Regulation (EU) 2022/1636"
+          - "Excise Duty Act Cap. 382"
+        administering_authority: "MTCA Customs - Excise Section"
+        tax_type: "Excise Duty (Duty-Paid)"
+        taxpayer_category: "Certified Consignor / Certified Consignee"
+        filing_frequency: "Per movement"
+        filing_deadline: "Before movement commences"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "EMCS"
+        eu_system_interface: "Trans-European EMCS"
+        source_url: "https://customs.gov.mt/excise"
+        xml_schema_ref: "EMCS Phase 4.1 - e-SAD specifications"
+        message_types:
+          - "IE815 - e-SAD submission"
+          - "IE802 - Reminder message"
+          - "IE803 - e-SAD notification"
+          - "IE810 - Cancellation"
+          - "IE813 - Change of destination"
+          - "IE818 - Report of receipt"
+          - "IE819 - Alert or rejection"
+        notes: |
+          Electronic simplified document for movement of excise goods on which
+          duty has already been paid from one Member State to another. Used by
+          Certified Consignors/Consignees. Mandatory from 13 February 2024.
+
+      sections:
+        - section_id: "ESAD_HEADER"
+          section_name: "e-SAD Header"
+          section_description: "Simplified document identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "arc_esad"
+              field_code: "1a"
+              field_name_en: "Administrative Reference Code (ARC)"
+              field_name_mt: "KodiÄ‹i ta' Referenza Amministrattiv"
+              field_description: "Unique e-SAD identifier"
+              data_type: "ARC"
+              format: "YYCCnnnnnnnnnnnnnnnnnC"
+              max_length: 21
+              precision: null
+              scale: null
+              required: true
+              required_condition: "System-generated"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "1a"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_esad"
+                column: "arc"
+              ors_mapping:
+                table: "mtca_ors.excise_movements_paid"
+                column: "arc"
+                data_type: "FixedString(21)"
+
+            - field_id: "certified_consignor_id"
+              field_code: "2a"
+              field_name_en: "Certified Consignor ID"
+              field_name_mt: "ID tal-Konsenjatur ÄŠertifikat"
+              field_description: "Certified consignor excise number"
+              data_type: "STRING"
+              format: null
+              max_length: 16
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ESAD_001"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid certified consignor in SEED"
+                  rule_expression: "EXISTS(seed_certified.excise_number)"
+                  error_message_en: "Invalid certified consignor"
+                  error_message_mt: "Konsenjatur Ä‹ertifikat mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "seed_certified_consignors"
+              eu_data_element: "2a"
+              cross_form_reference: "ECC.excise_number"
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_esad"
+                column: "cert_consignor_id"
+              ors_mapping:
+                table: "mtca_ors.excise_movements_paid"
+                column: "certified_consignor_id"
+                data_type: "String"
+
+            - field_id: "certified_consignee_id"
+              field_code: "3a"
+              field_name_en: "Certified Consignee ID"
+              field_name_mt: "ID tal-Konsenjatarju ÄŠertifikat"
+              field_description: "Certified consignee excise number"
+              data_type: "STRING"
+              format: null
+              max_length: 16
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ESAD_002"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid certified consignee in SEED"
+                  rule_expression: "EXISTS(seed_certified.excise_number)"
+                  error_message_en: "Invalid certified consignee"
+                  error_message_mt: "Konsenjatarju Ä‹ertifikat mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "seed_certified_consignees"
+              eu_data_element: "3a"
+              cross_form_reference: "ECC.excise_number"
+              legacy_mapping:
+                database: "excise_db"
+                table: "emcs_esad"
+                column: "cert_consignee_id"
+              ors_mapping:
+                table: "mtca_ors.excise_movements_paid"
+                column: "certified_consignee_id"
+                data_type: "String"
+
+      eu_system_integration:
+        trans_european_system: "EMCS"
+        message_exchange: "S2S / Portal"
+        interface_specification: "EMCS Phase 4.1"
+
+  # ==========================================================================
+  # AWK: Authorised Warehouse Keeper Application
+  # Tax warehouse authorization per Cap. 382
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "AWK"
+        form_name_en: "Authorised Warehouse Keeper Application"
+        form_name_mt: "Applikazzjoni gÄ§al Å»amma' tal-MaÄ§Å¼en Awtorizzat"
+        version: "2024"
+        effective_from: "2010-04-01"
+        effective_to: "current"
+        legislative_basis: "Excise Duty Act Cap. 382"
+        subsidiary_legislation:
+          - "S.L.382.01 - Excise Duty Regulations"
+          - "Council Directive (EU) 2020/262"
+        administering_authority: "MTCA Customs - Excise Section"
+        tax_type: "Excise Duty"
+        taxpayer_category: "Business/Economic Operator"
+        filing_frequency: "One-time (application)"
+        filing_deadline: "Before operating tax warehouse"
+        submission_method: "Electronic"
+        electronic_portal: "MTCA e-Forms"
+        eu_system_interface: "SEED registration"
+        source_url: "https://customs.gov.mt/excise/authorisations"
+        xml_schema_ref: null
+        notes: |
+          Application for authorization to operate as tax warehouse keeper.
+          Requires bank guarantee, fit and proper assessment, and detailed
+          premises information. Upon approval, operator receives unique
+          excise number registered in SEED.
+
+      sections:
+        - section_id: "AWK_APPLICANT"
+          section_name: "Applicant Details"
+          section_description: "Business information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "applicant_name"
+              field_code: "1"
+              field_name_en: "Business Name"
+              field_name_mt: "Isem tan-Negozju"
+              field_description: "Legal name of the applicant"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "awk_applications"
+                column: "business_name"
+              ors_mapping:
+                table: "mtca_ors.excise_authorizations"
+                column: "applicant_name"
+                data_type: "String"
+
+            - field_id: "vat_number_awk"
+              field_code: "2"
+              field_name_en: "VAT Number"
+              field_name_mt: "Numru VAT"
+              field_description: "Malta VAT registration number"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "AWK_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid Malta VAT format"
+                  rule_expression: "^MT[0-9]{8}$"
+                  error_message_en: "Invalid VAT number format"
+                  error_message_mt: "Format tan-numru VAT mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "vat_register"
+              eu_data_element: null
+              cross_form_reference: "VAT_FORM_1.vat_number"
+              legacy_mapping:
+                database: "excise_db"
+                table: "awk_applications"
+                column: "vat_no"
+              ors_mapping:
+                table: "mtca_ors.excise_authorizations"
+                column: "vat_number"
+                data_type: "FixedString(10)"
+
+            - field_id: "product_categories"
+              field_code: "3"
+              field_name_en: "Excise Product Categories"
+              field_name_mt: "Kategoriji ta' Prodotti tas-Sisa"
+              field_description: "Categories of excise goods to be handled"
+              data_type: "ARRAY"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "B"
+                  description_en: "Beer"
+                - code: "W"
+                  description_en: "Wine"
+                - code: "I"
+                  description_en: "Intermediate products"
+                - code: "S"
+                  description_en: "Ethyl alcohol and spirits"
+                - code: "T"
+                  description_en: "Tobacco products"
+                - code: "E"
+                  description_en: "Energy products"
+              reference_table: "excise_categories"
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "awk_applications"
+                column: "product_cats"
+              ors_mapping:
+                table: "mtca_ors.excise_authorizations"
+                column: "product_categories"
+                data_type: "Array(FixedString(1))"
+
+            - field_id: "guarantee_amount_awk"
+              field_code: "4"
+              field_name_en: "Bank Guarantee Amount"
+              field_name_mt: "Ammont tal-Garanzija Bankarja"
+              field_description: "Amount of bank guarantee provided"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.##"
+              max_length: null
+              precision: 16
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "AWK_002"
+                  rule_type: "range"
+                  rule_description: "Minimum guarantee required"
+                  rule_expression: "guarantee_amount_awk >= 10000"
+                  error_message_en: "Minimum guarantee is â‚¬10,000"
+                  error_message_mt: "Garanzija minima hija â‚¬10,000"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "awk_applications"
+                column: "guarantee_amount"
+              ors_mapping:
+                table: "mtca_ors.excise_authorizations"
+                column: "guarantee_amount_eur"
+                data_type: "Decimal(16,2)"
+
+        - section_id: "AWK_WAREHOUSE"
+          section_name: "Warehouse Details"
+          section_description: "Tax warehouse premises information"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          max_occurrences: 10
+          fields:
+            - field_id: "warehouse_address"
+              field_code: "5a"
+              field_name_en: "Warehouse Address"
+              field_name_mt: "Indirizz tal-MaÄ§Å¼en"
+              field_description: "Full address of tax warehouse"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "awk_warehouses"
+                column: "address"
+              ors_mapping:
+                table: "mtca_ors.excise_warehouses"
+                column: "warehouse_address"
+                data_type: "String"
+
+            - field_id: "storage_capacity"
+              field_code: "5b"
+              field_name_en: "Storage Capacity"
+              field_name_mt: "KapaÄ‹itÃ  tal-Ä¦aÅ¼na"
+              field_description: "Maximum storage capacity in hectoliters or units"
+              data_type: "DECIMAL"
+              format: "###,###,###"
+              max_length: null
+              precision: 16
+              scale: 0
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "awk_warehouses"
+                column: "capacity"
+              ors_mapping:
+                table: "mtca_ors.excise_warehouses"
+                column: "storage_capacity"
+                data_type: "Decimal(16,0)"
+
+      submission_workflow:
+        authentication_required: "e-ID Malta"
+        signature_required: true
+        guarantee_required: true
+        payment_integration: false
+        acknowledgment_type: "Application reference number"
+
+  # ==========================================================================
+  # ERC: Registered Consignee Application
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "ERC"
+        form_name_en: "Registered Consignee Application"
+        form_name_mt: "Applikazzjoni gÄ§al Konsenjatarju ReÄ¡istrat"
+        version: "2024"
+        effective_from: "2010-04-01"
+        effective_to: "current"
+        legislative_basis: "Excise Duty Act Cap. 382"
+        subsidiary_legislation:
+          - "S.L.382.01 - Excise Duty Regulations"
+          - "Council Directive (EU) 2020/262"
+        administering_authority: "MTCA Customs - Excise Section"
+        tax_type: "Excise Duty"
+        taxpayer_category: "Business"
+        filing_frequency: "One-time"
+        filing_deadline: "Before receiving duty-suspended goods"
+        submission_method: "Electronic"
+        electronic_portal: "MTCA e-Forms"
+        eu_system_interface: "SEED registration"
+        source_url: "https://customs.gov.mt/excise/authorisations"
+        notes: |
+          Authorization to receive excise goods under duty suspension from 
+          other EU Member States. Registered Consignee cannot store or dispatch
+          goods under suspension - must immediately pay duty upon receipt.
+
+      sections:
+        - section_id: "ERC_DETAILS"
+          section_name: "Registered Consignee Details"
+          section_description: "Applicant information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "erc_business_name"
+              field_code: "1"
+              field_name_en: "Business Name"
+              field_name_mt: "Isem tan-Negozju"
+              field_description: "Legal name"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "erc_applications"
+                column: "business_name"
+              ors_mapping:
+                table: "mtca_ors.excise_authorizations"
+                column: "applicant_name"
+                data_type: "String"
+
+            - field_id: "erc_type"
+              field_code: "2"
+              field_name_en: "Consignee Type"
+              field_name_mt: "Tip ta' Konsenjatarju"
+              field_description: "Permanent or temporary registration"
+              data_type: "CODE"
+              format: "A"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "P"
+                  description_en: "Permanent Registered Consignee"
+                - code: "T"
+                  description_en: "Temporary Registered Consignee"
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "excise_db"
+                table: "erc_applications"
+                column: "reg_type"
+              ors_mapping:
+                table: "mtca_ors.excise_authorizations"
+                column: "consignee_type"
+                data_type: "FixedString(1)"
+
+# ============================================================================
+# Reference Tables for Priority 4C: Excise/EMCS
+# ============================================================================
+reference_tables:
+  excise_product_codes:
+    - code: "B000"
+      description_en: "Beer"
+      category: "Alcohol"
+      unit: "HL"
+    - code: "W200"
+      description_en: "Still wine and fermented beverages"
+      category: "Alcohol"
+      unit: "HL"
+    - code: "W300"
+      description_en: "Sparkling wine and beverages"
+      category: "Alcohol"
+      unit: "HL"
+    - code: "I000"
+      description_en: "Intermediate products"
+      category: "Alcohol"
+      unit: "HL"
+    - code: "S200"
+      description_en: "Ethyl alcohol"
+      category: "Alcohol"
+      unit: "HL pure alcohol"
+    - code: "S300"
+      description_en: "Spirituous beverages"
+      category: "Alcohol"
+      unit: "HL pure alcohol"
+    - code: "S400"
+      description_en: "Partially denatured alcohol"
+      category: "Alcohol"
+      unit: "HL"
+    - code: "S500"
+      description_en: "Other ethyl alcohol products"
+      category: "Alcohol"
+      unit: "HL"
+    - code: "T200"
+      description_en: "Cigarettes"
+      category: "Tobacco"
+      unit: "1000 items"
+    - code: "T300"
+      description_en: "Cigars and cigarillos"
+      category: "Tobacco"
+      unit: "1000 items"
+    - code: "T400"
+      description_en: "Fine-cut tobacco"
+      category: "Tobacco"
+      unit: "KG"
+    - code: "T500"
+      description_en: "Other smoking tobacco"
+      category: "Tobacco"
+      unit: "KG"
+    - code: "E200"
+      description_en: "Leaded petrol"
+      category: "Energy"
+      unit: "1000L"
+    - code: "E300"
+      description_en: "Unleaded petrol"
+      category: "Energy"
+      unit: "1000L"
+    - code: "E410"
+      description_en: "Gas oil - motor fuel"
+      category: "Energy"
+      unit: "1000L"
+    - code: "E420"
+      description_en: "Gas oil - heating"
+      category: "Energy"
+      unit: "1000L"
+    - code: "E500"
+      description_en: "LPG and methane"
+      category: "Energy"
+      unit: "1000KG"
+    - code: "E600"
+      description_en: "Kerosene"
+      category: "Energy"
+      unit: "1000L"
+    - code: "E800"
+      description_en: "Electricity"
+      category: "Energy"
+      unit: "MWH"
+    - code: "E930"
+      description_en: "Natural gas"
+      category: "Energy"
+      unit: "GJ"
+
+  emcs_message_types:
+    - code: "IE801"
+      description: "e-AD submission"
+      direction: "Consignor -> MSA"
+    - code: "IE802"
+      description: "Reminder message"
+      direction: "MSA -> Consignor"
+    - code: "IE803"
+      description: "e-AD notification"
+      direction: "MSA -> Consignee"
+    - code: "IE810"
+      description: "Cancellation"
+      direction: "Consignor -> MSA"
+    - code: "IE813"
+      description: "Change of destination"
+      direction: "Consignor -> MSA"
+    - code: "IE818"
+      description: "Report of receipt"
+      direction: "Consignee -> MSA"
+    - code: "IE819"
+      description: "Alert or rejection"
+      direction: "Consignee -> MSA"
+    - code: "IE829"
+      description: "Acceptance/rejection by MSA"
+      direction: "MSA -> Consignor"
+    - code: "IE837"
+      description: "Explanation on delay"
+      direction: "Consignor -> MSA"
+    - code: "IE839"
+      description: "Refusal by MSA"
+      direction: "MSA -> Consignor"
+
+  ead_status_codes:
+    - code: "01"
+      description_en: "Accepted"
+    - code: "02"
+      description_en: "Delivered"
+    - code: "03"
+      description_en: "Refused"
+    - code: "04"
+      description_en: "Partially refused"
+    - code: "05"
+      description_en: "Diverted"
+    - code: "06"
+      description_en: "Cancelled"
+    - code: "07"
+      description_en: "Replaced"
+    - code: "08"
+      description_en: "Manually closed"
+    - code: "09"
+      description_en: "Rejected"
+    - code: "10"
+      description_en: "Exported"
+    - code: "11"
+      description_en: "Deemed exported"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  excise_db:
+    tables:
+      - legacy_table: "emcs_ead"
+        ors_table: "mtca_ors.excise_movements"
+        description: "e-AD header records"
+        key_columns:
+          - legacy: "arc"
+            ors: "arc"
+        volume_estimate: "~20,000 records/year"
+        
+      - legacy_table: "emcs_ead_items"
+        ors_table: "mtca_ors.excise_items"
+        description: "e-AD product details"
+        key_columns:
+          - legacy: "arc"
+            ors: "arc"
+          - legacy: "item_no"
+            ors: "item_number"
+        volume_estimate: "~50,000 records/year"
+        
+      - legacy_table: "awk_applications"
+        ors_table: "mtca_ors.excise_authorizations"
+        description: "Warehouse keeper applications"
+        key_columns:
+          - legacy: "app_ref"
+            ors: "application_reference"
+        volume_estimate: "~500 records"
+        
+      - legacy_table: "seed_operators"
+        ors_table: "mtca_ors.excise_operators"
+        description: "SEED registered operators"
+        key_columns:
+          - legacy: "excise_no"
+            ors: "excise_number"
+        volume_estimate: "~1,000 records"

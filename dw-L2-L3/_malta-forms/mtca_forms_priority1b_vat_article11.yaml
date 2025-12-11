@@ -1,0 +1,1330 @@
+# ============================================================================
+# MTCA Forms - Priority 1B: VAT Article 11 (Small Undertakings)
+# Forms: VAT Registration Form 2, VAT Return Article 11
+# Version: 1.0
+# Date: 2025-12-05
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # VAT Registration Form 2: Article 11 (Small Undertakings)
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "VAT_REG_FORM2"
+        form_name_en: "VAT Registration Form 2 - Article 11 Small Undertaking"
+        form_name_mt: "Formola ta' ReÄ¡istrazzjoni tal-VAT 2 - Artikolu 11 IntrapriÅ¼a Å»gÄ§ira"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "VAT Act Cap. 406, Article 11"
+        subsidiary_legislation:
+          - "S.L.406.01 - Value Added Tax Regulations"
+          - "S.L.406.04 - Small Undertakings Rules"
+        administering_authority: "CFR"
+        tax_type: "VAT"
+        taxpayer_category: "Small Undertaking"
+        filing_frequency: "One-time (registration)"
+        filing_deadline: "Before commencement of activity OR within 30 days of threshold breach"
+        submission_method: "Both"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/VAT/Pages/VAT-Registration.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          For businesses with turnover NOT exceeding â‚¬20,000 (from 2024, previously â‚¬18,000).
+          Exempt from charging VAT but no input VAT recovery. Annual return only.
+          Can opt into Article 10 registration for input VAT recovery.
+          Article 11 registration updated for threshold changes per LN 2024.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Applicant Details
+        # ----------------------------------------------------------------------
+        - section_id: "APPLICANT"
+          section_name: "Applicant Details"
+          section_description: "Details of the person or entity applying for registration"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "applicant_type"
+              field_code: "Box 1"
+              field_name_en: "Applicant Type"
+              field_name_mt: "Tip ta' Applikant"
+              field_description: "Legal form of the applicant"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_001"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid entity type"
+                  rule_expression: "EXISTS(entity_type_codes.code)"
+                  error_message_en: "Invalid applicant type"
+                  error_message_mt: "Tip ta' applikant mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "IND"
+                  description_en: "Individual/Sole Trader"
+                  description_mt: "Individwu/Negozjant WaÄ§du"
+                - code: "LTD"
+                  description_en: "Private Limited Company"
+                  description_mt: "Kumpanija Privata Limitata"
+                - code: "PLC"
+                  description_en: "Public Limited Company"
+                  description_mt: "Kumpanija Pubblika Limitata"
+                - code: "PAR"
+                  description_en: "Partnership (en nom collectif)"
+                  description_mt: "SoÄ‹jetÃ  f'isem kollettiv"
+                - code: "COM"
+                  description_en: "Partnership (en commandite)"
+                  description_mt: "SoÄ‹jetÃ  f'akkomanita"
+                - code: "SOC"
+                  description_en: "Cooperative/Society"
+                  description_mt: "Kooperattiva/SoÄ‹jetÃ "
+                - code: "TRS"
+                  description_en: "Trust"
+                  description_mt: "Trust"
+                - code: "OTH"
+                  description_en: "Other"
+                  description_mt: "IeÄ§or"
+              reference_table: "entity_type_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "entity_type"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "applicant_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "applicant_tin"
+              field_code: "Box 2"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "TIN of individual or company"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_002"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid TIN format"
+                  rule_expression: "^([0-9]{7}[MGAPLHBZ]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+                - rule_id: "VRF2_003"
+                  rule_type: "lookup"
+                  rule_description: "TIN must exist in taxpayer register"
+                  rule_expression: "EXISTS(taxpayer_register.tin)"
+                  error_message_en: "TIN not found in register"
+                  error_message_mt: "TIN ma nstabx fir-reÄ¡istru"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "tin"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "applicant_tin"
+                data_type: "String"
+
+            - field_id: "company_roc"
+              field_code: "Box 3"
+              field_name_en: "Company Registration Number"
+              field_name_mt: "Numru ta' ReÄ¡istrazzjoni tal-Kumpanija"
+              field_description: "MBR registration number (if company)"
+              data_type: "STRING"
+              format: "C#####"
+              max_length: 10
+              precision: null
+              scale: null
+              required: false
+              required_condition: "applicant_type IN ('LTD', 'PLC', 'PAR', 'COM')"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_004"
+                  rule_type: "conditional"
+                  rule_description: "Required for company applicants"
+                  rule_expression: "IF applicant_type IN ('LTD','PLC','PAR','COM') THEN company_roc IS NOT NULL"
+                  error_message_en: "Company registration number required"
+                  error_message_mt: "Numru ta' reÄ¡istrazzjoni tal-kumpanija meÄ§tieÄ¡"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "mbr_company_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "roc_number"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "company_roc"
+                data_type: "Nullable(String)"
+
+            - field_id: "legal_name"
+              field_code: "Box 4"
+              field_name_en: "Legal Name"
+              field_name_mt: "Isem Legali"
+              field_description: "Full legal name of individual or entity"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "legal_name"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "legal_name"
+                data_type: "String"
+
+            - field_id: "trading_name"
+              field_code: "Box 5"
+              field_name_en: "Trading Name"
+              field_name_mt: "Isem KummerÄ‹jali"
+              field_description: "Business trading name (if different from legal name)"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "trading_name"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "trading_name"
+                data_type: "Nullable(String)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Contact and Address Details
+        # ----------------------------------------------------------------------
+        - section_id: "ADDRESS"
+          section_name: "Contact and Address Details"
+          section_description: "Business address and contact information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "business_address_line1"
+              field_code: "Box 6a"
+              field_name_en: "Business Address Line 1"
+              field_name_mt: "Indirizz tan-Negozju Linja 1"
+              field_description: "Street address of principal place of business"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "address_line1"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "business_address_line1"
+                data_type: "String"
+
+            - field_id: "business_address_line2"
+              field_code: "Box 6b"
+              field_name_en: "Business Address Line 2"
+              field_name_mt: "Indirizz tan-Negozju Linja 2"
+              field_description: "Additional address information"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "address_line2"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "business_address_line2"
+                data_type: "Nullable(String)"
+
+            - field_id: "locality"
+              field_code: "Box 7"
+              field_name_en: "Locality"
+              field_name_mt: "LokalitÃ "
+              field_description: "Town or village"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_010"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid Malta locality"
+                  rule_expression: "EXISTS(malta_localities.name)"
+                  error_message_en: "Invalid locality"
+                  error_message_mt: "LokalitÃ  mhux valida"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: "malta_localities"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "locality"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "locality"
+                data_type: "String"
+
+            - field_id: "postal_code"
+              field_code: "Box 8"
+              field_name_en: "Postal Code"
+              field_name_mt: "KodiÄ‹i Postali"
+              field_description: "Malta postal code format"
+              data_type: "STRING"
+              format: "AAA ####"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_011"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Malta postal code format"
+                  rule_expression: "^[A-Z]{3} [0-9]{4}$"
+                  error_message_en: "Invalid postal code format (e.g., VLT 1234)"
+                  error_message_mt: "Format tal-kodiÄ‹i postali mhux validu (eÅ¼. VLT 1234)"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "malta_postal_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "postal_code"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "postal_code"
+                data_type: "FixedString(8)"
+
+            - field_id: "telephone"
+              field_code: "Box 9"
+              field_name_en: "Telephone Number"
+              field_name_mt: "Numru tat-Telefon"
+              field_description: "Business contact telephone"
+              data_type: "PHONE"
+              format: "+356########"
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_012"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Malta phone number"
+                  rule_expression: "^(\\+356)?[0-9]{8}$"
+                  error_message_en: "Invalid phone number"
+                  error_message_mt: "Numru tat-telefon mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "telephone"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "telephone"
+                data_type: "String"
+
+            - field_id: "email"
+              field_code: "Box 10"
+              field_name_en: "Email Address"
+              field_name_mt: "Indirizz Elettroniku"
+              field_description: "Business email address"
+              data_type: "EMAIL"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_013"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid email format"
+                  rule_expression: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                  error_message_en: "Invalid email format"
+                  error_message_mt: "Format tal-email mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "email"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "email"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Business Activity
+        # ----------------------------------------------------------------------
+        - section_id: "ACTIVITY"
+          section_name: "Business Activity"
+          section_description: "Nature of business and expected turnover"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "nace_code"
+              field_code: "Box 11"
+              field_name_en: "NACE Activity Code"
+              field_name_mt: "KodiÄ‹i tal-AttivitÃ  NACE"
+              field_description: "Principal business activity code (NACE Rev. 2)"
+              data_type: "CODE"
+              format: "##.##"
+              max_length: 5
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_020"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid NACE code"
+                  rule_expression: "EXISTS(nace_codes.code)"
+                  error_message_en: "Invalid NACE code"
+                  error_message_mt: "KodiÄ‹i NACE mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "nace_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration_activity"
+                column: "nace_code"
+              ors_mapping:
+                table: "mtca_ors.vat_registration_activity"
+                column: "nace_code"
+                data_type: "FixedString(5)"
+
+            - field_id: "activity_description"
+              field_code: "Box 12"
+              field_name_en: "Activity Description"
+              field_name_mt: "Deskrizzjoni tal-AttivitÃ "
+              field_description: "Brief description of business activities"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration_activity"
+                column: "description"
+              ors_mapping:
+                table: "mtca_ors.vat_registration_activity"
+                column: "activity_description"
+                data_type: "String"
+
+            - field_id: "activity_start_date"
+              field_code: "Box 13"
+              field_name_en: "Activity Start Date"
+              field_name_mt: "Data tal-Bidu tal-AttivitÃ "
+              field_description: "Date when business activity commenced or will commence"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "activity_start_date"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "activity_start_date"
+                data_type: "Date"
+
+            - field_id: "expected_annual_turnover"
+              field_code: "Box 14"
+              field_name_en: "Expected Annual Turnover"
+              field_name_mt: "DÄ§ul Annwali Mistenni"
+              field_description: "Estimated annual taxable supplies value"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_030"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "expected_annual_turnover >= 0"
+                  error_message_en: "Turnover cannot be negative"
+                  error_message_mt: "Id-dÄ§ul ma jistax ikun negattiv"
+                  severity: "error"
+                - rule_id: "VRF2_031"
+                  rule_type: "range"
+                  rule_description: "Article 11 threshold check"
+                  rule_expression: "expected_annual_turnover <= 20000"
+                  error_message_en: "For turnover exceeding â‚¬20,000, use Article 10 registration (Form 1)"
+                  error_message_mt: "GÄ§al dÄ§ul li jaqbeÅ¼ â‚¬20,000, uÅ¼a reÄ¡istrazzjoni Artikolu 10 (Formola 1)"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "expected_turnover"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "expected_annual_turnover"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Article 11 Declaration
+        # ----------------------------------------------------------------------
+        - section_id: "DECLARATION"
+          section_name: "Article 11 Declaration"
+          section_description: "Confirmation of small undertaking status"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "confirm_threshold"
+              field_code: "Box 15"
+              field_name_en: "Threshold Confirmation"
+              field_name_mt: "Konferma tal-Limitu"
+              field_description: "Confirm expected turnover does not exceed â‚¬20,000"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_040"
+                  rule_type: "cross_field"
+                  rule_description: "Must confirm if threshold met"
+                  rule_expression: "confirm_threshold = true"
+                  error_message_en: "Must confirm threshold compliance for Article 11"
+                  error_message_mt: "Irid tikkonferma konformitÃ  mal-limitu gÄ§all-Artikolu 11"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "threshold_confirmed"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "confirm_threshold"
+                data_type: "UInt8"
+
+            - field_id: "no_intra_community"
+              field_code: "Box 16"
+              field_name_en: "No Intra-Community Supplies"
+              field_name_mt: "L-ebda Provvisti Intra-Komunitarji"
+              field_description: "Confirm not making intra-community supplies of goods"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: true
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VRF2_041"
+                  rule_type: "cross_field"
+                  rule_description: "Article 11 incompatible with intra-community supplies"
+                  rule_expression: "no_intra_community = true"
+                  error_message_en: "Article 11 registration not available if making intra-community supplies"
+                  error_message_mt: "ReÄ¡istrazzjoni Artikolu 11 mhix disponibbli jekk tagÄ§mel provvisti intra-komunitarji"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "no_ic_supplies"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "no_intra_community"
+                data_type: "UInt8"
+
+            - field_id: "declaration_date"
+              field_code: "Box 17"
+              field_name_en: "Declaration Date"
+              field_name_mt: "Data tad-Dikjarazzjoni"
+              field_description: "Date of signing the registration form"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_registration"
+                column: "declaration_date"
+              ors_mapping:
+                table: "mtca_ors.vat_registration"
+                column: "declaration_date"
+                data_type: "Date"
+
+      attachments:
+        - attachment_code: "ID_COPY"
+          attachment_name: "Copy of ID Card"
+          required: true
+          required_condition: "applicant_type = 'IND'"
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+            - "JPG"
+            - "PNG"
+
+        - attachment_code: "MBR_CERT"
+          attachment_name: "MBR Registration Certificate"
+          required: true
+          required_condition: "applicant_type IN ('LTD', 'PLC', 'PAR', 'COM')"
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "VAT_REG_FORM1"
+          relationship_type: "alternative"
+          relationship_description: "Use Form 1 if turnover exceeds â‚¬20,000 threshold"
+        - form_code: "VAT_RETURN_ART11"
+          relationship_type: "child"
+          relationship_description: "Annual VAT return required after registration"
+
+      submission_workflow:
+        authentication_required: "e-ID or CFR credentials"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "VAT number assignment (MT format without prefix)"
+
+  # ==========================================================================
+  # VAT Return Article 11: Annual Return for Small Undertakings
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "VAT_RETURN_ART11"
+        form_name_en: "VAT Return - Article 11 (Annual)"
+        form_name_mt: "Dikjarazzjoni tal-VAT - Artikolu 11 (Annwali)"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "VAT Act Cap. 406, Article 11"
+        subsidiary_legislation:
+          - "S.L.406.01 - Value Added Tax Regulations"
+          - "S.L.406.04 - Small Undertakings Rules"
+        administering_authority: "CFR"
+        tax_type: "VAT"
+        taxpayer_category: "Small Undertaking"
+        filing_frequency: "Annual"
+        filing_deadline: "31 March of following year"
+        submission_method: "Both"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/VAT/Pages/VAT-Returns.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Simplified annual return for Article 11 registered small undertakings.
+          No VAT payment required (exempt). Reports total supplies only.
+          If turnover exceeds â‚¬20,000, must register under Article 10.
+          Mandatory electronic filing encouraged but paper accepted.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Trader Identification
+        # ----------------------------------------------------------------------
+        - section_id: "TRADER_ID"
+          section_name: "Trader Identification"
+          section_description: "VAT registration details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "vat_number"
+              field_code: "Box 1"
+              field_name_en: "VAT Registration Number"
+              field_name_mt: "Numru ta' ReÄ¡istrazzjoni tal-VAT"
+              field_description: "Article 11 VAT number (without MT prefix)"
+              data_type: "STRING"
+              format: "########"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VAR11_001"
+                  rule_type: "pattern"
+                  rule_description: "Article 11 numbers are 8 digits without MT prefix"
+                  rule_expression: "^[0-9]{8}$"
+                  error_message_en: "Invalid Article 11 VAT number format"
+                  error_message_mt: "Format tan-numru VAT Artikolu 11 mhux validu"
+                  severity: "error"
+                - rule_id: "VAR11_002"
+                  rule_type: "lookup"
+                  rule_description: "Must be registered under Article 11"
+                  rule_expression: "EXISTS(vat_register.number WHERE article = 11)"
+                  error_message_en: "VAT number not registered under Article 11"
+                  error_message_mt: "Numru VAT mhux reÄ¡istrat taÄ§t Artikolu 11"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "vat_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "vat_number"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "vat_number"
+                data_type: "FixedString(8)"
+
+            - field_id: "trader_name"
+              field_code: "Box 2"
+              field_name_en: "Trader Name"
+              field_name_mt: "Isem tan-Negozjant"
+              field_description: "Legal name of the registered person"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "trader_name"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "trader_name"
+                data_type: "String"
+
+            - field_id: "return_year"
+              field_code: "Box 3"
+              field_name_en: "Return Year"
+              field_name_mt: "Sena tad-Dikjarazzjoni"
+              field_description: "Calendar year for which return is submitted"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VAR11_003"
+                  rule_type: "range"
+                  rule_description: "Must be completed calendar year"
+                  rule_expression: "return_year <= CURRENT_YEAR - 1"
+                  error_message_en: "Return year must be a completed calendar year"
+                  error_message_mt: "Is-sena tad-dikjarazzjoni trid tkun sena kalendarja kompleta"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "return_year"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "return_year"
+                data_type: "UInt16"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Supplies Summary
+        # ----------------------------------------------------------------------
+        - section_id: "SUPPLIES"
+          section_name: "Supplies Summary"
+          section_description: "Total value of supplies made during the year"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_supplies"
+              field_code: "Box 4"
+              field_name_en: "Total Value of Supplies"
+              field_name_mt: "Valur Totali tal-Provvisti"
+              field_description: "Total value of all supplies made during the year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VAR11_010"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "total_supplies >= 0"
+                  error_message_en: "Total supplies cannot be negative"
+                  error_message_mt: "Provvisti totali ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "total_supplies"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "total_supplies"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "supplies_goods"
+              field_code: "Box 5"
+              field_name_en: "Value of Supplies of Goods"
+              field_name_mt: "Valur tal-Provvisti ta' Merkanzija"
+              field_description: "Value of goods supplied during the year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VAR11_011"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "supplies_goods >= 0"
+                  error_message_en: "Supplies of goods cannot be negative"
+                  error_message_mt: "Provvisti ta' merkanzija ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "supplies_goods"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "supplies_goods"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "supplies_services"
+              field_code: "Box 6"
+              field_name_en: "Value of Supplies of Services"
+              field_name_mt: "Valur tal-Provvisti ta' Servizzi"
+              field_description: "Value of services supplied during the year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VAR11_012"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "supplies_services >= 0"
+                  error_message_en: "Supplies of services cannot be negative"
+                  error_message_mt: "Provvisti ta' servizzi ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+                - rule_id: "VAR11_013"
+                  rule_type: "cross_field"
+                  rule_description: "Sum must equal total"
+                  rule_expression: "supplies_goods + supplies_services = total_supplies"
+                  error_message_en: "Goods + Services must equal Total Supplies"
+                  error_message_mt: "Merkanzija + Servizzi iridu jkunu ugwali gÄ§all-Provvisti Totali"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "supplies_services"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "supplies_services"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Threshold Check
+        # ----------------------------------------------------------------------
+        - section_id: "THRESHOLD"
+          section_name: "Threshold Check"
+          section_description: "Verification of Article 11 eligibility"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "threshold_exceeded"
+              field_code: "Box 7"
+              field_name_en: "Threshold Exceeded"
+              field_name_mt: "Limitu MaqbuÅ¼"
+              field_description: "Did total supplies exceed â‚¬20,000 during the year?"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_supplies > 20000"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "threshold_exceeded"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "threshold_exceeded"
+                data_type: "UInt8"
+
+            - field_id: "threshold_breach_date"
+              field_code: "Box 8"
+              field_name_en: "Date Threshold Exceeded"
+              field_name_mt: "Data meta l-Limitu nqabeÅ¼"
+              field_description: "Date when â‚¬20,000 threshold was exceeded (if applicable)"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: false
+              required_condition: "threshold_exceeded = true"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VAR11_020"
+                  rule_type: "conditional"
+                  rule_description: "Required if threshold exceeded"
+                  rule_expression: "IF threshold_exceeded THEN threshold_breach_date IS NOT NULL"
+                  error_message_en: "Date required when threshold exceeded"
+                  error_message_mt: "Data meÄ§tieÄ¡a meta l-limitu nqabeÅ¼"
+                  severity: "error"
+                - rule_id: "VAR11_021"
+                  rule_type: "date_logic"
+                  rule_description: "Date must be within return year"
+                  rule_expression: "YEAR(threshold_breach_date) = return_year"
+                  error_message_en: "Date must be within the return year"
+                  error_message_mt: "Id-data trid tkun fi Ä§dan is-sena tad-dikjarazzjoni"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "breach_date"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "threshold_breach_date"
+                data_type: "Nullable(Date)"
+
+            - field_id: "article10_application"
+              field_code: "Box 9"
+              field_name_en: "Article 10 Registration Applied"
+              field_name_mt: "ReÄ¡istrazzjoni Artikolu 10 Applikata"
+              field_description: "Has application for Article 10 registration been submitted?"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: false
+              required_condition: "threshold_exceeded = true"
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VAR11_022"
+                  rule_type: "conditional"
+                  rule_description: "Required if threshold exceeded"
+                  rule_expression: "IF threshold_exceeded THEN article10_application = true"
+                  error_message_en: "Must apply for Article 10 registration if threshold exceeded"
+                  error_message_mt: "Trid tapplika gÄ§al reÄ¡istrazzjoni Artikolu 10 jekk il-limitu nqabeÅ¼"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "VAT_REG_FORM1"
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "art10_applied"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "article10_application"
+                data_type: "UInt8"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Declaration
+        # ----------------------------------------------------------------------
+        - section_id: "DECLARATION"
+          section_name: "Declaration"
+          section_description: "Certification of return accuracy"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "declaration_confirmed"
+              field_code: "Box 10"
+              field_name_en: "Declaration Confirmation"
+              field_name_mt: "Konferma tad-Dikjarazzjoni"
+              field_description: "I declare the information in this return is correct and complete"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VAR11_030"
+                  rule_type: "cross_field"
+                  rule_description: "Must confirm declaration"
+                  rule_expression: "declaration_confirmed = true"
+                  error_message_en: "Must confirm the declaration"
+                  error_message_mt: "Trid tikkonferma d-dikjarazzjoni"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "declaration_confirmed"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "declaration_confirmed"
+                data_type: "UInt8"
+
+            - field_id: "submission_date"
+              field_code: "Box 11"
+              field_name_en: "Submission Date"
+              field_name_mt: "Data tas-Sottomissjoni"
+              field_description: "Date when return is submitted"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "CURRENT_DATE"
+              validation_rules:
+                - rule_id: "VAR11_031"
+                  rule_type: "date_logic"
+                  rule_description: "Check filing deadline"
+                  rule_expression: "submission_date <= CONCAT(return_year + 1, '-03-31')"
+                  error_message_en: "Return submitted after deadline (31 March)"
+                  error_message_mt: "Dikjarazzjoni sottomessa wara l-iskadenza (31 ta' Marzu)"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "vat_return_art11"
+                column: "submission_date"
+              ors_mapping:
+                table: "mtca_ors.vat_return_art11"
+                column: "submission_date"
+                data_type: "Date"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "VAT_REG_FORM2"
+          relationship_type: "prerequisite"
+          relationship_description: "Must be registered under Article 11 to file this return"
+        - form_code: "VAT_REG_FORM1"
+          relationship_type: "related"
+          relationship_description: "Required if threshold exceeded during year"
+        - form_code: "VAT_RETURN_ART10"
+          relationship_type: "related"
+          relationship_description: "Quarterly/monthly return if upgraded to Article 10"
+
+      submission_workflow:
+        authentication_required: "e-ID or CFR credentials"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Reference number and submission receipt"
+
+# ============================================================================
+# Reference Tables for Priority 1B Forms
+# ============================================================================
+reference_tables:
+  entity_type_codes:
+    - code: "IND"
+      description_en: "Individual/Sole Trader"
+    - code: "LTD"
+      description_en: "Private Limited Company"
+    - code: "PLC"
+      description_en: "Public Limited Company"
+    - code: "PAR"
+      description_en: "Partnership (en nom collectif)"
+    - code: "COM"
+      description_en: "Partnership (en commandite)"
+    - code: "SOC"
+      description_en: "Cooperative/Society"
+    - code: "TRS"
+      description_en: "Trust"
+    - code: "OTH"
+      description_en: "Other"
+
+  article11_thresholds:
+    - year: 2018
+      threshold: 14000
+    - year: 2019
+      threshold: 14000
+    - year: 2020
+      threshold: 18000
+    - year: 2021
+      threshold: 18000
+    - year: 2022
+      threshold: 18000
+    - year: 2023
+      threshold: 20000
+    - year: 2024
+      threshold: 20000
+    - year: 2025
+      threshold: 20000
+
+# ============================================================================
+# Cross-Form Relationships Summary
+# ============================================================================
+form_relationships:
+  vat_article11_chain:
+    description: "VAT Article 11 small undertaking compliance chain"
+    flow:
+      - source: "VAT_REG_FORM2"
+        target: "VAT_RETURN_ART11"
+        relationship: "Registration enables annual return filing"
+      - source: "VAT_RETURN_ART11"
+        target: "VAT_REG_FORM1"
+        relationship: "Threshold breach triggers Article 10 registration"
+      - source: "VAT_REG_FORM1"
+        target: "VAT_RETURN_ART10"
+        relationship: "Article 10 requires quarterly/monthly returns"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping Summary
+# ============================================================================
+migration_mapping:
+  vat_db:
+    tables:
+      - legacy_table: "vat_registration"
+        ors_table: "mtca_ors.vat_registration"
+        key_columns:
+          - legacy: "vat_number"
+            ors: "vat_number"
+        notes: "Filter by article = 11 for Article 11 registrations"
+      - legacy_table: "vat_registration_activity"
+        ors_table: "mtca_ors.vat_registration_activity"
+        key_columns:
+          - legacy: "vat_number"
+            ors: "vat_number"
+          - legacy: "nace_code"
+            ors: "nace_code"
+      - legacy_table: "vat_return_art11"
+        ors_table: "mtca_ors.vat_return_art11"
+        key_columns:
+          - legacy: "vat_number"
+            ors: "vat_number"
+          - legacy: "return_year"
+            ors: "return_year"

@@ -1,0 +1,2496 @@
+# ============================================================================
+# MTCA Forms - Priority 5D: EU VAT Schemes (OSS/IOSS) & Intra-EU Trade Reporting
+# Forms: Union OSS, Non-Union OSS, IOSS, Recapitulative Statement, Intrastat
+# Version: 1.0
+# Date: 2025-12-08
+# Purpose: ORS Database Schema Design and EU VAT Compliance
+# Standards: Council Directive 2017/2455/EU, 2019/1995/EU, Regulation 2019/2152
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # UNION_OSS_RETURN: One Stop Shop Return (Union Scheme)
+  # Council Directive 2017/2455/EU
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "UNION_OSS_RETURN"
+        form_name_en: "One Stop Shop VAT Return - Union Scheme"
+        form_name_mt: "Dikjarazzjoni tal-VAT tal-OSS - Skema tal-Unjoni"
+        version: "2021"
+        effective_from: "2021-07-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive 2017/2455/EU"
+        subsidiary_legislation:
+          - "VAT Act Cap. 406"
+          - "S.L.406.18 - One Stop Shop Regulations"
+        administering_authority: "CFR"
+        tax_type: "VAT"
+        taxpayer_category: "Taxable Person (EU-established)"
+        filing_frequency: "Quarterly"
+        filing_deadline: "End of month following quarter (Q1: Apr 30, Q2: Jul 31, Q3: Oct 31, Q4: Jan 31)"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "CFR e-Services / EU OSS Portal"
+        xml_schema_ref: "EU OSS Schema"
+        exchange_partner: "EU Member States"
+        source_url: "https://cfr.gov.mt/en/vat/Pages/OSS.aspx"
+        notes: |
+          The Union OSS scheme allows EU-established businesses to declare and pay
+          VAT on B2C supplies of services and intra-Community distance sales of
+          goods to consumers in other EU Member States through a single return
+          filed in their Member State of identification (Malta). Replaced the
+          former MOSS scheme from 1 July 2021. All amounts must be in EUR.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section: Return Identification
+        # ----------------------------------------------------------------------
+        - section_id: "RETURN_ID"
+          section_name: "Return Identification"
+          section_description: "Identification of the OSS return"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "oss:OSSReturn/oss:Header"
+          fields:
+            - field_id: "vat_number"
+              field_code: "VATNumber"
+              field_name_en: "VAT Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tal-VAT"
+              field_description: "Malta VAT number of the taxable person"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:VATNumber"
+              validation_rules:
+                - rule_id: "OSS_RET_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Malta VAT number"
+                  rule_expression: "^MT[0-9]{8}$"
+                  error_message_en: "Invalid Malta VAT number format"
+                  error_message_mt: "Format tan-numru tal-VAT ta' Malta mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "OSS_REGISTRATION.vat_number"
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_returns"
+                column: "vat_number"
+              ors_mapping:
+                table: "mtca_ors.oss_returns"
+                column: "vat_number"
+                data_type: "FixedString(10)"
+
+            - field_id: "return_period"
+              field_code: "ReturnPeriod"
+              field_name_en: "Return Period"
+              field_name_mt: "Perjodu tad-Dikjarazzjoni"
+              field_description: "Quarter and year for the return (e.g., 2024Q1)"
+              data_type: "STRING"
+              format: "YYYYQN"
+              max_length: 6
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:ReturnPeriod"
+              validation_rules:
+                - rule_id: "OSS_RET_002"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid quarter format"
+                  rule_expression: "^[0-9]{4}Q[1-4]$"
+                  error_message_en: "Invalid return period format (use YYYYQN)"
+                  error_message_mt: "Format tal-perjodu tad-dikjarazzjoni mhux validu (uÅ¼a YYYYQN)"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_returns"
+                column: "return_period"
+              ors_mapping:
+                table: "mtca_ors.oss_returns"
+                column: "return_period"
+                data_type: "String"
+
+            - field_id: "scheme_type"
+              field_code: "SchemeType"
+              field_name_en: "OSS Scheme Type"
+              field_name_mt: "Tip tal-Iskema OSS"
+              field_description: "Type of OSS scheme (Union)"
+              data_type: "CODE"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "UNION"
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:SchemeType"
+              validation_rules: []
+              allowed_values:
+                - code: "UNION"
+                  description_en: "Union Scheme (EU-established)"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_returns"
+                column: "scheme_type"
+              ors_mapping:
+                table: "mtca_ors.oss_returns"
+                column: "scheme_type"
+                data_type: "String"
+
+            - field_id: "nil_return"
+              field_code: "NilReturn"
+              field_name_en: "Nil Return"
+              field_name_mt: "Dikjarazzjoni Å»ero"
+              field_description: "Indicates if this is a nil return (no supplies)"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:NilReturn"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_returns"
+                column: "nil_return"
+              ors_mapping:
+                table: "mtca_ors.oss_returns"
+                column: "nil_return"
+                data_type: "UInt8"
+
+        # ----------------------------------------------------------------------
+        # Section: Supplies by Member State of Consumption
+        # ----------------------------------------------------------------------
+        - section_id: "SUPPLIES_BY_MS"
+          section_name: "Supplies by Member State"
+          section_description: "Breakdown of supplies by Member State of consumption"
+          repeatable: true
+          conditional: true
+          condition_logic: "nil_return = false"
+          xml_element: "oss:OSSReturn/oss:SuppliesByMS"
+          fields:
+            - field_id: "ms_consumption"
+              field_code: "MSConsumption"
+              field_name_en: "Member State of Consumption"
+              field_name_mt: "Stat Membru tal-Konsum"
+              field_description: "EU Member State where supplies are consumed"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:MSConsumption"
+              validation_rules:
+                - rule_id: "OSS_SUP_001"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid EU Member State (not Malta)"
+                  rule_expression: "IN(eu_member_states) AND != 'MT'"
+                  error_message_en: "Invalid Member State of consumption"
+                  error_message_mt: "Stat Membru tal-konsum mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_member_states"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_supplies"
+                column: "ms_consumption"
+              ors_mapping:
+                table: "mtca_ors.oss_supplies"
+                column: "ms_consumption"
+                data_type: "FixedString(2)"
+
+            - field_id: "supply_type"
+              field_code: "SupplyType"
+              field_name_en: "Type of Supply"
+              field_name_mt: "Tip ta' Provvista"
+              field_description: "Category of supply"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:SupplyType"
+              validation_rules:
+                - rule_id: "OSS_SUP_002"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid supply type"
+                  rule_expression: "IN(oss_supply_types)"
+                  error_message_en: "Invalid supply type"
+                  error_message_mt: "Tip ta' provvista mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "SERVICES"
+                  description_en: "Services to non-taxable persons"
+                - code: "DISTANCE_GOODS"
+                  description_en: "Intra-Community distance sales of goods"
+                - code: "DOMESTIC_EI"
+                  description_en: "Domestic sales via electronic interfaces (deemed supplier)"
+              reference_table: "oss_supply_types"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_supplies"
+                column: "supply_type"
+              ors_mapping:
+                table: "mtca_ors.oss_supplies"
+                column: "supply_type"
+                data_type: "Enum8('SERVICES'=1,'DISTANCE_GOODS'=2,'DOMESTIC_EI'=3)"
+
+            - field_id: "vat_rate_type"
+              field_code: "VATRateType"
+              field_name_en: "VAT Rate Type"
+              field_name_mt: "Tip tar-Rata tal-VAT"
+              field_description: "Type of VAT rate applied"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:VATRateType"
+              validation_rules:
+                - rule_id: "OSS_SUP_003"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid VAT rate type"
+                  rule_expression: "IN(vat_rate_types)"
+                  error_message_en: "Invalid VAT rate type"
+                  error_message_mt: "Tip tar-rata tal-VAT mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "STANDARD"
+                  description_en: "Standard rate"
+                - code: "REDUCED"
+                  description_en: "Reduced rate"
+                - code: "SUPER_REDUCED"
+                  description_en: "Super-reduced rate"
+                - code: "PARKING"
+                  description_en: "Parking rate"
+              reference_table: "vat_rate_types"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_supplies"
+                column: "vat_rate_type"
+              ors_mapping:
+                table: "mtca_ors.oss_supplies"
+                column: "vat_rate_type"
+                data_type: "Enum8('STANDARD'=1,'REDUCED'=2,'SUPER_REDUCED'=3,'PARKING'=4)"
+
+            - field_id: "vat_rate"
+              field_code: "VATRate"
+              field_name_en: "VAT Rate (%)"
+              field_name_mt: "Rata tal-VAT (%)"
+              field_description: "VAT rate percentage applicable in MS of consumption"
+              data_type: "DECIMAL"
+              format: "##.##"
+              max_length: null
+              precision: 5
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:VATRate"
+              validation_rules:
+                - rule_id: "OSS_SUP_004"
+                  rule_type: "range"
+                  rule_description: "VAT rate must be between 0 and 30%"
+                  rule_expression: "vat_rate >= 0 AND vat_rate <= 30"
+                  error_message_en: "VAT rate must be between 0% and 30%"
+                  error_message_mt: "Ir-rata tal-VAT trid tkun bejn 0% u 30%"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_supplies"
+                column: "vat_rate"
+              ors_mapping:
+                table: "mtca_ors.oss_supplies"
+                column: "vat_rate"
+                data_type: "Decimal(5,2)"
+
+            - field_id: "taxable_amount"
+              field_code: "TaxableAmount"
+              field_name_en: "Taxable Amount (EUR)"
+              field_name_mt: "Ammont Taxxabbli (EUR)"
+              field_description: "Total taxable amount for this rate in EUR"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:TaxableAmount"
+              validation_rules:
+                - rule_id: "OSS_SUP_005"
+                  rule_type: "range"
+                  rule_description: "Amount must be non-negative"
+                  rule_expression: "taxable_amount >= 0"
+                  error_message_en: "Taxable amount cannot be negative"
+                  error_message_mt: "L-ammont taxxabbli ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_supplies"
+                column: "taxable_amount"
+              ors_mapping:
+                table: "mtca_ors.oss_supplies"
+                column: "taxable_amount"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "vat_amount"
+              field_code: "VATAmount"
+              field_name_en: "VAT Amount (EUR)"
+              field_name_mt: "Ammont tal-VAT (EUR)"
+              field_description: "VAT amount due for this rate in EUR"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: true
+              calculation_formula: "ROUND(taxable_amount * vat_rate / 100, 2)"
+              xml_element: "oss:VATAmount"
+              validation_rules:
+                - rule_id: "OSS_SUP_006"
+                  rule_type: "calculation"
+                  rule_description: "VAT amount must match calculation"
+                  rule_expression: "ABS(vat_amount - (taxable_amount * vat_rate / 100)) < 0.01"
+                  error_message_en: "VAT amount calculation error"
+                  error_message_mt: "Å»ball fil-kalkolu tal-ammont tal-VAT"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_supplies"
+                column: "vat_amount"
+              ors_mapping:
+                table: "mtca_ors.oss_supplies"
+                column: "vat_amount"
+                data_type: "Decimal(18,2)"
+
+        # ----------------------------------------------------------------------
+        # Section: Corrections
+        # ----------------------------------------------------------------------
+        - section_id: "CORRECTIONS"
+          section_name: "Corrections to Previous Returns"
+          section_description: "Corrections to VAT amounts from previous periods"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "oss:OSSReturn/oss:Corrections"
+          fields:
+            - field_id: "correction_period"
+              field_code: "CorrectionPeriod"
+              field_name_en: "Period Being Corrected"
+              field_name_mt: "Perjodu li Qed JiÄ¡i Korrett"
+              field_description: "Return period to which correction relates"
+              data_type: "STRING"
+              format: "YYYYQN"
+              max_length: 6
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:CorrectionPeriod"
+              validation_rules:
+                - rule_id: "OSS_COR_001"
+                  rule_type: "range"
+                  rule_description: "Correction period must be within 3 years"
+                  rule_expression: "CorrectionPeriod >= PERIOD_MINUS_3_YEARS(ReturnPeriod)"
+                  error_message_en: "Correction period exceeds 3-year limit"
+                  error_message_mt: "Il-perjodu tal-korrezzjoni jeÄ‹Ä‹edi l-limitu ta' 3 snin"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_corrections"
+                column: "correction_period"
+              ors_mapping:
+                table: "mtca_ors.oss_corrections"
+                column: "correction_period"
+                data_type: "String"
+
+            - field_id: "correction_ms"
+              field_code: "CorrectionMS"
+              field_name_en: "Member State"
+              field_name_mt: "Stat Membru"
+              field_description: "Member State to which correction relates"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:CorrectionMS"
+              validation_rules:
+                - rule_id: "OSS_COR_002"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid EU Member State"
+                  rule_expression: "IN(eu_member_states)"
+                  error_message_en: "Invalid Member State"
+                  error_message_mt: "Stat Membru mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_member_states"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_corrections"
+                column: "correction_ms"
+              ors_mapping:
+                table: "mtca_ors.oss_corrections"
+                column: "correction_ms"
+                data_type: "FixedString(2)"
+
+            - field_id: "correction_amount"
+              field_code: "CorrectionAmount"
+              field_name_en: "Correction Amount (EUR)"
+              field_name_mt: "Ammont tal-Korrezzjoni (EUR)"
+              field_description: "VAT correction amount (positive increases, negative decreases)"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:CorrectionAmount"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_corrections"
+                column: "correction_amount"
+              ors_mapping:
+                table: "mtca_ors.oss_corrections"
+                column: "correction_amount"
+                data_type: "Decimal(18,2)"
+
+        # ----------------------------------------------------------------------
+        # Section: Totals
+        # ----------------------------------------------------------------------
+        - section_id: "TOTALS"
+          section_name: "Return Totals"
+          section_description: "Total VAT due by Member State"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "oss:OSSReturn/oss:Totals"
+          fields:
+            - field_id: "total_ms"
+              field_code: "TotalMS"
+              field_name_en: "Member State"
+              field_name_mt: "Stat Membru"
+              field_description: "Member State for total"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "oss:TotalMS"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eu_member_states"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_totals"
+                column: "ms_code"
+              ors_mapping:
+                table: "mtca_ors.oss_totals"
+                column: "ms_code"
+                data_type: "FixedString(2)"
+
+            - field_id: "total_vat_due"
+              field_code: "TotalVATDue"
+              field_name_en: "Total VAT Due (EUR)"
+              field_name_mt: "Total VAT Dovut (EUR)"
+              field_description: "Total VAT due to this Member State"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(vat_amount WHERE ms_consumption = total_ms) + SUM(correction_amount WHERE correction_ms = total_ms)"
+              xml_element: "oss:TotalVATDue"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_totals"
+                column: "total_vat_due"
+              ors_mapping:
+                table: "mtca_ors.oss_totals"
+                column: "total_vat_due"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "grand_total"
+              field_code: "GrandTotal"
+              field_name_en: "Grand Total VAT Due (EUR)"
+              field_name_mt: "Total Ä enerali tal-VAT Dovut (EUR)"
+              field_description: "Total VAT due across all Member States"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(total_vat_due)"
+              xml_element: "oss:GrandTotal"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "oss_returns"
+                column: "grand_total"
+              ors_mapping:
+                table: "mtca_ors.oss_returns"
+                column: "grand_total"
+                data_type: "Decimal(18,2)"
+
+      xml_schema:
+        namespace: "urn:eu:taxud:oss:v1"
+        root_element: "OSSReturn"
+        schema_version: "1.0"
+        schema_url: "https://ec.europa.eu/taxation_customs/vies/schema/oss_return_v1.xsd"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "OSS_REGISTRATION"
+          relationship_type: "prerequisite"
+          relationship_description: "Must be registered for Union OSS before filing returns"
+        - form_code: "VAT_RETURN"
+          relationship_type: "supplement"
+          relationship_description: "OSS supplies excluded from domestic VAT return"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Quarterly (via OSS system)"
+        partner_authorities: "EU Member States of consumption"
+        encryption_required: true
+        transmission_protocol: "EU OSS Portal"
+
+      submission_workflow:
+        authentication_required: "CFR e-ID credentials"
+        signature_required: false
+        validation_type: "Business rules and rate validation"
+        acknowledgment_type: "Return acceptance confirmation"
+
+  # ==========================================================================
+  # IOSS_RETURN: Import One Stop Shop Return
+  # Council Directive 2019/1995/EU
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "IOSS_RETURN"
+        form_name_en: "Import One Stop Shop VAT Return"
+        form_name_mt: "Dikjarazzjoni tal-VAT tal-IOSS"
+        version: "2021"
+        effective_from: "2021-07-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive 2019/1995/EU"
+        subsidiary_legislation:
+          - "VAT Act Cap. 406"
+          - "S.L.406.18 - One Stop Shop Regulations"
+        administering_authority: "CFR"
+        tax_type: "VAT"
+        taxpayer_category: "Taxable Person / Intermediary"
+        filing_frequency: "Monthly"
+        filing_deadline: "End of month following reporting month"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "CFR e-Services / EU IOSS Portal"
+        xml_schema_ref: "EU IOSS Schema"
+        exchange_partner: "EU Member States"
+        source_url: "https://cfr.gov.mt/en/vat/Pages/IOSS.aspx"
+        notes: |
+          The Import One Stop Shop (IOSS) allows businesses to collect and remit
+          import VAT on distance sales of goods imported from third countries
+          where the consignment value does not exceed â‚¬150. The IOSS number
+          must be provided to customs for VAT exemption at import. Returns are
+          monthly and amounts must be in EUR.
+
+      sections:
+        - section_id: "RETURN_ID"
+          section_name: "Return Identification"
+          section_description: "Identification of the IOSS return"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "ioss:IOSSReturn/ioss:Header"
+          fields:
+            - field_id: "ioss_number"
+              field_code: "IOSSNumber"
+              field_name_en: "IOSS Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tal-IOSS"
+              field_description: "IOSS number assigned to the taxable person (IM###########MT)"
+              data_type: "STRING"
+              format: "IM###########CC"
+              max_length: 14
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ioss:IOSSNumber"
+              validation_rules:
+                - rule_id: "IOSS_RET_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid IOSS number format"
+                  rule_expression: "^IM[0-9]{10}[A-Z]{2}$"
+                  error_message_en: "Invalid IOSS number format"
+                  error_message_mt: "Format tan-numru tal-IOSS mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "IOSS_REGISTRATION.ioss_number"
+              legacy_mapping:
+                database: "vat_db"
+                table: "ioss_returns"
+                column: "ioss_number"
+              ors_mapping:
+                table: "mtca_ors.ioss_returns"
+                column: "ioss_number"
+                data_type: "FixedString(14)"
+
+            - field_id: "return_month"
+              field_code: "ReturnMonth"
+              field_name_en: "Return Month"
+              field_name_mt: "Xahar tad-Dikjarazzjoni"
+              field_description: "Month and year for the return (YYYY-MM)"
+              data_type: "STRING"
+              format: "YYYY-MM"
+              max_length: 7
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ioss:ReturnMonth"
+              validation_rules:
+                - rule_id: "IOSS_RET_002"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid month format"
+                  rule_expression: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+                  error_message_en: "Invalid return month format"
+                  error_message_mt: "Format tax-xahar tad-dikjarazzjoni mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "ioss_returns"
+                column: "return_month"
+              ors_mapping:
+                table: "mtca_ors.ioss_returns"
+                column: "return_month"
+                data_type: "String"
+
+            - field_id: "nil_return"
+              field_code: "NilReturn"
+              field_name_en: "Nil Return"
+              field_name_mt: "Dikjarazzjoni Å»ero"
+              field_description: "Indicates if this is a nil return (no supplies)"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              xml_element: "ioss:NilReturn"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "ioss_returns"
+                column: "nil_return"
+              ors_mapping:
+                table: "mtca_ors.ioss_returns"
+                column: "nil_return"
+                data_type: "UInt8"
+
+        - section_id: "IMPORT_SUPPLIES"
+          section_name: "Import Supplies by Member State"
+          section_description: "Distance sales of imported goods by MS of destination"
+          repeatable: true
+          conditional: true
+          condition_logic: "nil_return = false"
+          xml_element: "ioss:IOSSReturn/ioss:ImportSupplies"
+          fields:
+            - field_id: "ms_destination"
+              field_code: "MSDestination"
+              field_name_en: "Member State of Destination"
+              field_name_mt: "Stat Membru tad-Destinazzjoni"
+              field_description: "EU Member State where goods are delivered"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ioss:MSDestination"
+              validation_rules:
+                - rule_id: "IOSS_SUP_001"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid EU Member State"
+                  rule_expression: "IN(eu_member_states)"
+                  error_message_en: "Invalid Member State"
+                  error_message_mt: "Stat Membru mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_member_states"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "ioss_supplies"
+                column: "ms_destination"
+              ors_mapping:
+                table: "mtca_ors.ioss_supplies"
+                column: "ms_destination"
+                data_type: "FixedString(2)"
+
+            - field_id: "vat_rate_type"
+              field_code: "VATRateType"
+              field_name_en: "VAT Rate Type"
+              field_name_mt: "Tip tar-Rata tal-VAT"
+              field_description: "Type of VAT rate"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ioss:VATRateType"
+              validation_rules:
+                - rule_id: "IOSS_SUP_002"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid rate type"
+                  rule_expression: "IN(vat_rate_types)"
+                  error_message_en: "Invalid VAT rate type"
+                  error_message_mt: "Tip tar-rata tal-VAT mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "STANDARD"
+                  description_en: "Standard rate"
+                - code: "REDUCED"
+                  description_en: "Reduced rate"
+              reference_table: "vat_rate_types"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "ioss_supplies"
+                column: "vat_rate_type"
+              ors_mapping:
+                table: "mtca_ors.ioss_supplies"
+                column: "vat_rate_type"
+                data_type: "Enum8('STANDARD'=1,'REDUCED'=2)"
+
+            - field_id: "vat_rate"
+              field_code: "VATRate"
+              field_name_en: "VAT Rate (%)"
+              field_name_mt: "Rata tal-VAT (%)"
+              field_description: "VAT rate percentage"
+              data_type: "DECIMAL"
+              format: "##.##"
+              max_length: null
+              precision: 5
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ioss:VATRate"
+              validation_rules:
+                - rule_id: "IOSS_SUP_003"
+                  rule_type: "range"
+                  rule_description: "VAT rate must be valid"
+                  rule_expression: "vat_rate >= 0 AND vat_rate <= 30"
+                  error_message_en: "Invalid VAT rate"
+                  error_message_mt: "Rata tal-VAT mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "ioss_supplies"
+                column: "vat_rate"
+              ors_mapping:
+                table: "mtca_ors.ioss_supplies"
+                column: "vat_rate"
+                data_type: "Decimal(5,2)"
+
+            - field_id: "taxable_amount"
+              field_code: "TaxableAmount"
+              field_name_en: "Taxable Amount (EUR)"
+              field_name_mt: "Ammont Taxxabbli (EUR)"
+              field_description: "Total value of imported goods"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "ioss:TaxableAmount"
+              validation_rules:
+                - rule_id: "IOSS_SUP_004"
+                  rule_type: "range"
+                  rule_description: "Amount must be non-negative"
+                  rule_expression: "taxable_amount >= 0"
+                  error_message_en: "Amount cannot be negative"
+                  error_message_mt: "L-ammont ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "ioss_supplies"
+                column: "taxable_amount"
+              ors_mapping:
+                table: "mtca_ors.ioss_supplies"
+                column: "taxable_amount"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "vat_amount"
+              field_code: "VATAmount"
+              field_name_en: "VAT Amount (EUR)"
+              field_name_mt: "Ammont tal-VAT (EUR)"
+              field_description: "Import VAT collected"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: true
+              calculation_formula: "ROUND(taxable_amount * vat_rate / 100, 2)"
+              xml_element: "ioss:VATAmount"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "ioss_supplies"
+                column: "vat_amount"
+              ors_mapping:
+                table: "mtca_ors.ioss_supplies"
+                column: "vat_amount"
+                data_type: "Decimal(18,2)"
+
+      xml_schema:
+        namespace: "urn:eu:taxud:ioss:v1"
+        root_element: "IOSSReturn"
+        schema_version: "1.0"
+        schema_url: "https://ec.europa.eu/taxation_customs/vies/schema/ioss_return_v1.xsd"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "IOSS_REGISTRATION"
+          relationship_type: "prerequisite"
+          relationship_description: "Must be registered for IOSS before filing returns"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Monthly (via IOSS system)"
+        partner_authorities: "EU Member States of destination"
+        encryption_required: true
+        transmission_protocol: "EU IOSS Portal"
+
+      submission_workflow:
+        authentication_required: "CFR e-ID credentials"
+        signature_required: false
+        validation_type: "Business rules and rate validation"
+        acknowledgment_type: "Return acceptance confirmation"
+
+  # ==========================================================================
+  # RECAPITULATIVE_STATEMENT: EC Sales List (VIES)
+  # Council Directive 2006/112/EC Art 262-263
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "RECAPITULATIVE_STATEMENT"
+        form_name_en: "Recapitulative Statement (EC Sales List)"
+        form_name_mt: "Dikjarazzjoni Rikapitulattiva (Lista ta' BejgÄ§ tal-KE)"
+        version: "2024"
+        effective_from: "2010-01-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive 2006/112/EC Art 262-263"
+        subsidiary_legislation:
+          - "VAT Act Cap. 406"
+          - "S.L.406.01 - VAT Regulations"
+        administering_authority: "CFR"
+        tax_type: "VAT"
+        taxpayer_category: "VAT Registered Person"
+        filing_frequency: "Monthly (if >â‚¬50k quarterly) or Quarterly"
+        filing_deadline: "15th of month following period"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: null
+        exchange_partner: "EU Member States (via VIES)"
+        source_url: "https://cfr.gov.mt/en/vat/Pages/Recapitulative-Statement.aspx"
+        notes: |
+          The Recapitulative Statement (EC Sales List) reports intra-Community
+          supplies of goods and services to VAT-registered customers in other
+          EU Member States. Required monthly if quarterly intra-EU supplies
+          exceed â‚¬50,000, otherwise quarterly. Customer VAT numbers must be
+          validated through VIES before submission.
+
+      sections:
+        - section_id: "HEADER"
+          section_name: "Statement Header"
+          section_description: "Statement identification information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "vat_number"
+              field_code: "VATNumber"
+              field_name_en: "VAT Number"
+              field_name_mt: "Numru tal-VAT"
+              field_description: "Malta VAT number of the supplier"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "RECAP_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Malta VAT number"
+                  rule_expression: "^MT[0-9]{8}$"
+                  error_message_en: "Invalid Malta VAT number"
+                  error_message_mt: "Numru tal-VAT ta' Malta mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "VAT_REGISTRATION.vat_number"
+              legacy_mapping:
+                database: "vat_db"
+                table: "recap_statements"
+                column: "vat_number"
+              ors_mapping:
+                table: "mtca_ors.recap_statements"
+                column: "vat_number"
+                data_type: "FixedString(10)"
+
+            - field_id: "period_type"
+              field_code: "PeriodType"
+              field_name_en: "Period Type"
+              field_name_mt: "Tip tal-Perjodu"
+              field_description: "Monthly or quarterly reporting"
+              data_type: "CODE"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values:
+                - code: "MONTHLY"
+                  description_en: "Monthly (if quarterly supplies > â‚¬50,000)"
+                - code: "QUARTERLY"
+                  description_en: "Quarterly"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "recap_statements"
+                column: "period_type"
+              ors_mapping:
+                table: "mtca_ors.recap_statements"
+                column: "period_type"
+                data_type: "Enum8('MONTHLY'=1,'QUARTERLY'=2)"
+
+            - field_id: "period"
+              field_code: "Period"
+              field_name_en: "Reporting Period"
+              field_name_mt: "Perjodu ta' Rappurtar"
+              field_description: "Month (YYYY-MM) or Quarter (YYYYQN)"
+              data_type: "STRING"
+              format: null
+              max_length: 7
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "RECAP_002"
+                  rule_type: "pattern"
+                  rule_description: "Valid period format"
+                  rule_expression: "^([0-9]{4}-(0[1-9]|1[0-2])|[0-9]{4}Q[1-4])$"
+                  error_message_en: "Invalid period format"
+                  error_message_mt: "Format tal-perjodu mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "recap_statements"
+                column: "period"
+              ors_mapping:
+                table: "mtca_ors.recap_statements"
+                column: "period"
+                data_type: "String"
+
+        - section_id: "SUPPLIES"
+          section_name: "Intra-Community Supplies"
+          section_description: "List of supplies to EU customers"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "customer_vat"
+              field_code: "CustomerVAT"
+              field_name_en: "Customer VAT Number"
+              field_name_mt: "Numru tal-VAT tal-Klijent"
+              field_description: "VAT number of EU customer (VIES validated)"
+              data_type: "STRING"
+              format: "CC########..."
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "RECAP_003"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid EU VAT number format"
+                  rule_expression: "^[A-Z]{2}[A-Za-z0-9]{2,13}$"
+                  error_message_en: "Invalid EU VAT number format"
+                  error_message_mt: "Format tan-numru tal-VAT tal-UE mhux validu"
+                  severity: "error"
+                - rule_id: "RECAP_004"
+                  rule_type: "vies"
+                  rule_description: "VAT number must be valid in VIES"
+                  rule_expression: "VIES_VALID(customer_vat)"
+                  error_message_en: "VAT number not valid in VIES"
+                  error_message_mt: "Numru tal-VAT mhux validu fil-VIES"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "recap_supplies"
+                column: "customer_vat"
+              ors_mapping:
+                table: "mtca_ors.recap_supplies"
+                column: "customer_vat"
+                data_type: "String"
+
+            - field_id: "supply_indicator"
+              field_code: "SupplyIndicator"
+              field_name_en: "Supply Indicator"
+              field_name_mt: "Indikatur tal-Provvista"
+              field_description: "Type of supply"
+              data_type: "CODE"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values:
+                - code: "G"
+                  description_en: "Goods"
+                - code: "S"
+                  description_en: "Services"
+                - code: "T"
+                  description_en: "Triangulation"
+                - code: "C"
+                  description_en: "Call-off stock"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "recap_supplies"
+                column: "supply_indicator"
+              ors_mapping:
+                table: "mtca_ors.recap_supplies"
+                column: "supply_indicator"
+                data_type: "Enum8('G'=1,'S'=2,'T'=3,'C'=4)"
+
+            - field_id: "supply_value"
+              field_code: "SupplyValue"
+              field_name_en: "Value of Supplies (EUR)"
+              field_name_mt: "Valur tal-Provvisti (EUR)"
+              field_description: "Total value of supplies to this customer"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "RECAP_005"
+                  rule_type: "range"
+                  rule_description: "Value must be positive"
+                  rule_expression: "supply_value > 0"
+                  error_message_en: "Supply value must be positive"
+                  error_message_mt: "Il-valur tal-provvista irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "recap_supplies"
+                column: "supply_value"
+              ors_mapping:
+                table: "mtca_ors.recap_supplies"
+                column: "supply_value"
+                data_type: "Decimal(18,2)"
+
+      xml_schema: null
+
+      attachments: []
+
+      related_forms:
+        - form_code: "VAT_RETURN"
+          relationship_type: "cross_reference"
+          relationship_description: "Intra-EU supplies must reconcile with VAT return"
+        - form_code: "INTRASTAT_DISPATCHES"
+          relationship_type: "cross_reference"
+          relationship_description: "Goods supplies must reconcile with Intrastat"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Monthly/Quarterly (via VIES)"
+        partner_authorities: "EU Member States"
+        encryption_required: true
+        transmission_protocol: "VIES Network"
+
+      submission_workflow:
+        authentication_required: "CFR e-ID credentials"
+        signature_required: false
+        validation_type: "VIES validation"
+        acknowledgment_type: "Submission receipt"
+
+  # ==========================================================================
+  # INTRASTAT_ARRIVALS: Intrastat Declaration (Arrivals)
+  # Regulation (EU) 2019/2152
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "INTRASTAT_ARRIVALS"
+        form_name_en: "Intrastat Declaration - Arrivals"
+        form_name_mt: "Dikjarazzjoni Intrastat - Waslin"
+        version: "2024"
+        effective_from: "2022-01-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) 2019/2152"
+        subsidiary_legislation:
+          - "S.L.365.06 - Statistics on the Trading of Goods between Member States Regulations"
+        administering_authority: "NSO Malta"
+        tax_type: "Trade Statistics"
+        taxpayer_category: "VAT Registered Person"
+        filing_frequency: "Monthly"
+        filing_deadline: "10th working day of following month"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "NSO Intrastat Portal"
+        xml_schema_ref: "NSO Intrastat XML"
+        exchange_partner: "Eurostat"
+        source_url: "https://nso.gov.mt/intrastat/"
+        notes: |
+          Intrastat arrivals declaration is required from VAT-registered persons
+          whose annual value of intra-EU goods acquisitions exceeds the â‚¬700
+          exemption threshold. Declarations cover the movement of goods from
+          other EU Member States to Malta. Statistical value is required if
+          annual arrivals exceed â‚¬8 million.
+
+      sections:
+        - section_id: "HEADER"
+          section_name: "Declaration Header"
+          section_description: "Declaration identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "intrastat:Declaration/intrastat:Header"
+          fields:
+            - field_id: "vat_number"
+              field_code: "VATNumber"
+              field_name_en: "VAT Number"
+              field_name_mt: "Numru tal-VAT"
+              field_description: "Malta VAT number"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:VATNumber"
+              validation_rules:
+                - rule_id: "INTRA_ARR_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Malta VAT number"
+                  rule_expression: "^MT[0-9]{8}$"
+                  error_message_en: "Invalid Malta VAT number"
+                  error_message_mt: "Numru tal-VAT ta' Malta mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_arrivals"
+                column: "vat_number"
+              ors_mapping:
+                table: "mtca_ors.intrastat_arrivals"
+                column: "vat_number"
+                data_type: "FixedString(10)"
+
+            - field_id: "reference_month"
+              field_code: "ReferenceMonth"
+              field_name_en: "Reference Month"
+              field_name_mt: "Xahar ta' Referenza"
+              field_description: "Month of goods movement"
+              data_type: "STRING"
+              format: "YYYY-MM"
+              max_length: 7
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:ReferenceMonth"
+              validation_rules:
+                - rule_id: "INTRA_ARR_002"
+                  rule_type: "pattern"
+                  rule_description: "Valid month format"
+                  rule_expression: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+                  error_message_en: "Invalid month format"
+                  error_message_mt: "Format tax-xahar mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_arrivals"
+                column: "reference_month"
+              ors_mapping:
+                table: "mtca_ors.intrastat_arrivals"
+                column: "reference_month"
+                data_type: "String"
+
+            - field_id: "flow_type"
+              field_code: "FlowType"
+              field_name_en: "Flow Type"
+              field_name_mt: "Tip ta' Fluss"
+              field_description: "Type of trade flow"
+              data_type: "CODE"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "A"
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:FlowType"
+              validation_rules: []
+              allowed_values:
+                - code: "A"
+                  description_en: "Arrivals"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_arrivals"
+                column: "flow_type"
+              ors_mapping:
+                table: "mtca_ors.intrastat_arrivals"
+                column: "flow_type"
+                data_type: "FixedString(1)"
+
+        - section_id: "ITEMS"
+          section_name: "Item Details"
+          section_description: "Details of goods arrivals"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "intrastat:Declaration/intrastat:Items/intrastat:Item"
+          fields:
+            - field_id: "cn_code"
+              field_code: "CNCode"
+              field_name_en: "Combined Nomenclature Code"
+              field_name_mt: "KodiÄ‹i tan-Nomenklatura Kombinata"
+              field_description: "8-digit CN commodity code"
+              data_type: "STRING"
+              format: "########"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:CNCode"
+              validation_rules:
+                - rule_id: "INTRA_ITM_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be 8-digit CN code"
+                  rule_expression: "^[0-9]{8}$"
+                  error_message_en: "Invalid CN code format"
+                  error_message_mt: "Format tal-kodiÄ‹i CN mhux validu"
+                  severity: "error"
+                - rule_id: "INTRA_ITM_002"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid CN code"
+                  rule_expression: "EXISTS(cn_nomenclature.code)"
+                  error_message_en: "CN code not found"
+                  error_message_mt: "KodiÄ‹i CN ma nstabx"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "cn_nomenclature"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_items"
+                column: "cn_code"
+              ors_mapping:
+                table: "mtca_ors.intrastat_items"
+                column: "cn_code"
+                data_type: "FixedString(8)"
+
+            - field_id: "partner_ms"
+              field_code: "PartnerMS"
+              field_name_en: "Partner Member State"
+              field_name_mt: "Stat Membru SieÄ§eb"
+              field_description: "MS from which goods were dispatched"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:PartnerMS"
+              validation_rules:
+                - rule_id: "INTRA_ITM_003"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid EU MS (not Malta)"
+                  rule_expression: "IN(eu_member_states) AND != 'MT'"
+                  error_message_en: "Invalid partner Member State"
+                  error_message_mt: "Stat Membru sieÄ§eb mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_member_states"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_items"
+                column: "partner_ms"
+              ors_mapping:
+                table: "mtca_ors.intrastat_items"
+                column: "partner_ms"
+                data_type: "FixedString(2)"
+
+            - field_id: "country_origin"
+              field_code: "CountryOrigin"
+              field_name_en: "Country of Origin"
+              field_name_mt: "PajjiÅ¼ tal-OriÄ¡ini"
+              field_description: "Country where goods originated"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:CountryOrigin"
+              validation_rules:
+                - rule_id: "INTRA_ITM_004"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO country code"
+                  rule_expression: "IN(iso_3166_1_alpha2)"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_3166_1_alpha2"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_items"
+                column: "country_origin"
+              ors_mapping:
+                table: "mtca_ors.intrastat_items"
+                column: "country_origin"
+                data_type: "FixedString(2)"
+
+            - field_id: "nature_transaction"
+              field_code: "NatureTransaction"
+              field_name_en: "Nature of Transaction"
+              field_name_mt: "Natura tat-TranÅ¼azzjoni"
+              field_description: "2-digit transaction code"
+              data_type: "STRING"
+              format: "##"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:NatureTransaction"
+              validation_rules:
+                - rule_id: "INTRA_ITM_005"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid transaction code"
+                  rule_expression: "IN(nature_transaction_codes)"
+                  error_message_en: "Invalid transaction code"
+                  error_message_mt: "KodiÄ‹i tat-tranÅ¼azzjoni mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "11"
+                  description_en: "Outright purchase/sale"
+                - code: "12"
+                  description_en: "Supply for sale on approval"
+                - code: "21"
+                  description_en: "Return of goods"
+                - code: "22"
+                  description_en: "Replacement for returned goods"
+                - code: "31"
+                  description_en: "Goods for processing"
+                - code: "32"
+                  description_en: "Return after processing"
+                - code: "41"
+                  description_en: "Goods under operating lease"
+                - code: "42"
+                  description_en: "Return from operating lease"
+                - code: "51"
+                  description_en: "Goods following repair"
+                - code: "52"
+                  description_en: "Return for repair"
+                - code: "91"
+                  description_en: "Other transactions"
+              reference_table: "nature_transaction_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_items"
+                column: "nature_transaction"
+              ors_mapping:
+                table: "mtca_ors.intrastat_items"
+                column: "nature_transaction"
+                data_type: "FixedString(2)"
+
+            - field_id: "mode_transport"
+              field_code: "ModeTransport"
+              field_name_en: "Mode of Transport"
+              field_name_mt: "Mod ta' Trasport"
+              field_description: "Mode of transport at Malta border"
+              data_type: "CODE"
+              format: "#"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:ModeTransport"
+              validation_rules: []
+              allowed_values:
+                - code: "1"
+                  description_en: "Sea transport"
+                - code: "2"
+                  description_en: "Rail transport"
+                - code: "3"
+                  description_en: "Road transport"
+                - code: "4"
+                  description_en: "Air transport"
+                - code: "5"
+                  description_en: "Post"
+                - code: "7"
+                  description_en: "Fixed transport installations"
+                - code: "8"
+                  description_en: "Inland waterway transport"
+                - code: "9"
+                  description_en: "Own propulsion"
+              reference_table: "mode_transport_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_items"
+                column: "mode_transport"
+              ors_mapping:
+                table: "mtca_ors.intrastat_items"
+                column: "mode_transport"
+                data_type: "FixedString(1)"
+
+            - field_id: "net_mass"
+              field_code: "NetMass"
+              field_name_en: "Net Mass (kg)"
+              field_name_mt: "Massa Netta (kg)"
+              field_description: "Net mass in kilograms"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 18
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:NetMass"
+              validation_rules:
+                - rule_id: "INTRA_ITM_006"
+                  rule_type: "range"
+                  rule_description: "Mass must be positive"
+                  rule_expression: "net_mass > 0"
+                  error_message_en: "Net mass must be positive"
+                  error_message_mt: "Il-massa netta trid tkun poÅ¼ittiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_items"
+                column: "net_mass"
+              ors_mapping:
+                table: "mtca_ors.intrastat_items"
+                column: "net_mass"
+                data_type: "Decimal(18,3)"
+
+            - field_id: "supplementary_units"
+              field_code: "SupplementaryUnits"
+              field_name_en: "Supplementary Units"
+              field_name_mt: "Unitajiet Supplimentari"
+              field_description: "Supplementary quantity (if required by CN code)"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 18
+              scale: 3
+              required: false
+              required_condition: "CN code requires supplementary units"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:SupplementaryUnits"
+              validation_rules:
+                - rule_id: "INTRA_ITM_007"
+                  rule_type: "range"
+                  rule_description: "Units must be positive if provided"
+                  rule_expression: "supplementary_units > 0 OR supplementary_units IS NULL"
+                  error_message_en: "Supplementary units must be positive"
+                  error_message_mt: "L-unitajiet supplimentari iridu jkunu poÅ¼ittivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_items"
+                column: "supplementary_units"
+              ors_mapping:
+                table: "mtca_ors.intrastat_items"
+                column: "supplementary_units"
+                data_type: "Nullable(Decimal(18,3))"
+
+            - field_id: "invoice_value"
+              field_code: "InvoiceValue"
+              field_name_en: "Invoice Value (EUR)"
+              field_name_mt: "Valur tal-Fattura (EUR)"
+              field_description: "Invoice value in EUR"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:InvoiceValue"
+              validation_rules:
+                - rule_id: "INTRA_ITM_008"
+                  rule_type: "range"
+                  rule_description: "Value must be positive"
+                  rule_expression: "invoice_value > 0"
+                  error_message_en: "Invoice value must be positive"
+                  error_message_mt: "Il-valur tal-fattura irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_items"
+                column: "invoice_value"
+              ors_mapping:
+                table: "mtca_ors.intrastat_items"
+                column: "invoice_value"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "statistical_value"
+              field_code: "StatisticalValue"
+              field_name_en: "Statistical Value (EUR)"
+              field_name_mt: "Valur Statistiku (EUR)"
+              field_description: "Statistical value (required if annual arrivals >â‚¬8M)"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: false
+              required_condition: "Annual arrivals > â‚¬8 million"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:StatisticalValue"
+              validation_rules:
+                - rule_id: "INTRA_ITM_009"
+                  rule_type: "range"
+                  rule_description: "Value must be positive if provided"
+                  rule_expression: "statistical_value > 0 OR statistical_value IS NULL"
+                  error_message_en: "Statistical value must be positive"
+                  error_message_mt: "Il-valur statistiku irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_items"
+                column: "statistical_value"
+              ors_mapping:
+                table: "mtca_ors.intrastat_items"
+                column: "statistical_value"
+                data_type: "Nullable(Decimal(18,2))"
+
+      xml_schema:
+        namespace: "urn:nso:malta:intrastat:v1"
+        root_element: "IntrastatDeclaration"
+        schema_version: "1.0"
+        schema_url: null
+
+      attachments: []
+
+      related_forms:
+        - form_code: "INTRASTAT_DISPATCHES"
+          relationship_type: "counterpart"
+          relationship_description: "Dispatches are the opposite flow"
+        - form_code: "RECAPITULATIVE_STATEMENT"
+          relationship_type: "cross_reference"
+          relationship_description: "Goods purchases from EU suppliers"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Monthly"
+        partner_authorities: "Eurostat"
+        encryption_required: true
+        transmission_protocol: "NSO Portal"
+
+      submission_workflow:
+        authentication_required: "NSO Portal credentials"
+        signature_required: false
+        validation_type: "CN code and business rules"
+        acknowledgment_type: "Submission receipt"
+
+  # ==========================================================================
+  # INTRASTAT_DISPATCHES: Intrastat Declaration (Dispatches)
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "INTRASTAT_DISPATCHES"
+        form_name_en: "Intrastat Declaration - Dispatches"
+        form_name_mt: "Dikjarazzjoni Intrastat - Dispacci"
+        version: "2024"
+        effective_from: "2022-01-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) 2019/2152"
+        subsidiary_legislation:
+          - "S.L.365.06 - Statistics on the Trading of Goods between Member States Regulations"
+        administering_authority: "NSO Malta"
+        tax_type: "Trade Statistics"
+        taxpayer_category: "VAT Registered Person"
+        filing_frequency: "Monthly"
+        filing_deadline: "10th working day of following month"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "NSO Intrastat Portal"
+        xml_schema_ref: "NSO Intrastat XML"
+        exchange_partner: "Eurostat"
+        source_url: "https://nso.gov.mt/intrastat/"
+        notes: |
+          Intrastat dispatches declaration is required from VAT-registered persons
+          whose annual value of intra-EU goods dispatches exceeds the â‚¬700
+          exemption threshold. Declarations cover the movement of goods from
+          Malta to other EU Member States. Statistical value is required for all
+          dispatches if annual dispatches exceed â‚¬8 million.
+
+      sections:
+        - section_id: "HEADER"
+          section_name: "Declaration Header"
+          section_description: "Declaration identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "intrastat:Declaration/intrastat:Header"
+          fields:
+            - field_id: "vat_number"
+              field_code: "VATNumber"
+              field_name_en: "VAT Number"
+              field_name_mt: "Numru tal-VAT"
+              field_description: "Malta VAT number"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:VATNumber"
+              validation_rules:
+                - rule_id: "INTRA_DIS_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Malta VAT number"
+                  rule_expression: "^MT[0-9]{8}$"
+                  error_message_en: "Invalid Malta VAT number"
+                  error_message_mt: "Numru tal-VAT ta' Malta mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_dispatches"
+                column: "vat_number"
+              ors_mapping:
+                table: "mtca_ors.intrastat_dispatches"
+                column: "vat_number"
+                data_type: "FixedString(10)"
+
+            - field_id: "reference_month"
+              field_code: "ReferenceMonth"
+              field_name_en: "Reference Month"
+              field_name_mt: "Xahar ta' Referenza"
+              field_description: "Month of goods dispatch"
+              data_type: "STRING"
+              format: "YYYY-MM"
+              max_length: 7
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:ReferenceMonth"
+              validation_rules:
+                - rule_id: "INTRA_DIS_002"
+                  rule_type: "pattern"
+                  rule_description: "Valid month format"
+                  rule_expression: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+                  error_message_en: "Invalid month format"
+                  error_message_mt: "Format tax-xahar mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_dispatches"
+                column: "reference_month"
+              ors_mapping:
+                table: "mtca_ors.intrastat_dispatches"
+                column: "reference_month"
+                data_type: "String"
+
+            - field_id: "flow_type"
+              field_code: "FlowType"
+              field_name_en: "Flow Type"
+              field_name_mt: "Tip ta' Fluss"
+              field_description: "Type of trade flow"
+              data_type: "CODE"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "D"
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:FlowType"
+              validation_rules: []
+              allowed_values:
+                - code: "D"
+                  description_en: "Dispatches"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_dispatches"
+                column: "flow_type"
+              ors_mapping:
+                table: "mtca_ors.intrastat_dispatches"
+                column: "flow_type"
+                data_type: "FixedString(1)"
+
+        - section_id: "ITEMS"
+          section_name: "Item Details"
+          section_description: "Details of goods dispatches"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "intrastat:Declaration/intrastat:Items/intrastat:Item"
+          fields:
+            - field_id: "cn_code"
+              field_code: "CNCode"
+              field_name_en: "Combined Nomenclature Code"
+              field_name_mt: "KodiÄ‹i tan-Nomenklatura Kombinata"
+              field_description: "8-digit CN commodity code"
+              data_type: "STRING"
+              format: "########"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:CNCode"
+              validation_rules:
+                - rule_id: "INTRA_DIS_ITM_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be 8-digit CN code"
+                  rule_expression: "^[0-9]{8}$"
+                  error_message_en: "Invalid CN code format"
+                  error_message_mt: "Format tal-kodiÄ‹i CN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "cn_nomenclature"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_dispatch_items"
+                column: "cn_code"
+              ors_mapping:
+                table: "mtca_ors.intrastat_dispatch_items"
+                column: "cn_code"
+                data_type: "FixedString(8)"
+
+            - field_id: "partner_ms"
+              field_code: "PartnerMS"
+              field_name_en: "Partner Member State"
+              field_name_mt: "Stat Membru SieÄ§eb"
+              field_description: "MS to which goods are dispatched"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:PartnerMS"
+              validation_rules:
+                - rule_id: "INTRA_DIS_ITM_002"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid EU MS (not Malta)"
+                  rule_expression: "IN(eu_member_states) AND != 'MT'"
+                  error_message_en: "Invalid partner Member State"
+                  error_message_mt: "Stat Membru sieÄ§eb mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_member_states"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_dispatch_items"
+                column: "partner_ms"
+              ors_mapping:
+                table: "mtca_ors.intrastat_dispatch_items"
+                column: "partner_ms"
+                data_type: "FixedString(2)"
+
+            - field_id: "nature_transaction"
+              field_code: "NatureTransaction"
+              field_name_en: "Nature of Transaction"
+              field_name_mt: "Natura tat-TranÅ¼azzjoni"
+              field_description: "2-digit transaction code"
+              data_type: "STRING"
+              format: "##"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:NatureTransaction"
+              validation_rules:
+                - rule_id: "INTRA_DIS_ITM_003"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid transaction code"
+                  rule_expression: "IN(nature_transaction_codes)"
+                  error_message_en: "Invalid transaction code"
+                  error_message_mt: "KodiÄ‹i tat-tranÅ¼azzjoni mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "11"
+                  description_en: "Outright purchase/sale"
+                - code: "12"
+                  description_en: "Supply for sale on approval"
+                - code: "21"
+                  description_en: "Return of goods"
+                - code: "22"
+                  description_en: "Replacement for returned goods"
+                - code: "31"
+                  description_en: "Goods sent for processing"
+                - code: "32"
+                  description_en: "Return after processing"
+                - code: "91"
+                  description_en: "Other transactions"
+              reference_table: "nature_transaction_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_dispatch_items"
+                column: "nature_transaction"
+              ors_mapping:
+                table: "mtca_ors.intrastat_dispatch_items"
+                column: "nature_transaction"
+                data_type: "FixedString(2)"
+
+            - field_id: "mode_transport"
+              field_code: "ModeTransport"
+              field_name_en: "Mode of Transport"
+              field_name_mt: "Mod ta' Trasport"
+              field_description: "Mode of transport"
+              data_type: "CODE"
+              format: "#"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:ModeTransport"
+              validation_rules: []
+              allowed_values:
+                - code: "1"
+                  description_en: "Sea transport"
+                - code: "3"
+                  description_en: "Road transport"
+                - code: "4"
+                  description_en: "Air transport"
+                - code: "5"
+                  description_en: "Post"
+                - code: "9"
+                  description_en: "Own propulsion"
+              reference_table: "mode_transport_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_dispatch_items"
+                column: "mode_transport"
+              ors_mapping:
+                table: "mtca_ors.intrastat_dispatch_items"
+                column: "mode_transport"
+                data_type: "FixedString(1)"
+
+            - field_id: "net_mass"
+              field_code: "NetMass"
+              field_name_en: "Net Mass (kg)"
+              field_name_mt: "Massa Netta (kg)"
+              field_description: "Net mass in kilograms"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 18
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:NetMass"
+              validation_rules:
+                - rule_id: "INTRA_DIS_ITM_004"
+                  rule_type: "range"
+                  rule_description: "Mass must be positive"
+                  rule_expression: "net_mass > 0"
+                  error_message_en: "Net mass must be positive"
+                  error_message_mt: "Il-massa netta trid tkun poÅ¼ittiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_dispatch_items"
+                column: "net_mass"
+              ors_mapping:
+                table: "mtca_ors.intrastat_dispatch_items"
+                column: "net_mass"
+                data_type: "Decimal(18,3)"
+
+            - field_id: "invoice_value"
+              field_code: "InvoiceValue"
+              field_name_en: "Invoice Value (EUR)"
+              field_name_mt: "Valur tal-Fattura (EUR)"
+              field_description: "Invoice value"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "intrastat:InvoiceValue"
+              validation_rules:
+                - rule_id: "INTRA_DIS_ITM_005"
+                  rule_type: "range"
+                  rule_description: "Value must be positive"
+                  rule_expression: "invoice_value > 0"
+                  error_message_en: "Invoice value must be positive"
+                  error_message_mt: "Il-valur tal-fattura irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "statistics_db"
+                table: "intrastat_dispatch_items"
+                column: "invoice_value"
+              ors_mapping:
+                table: "mtca_ors.intrastat_dispatch_items"
+                column: "invoice_value"
+                data_type: "Decimal(18,2)"
+
+      xml_schema:
+        namespace: "urn:nso:malta:intrastat:v1"
+        root_element: "IntrastatDeclaration"
+        schema_version: "1.0"
+        schema_url: null
+
+      attachments: []
+
+      related_forms:
+        - form_code: "INTRASTAT_ARRIVALS"
+          relationship_type: "counterpart"
+          relationship_description: "Arrivals are the opposite flow"
+        - form_code: "RECAPITULATIVE_STATEMENT"
+          relationship_type: "cross_reference"
+          relationship_description: "Goods sales to EU customers"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Monthly"
+        partner_authorities: "Eurostat"
+        encryption_required: true
+        transmission_protocol: "NSO Portal"
+
+      submission_workflow:
+        authentication_required: "NSO Portal credentials"
+        signature_required: false
+        validation_type: "CN code and business rules"
+        acknowledgment_type: "Submission receipt"
+
+# ============================================================================
+# Reference Tables
+# ============================================================================
+reference_tables:
+  eu_vat_rates_2024:
+    - country: "AT"
+      standard: 20
+      reduced: [10, 13]
+    - country: "BE"
+      standard: 21
+      reduced: [6, 12]
+    - country: "BG"
+      standard: 20
+      reduced: [9]
+    - country: "HR"
+      standard: 25
+      reduced: [5, 13]
+    - country: "CY"
+      standard: 19
+      reduced: [5, 9]
+    - country: "CZ"
+      standard: 21
+      reduced: [12, 15]
+    - country: "DK"
+      standard: 25
+      reduced: []
+    - country: "EE"
+      standard: 22
+      reduced: [9]
+    - country: "FI"
+      standard: 24
+      reduced: [10, 14]
+    - country: "FR"
+      standard: 20
+      reduced: [5.5, 10]
+    - country: "DE"
+      standard: 19
+      reduced: [7]
+    - country: "GR"
+      standard: 24
+      reduced: [6, 13]
+    - country: "HU"
+      standard: 27
+      reduced: [5, 18]
+    - country: "IE"
+      standard: 23
+      reduced: [9, 13.5]
+    - country: "IT"
+      standard: 22
+      reduced: [5, 10]
+    - country: "LV"
+      standard: 21
+      reduced: [12]
+    - country: "LT"
+      standard: 21
+      reduced: [5, 9]
+    - country: "LU"
+      standard: 17
+      reduced: [8, 14]
+    - country: "MT"
+      standard: 18
+      reduced: [5, 7]
+    - country: "NL"
+      standard: 21
+      reduced: [9]
+    - country: "PL"
+      standard: 23
+      reduced: [5, 8]
+    - country: "PT"
+      standard: 23
+      reduced: [6, 13]
+    - country: "RO"
+      standard: 19
+      reduced: [5, 9]
+    - country: "SK"
+      standard: 20
+      reduced: [10]
+    - country: "SI"
+      standard: 22
+      reduced: [9.5]
+    - country: "ES"
+      standard: 21
+      reduced: [4, 10]
+    - country: "SE"
+      standard: 25
+      reduced: [6, 12]
+
+  intrastat_thresholds:
+    arrivals:
+      exemption_threshold: 700
+      statistical_value_threshold: 8000000
+    dispatches:
+      exemption_threshold: 700
+      statistical_value_threshold: 8000000
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  vat_db:
+    tables:
+      - legacy_table: "oss_returns"
+        ors_table: "mtca_ors.oss_returns"
+        description: "OSS return headers"
+        key_columns:
+          - legacy: "return_id"
+            ors: "return_id"
+
+      - legacy_table: "oss_supplies"
+        ors_table: "mtca_ors.oss_supplies"
+        description: "OSS supply line items"
+        key_columns:
+          - legacy: "supply_id"
+            ors: "supply_id"
+
+      - legacy_table: "ioss_returns"
+        ors_table: "mtca_ors.ioss_returns"
+        description: "IOSS return headers"
+        key_columns:
+          - legacy: "return_id"
+            ors: "return_id"
+
+      - legacy_table: "ioss_supplies"
+        ors_table: "mtca_ors.ioss_supplies"
+        description: "IOSS supply line items"
+        key_columns:
+          - legacy: "supply_id"
+            ors: "supply_id"
+
+      - legacy_table: "recap_statements"
+        ors_table: "mtca_ors.recap_statements"
+        description: "Recapitulative statement headers"
+        key_columns:
+          - legacy: "statement_id"
+            ors: "statement_id"
+
+      - legacy_table: "recap_supplies"
+        ors_table: "mtca_ors.recap_supplies"
+        description: "Recapitulative statement line items"
+        key_columns:
+          - legacy: "supply_id"
+            ors: "supply_id"
+
+  statistics_db:
+    tables:
+      - legacy_table: "intrastat_arrivals"
+        ors_table: "mtca_ors.intrastat_arrivals"
+        description: "Intrastat arrivals headers"
+        key_columns:
+          - legacy: "declaration_id"
+            ors: "declaration_id"
+
+      - legacy_table: "intrastat_items"
+        ors_table: "mtca_ors.intrastat_arrival_items"
+        description: "Intrastat arrivals line items"
+        key_columns:
+          - legacy: "item_id"
+            ors: "item_id"
+
+      - legacy_table: "intrastat_dispatches"
+        ors_table: "mtca_ors.intrastat_dispatches"
+        description: "Intrastat dispatches headers"
+        key_columns:
+          - legacy: "declaration_id"
+            ors: "declaration_id"
+
+      - legacy_table: "intrastat_dispatch_items"
+        ors_table: "mtca_ors.intrastat_dispatch_items"
+        description: "Intrastat dispatches line items"
+        key_columns:
+          - legacy: "item_id"
+            ors: "item_id"

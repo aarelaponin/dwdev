@@ -1,0 +1,482 @@
+# ==============================================================================
+# Malta L3 Warehouse Model: dim_payment_method
+# Step 10c: Reference & Analytical Dimensions
+# ==============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Purpose: Payment method classification dimension for fact_payment
+# ==============================================================================
+
+dimension:
+  name: "dim_payment_method"
+  schema: "warehouse"
+  display_name: "Payment Method Dimension"
+  description: |
+    Classification dimension for tax payment methods. Supports analysis of
+    payment channel usage, electronic vs manual payments, and processing
+    characteristics.
+    
+    Malta accepts payments via bank transfer, direct debit, credit/debit
+    cards, cheques, and cash (limited). This dimension enables tracking
+    of digital transformation in payment processing.
+    
+  scd_type: 1
+  scd_type_description: "Type 1 - Overwrite on change (reference data rarely changes)"
+  
+  natural_key: ["payment_method_code"]
+  surrogate_key: "payment_method_key"
+  
+  grain: "One row per payment method"
+  estimated_rows: 15
+  
+  source_system:
+    primary_table: "reference.ref_payment_method"
+    
+  refresh_frequency: "Annual (or on new payment method introduction)"
+  
+  # ============================================================================
+  # COLUMNS
+  # ============================================================================
+  columns:
+    # --------------------------------------------------------------------------
+    # Surrogate Key
+    # --------------------------------------------------------------------------
+    - name: "payment_method_key"
+      display_name: "Payment Method Key"
+      data_type: "INT"
+      nullable: false
+      description: "Surrogate key for payment method dimension"
+      constraints:
+        primary_key: true
+        auto_increment: true
+
+    # --------------------------------------------------------------------------
+    # Natural Key & Names
+    # --------------------------------------------------------------------------
+    - name: "payment_method_code"
+      display_name: "Payment Method Code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Short code for payment method"
+      constraints:
+        unique: true
+      examples: ["BANK_TRANSFER", "DIRECT_DEBIT", "CARD_ONLINE", "CHEQUE", "CASH"]
+      
+    - name: "payment_method_name"
+      display_name: "Payment Method Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Full name of the payment method"
+      examples: ["Bank Transfer", "Direct Debit", "Card Payment (Online)", "Cheque", "Cash"]
+      
+    - name: "payment_method_name_mt"
+      display_name: "Payment Method Name (Maltese)"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Payment method name in Maltese"
+      examples: ["Trasferiment Bankarju", "Debitu Dirett", "Karta tal-Kreditu", "Ċekk", "Flus Kontanti"]
+      
+    - name: "payment_method_description"
+      display_name: "Payment Method Description"
+      data_type: "VARCHAR(500)"
+      nullable: true
+      description: "Detailed description of the payment method"
+
+    # --------------------------------------------------------------------------
+    # Classification
+    # --------------------------------------------------------------------------
+    - name: "payment_channel"
+      display_name: "Payment Channel"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "High-level payment channel category"
+      constraints:
+        check: "payment_channel IN ('ONLINE', 'BANK', 'COUNTER', 'AGENT', 'EMPLOYER')"
+      examples: ["ONLINE", "BANK", "COUNTER"]
+      
+    - name: "payment_channel_name"
+      display_name: "Payment Channel Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Display name for payment channel"
+      examples: ["Online Portal", "Bank Branch", "Tax Office Counter", "Authorized Agent", "Employer Withholding"]
+      
+    - name: "payment_type"
+      display_name: "Payment Type"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "Type of payment instrument"
+      constraints:
+        check: "payment_type IN ('TRANSFER', 'DEBIT', 'CARD', 'CASH', 'CHEQUE', 'OFFSET', 'OTHER')"
+      examples: ["TRANSFER", "DEBIT", "CARD", "CASH", "CHEQUE"]
+
+    # --------------------------------------------------------------------------
+    # Characteristics
+    # --------------------------------------------------------------------------
+    - name: "is_electronic"
+      display_name: "Electronic"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether this is an electronic payment method"
+      
+    - name: "is_real_time"
+      display_name: "Real Time"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether payment is processed in real-time"
+      
+    - name: "is_reversible"
+      display_name: "Reversible"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether payment can be reversed/chargebacked"
+      
+    - name: "is_automated"
+      display_name: "Automated"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether payment is automated (e.g., standing order, direct debit)"
+      
+    - name: "processing_days"
+      display_name: "Processing Days"
+      data_type: "SMALLINT"
+      nullable: true
+      description: "Number of business days to clear/process payment"
+      
+    - name: "transaction_fee_applies"
+      display_name: "Transaction Fee Applies"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether a transaction fee may apply"
+      
+    - name: "minimum_amount"
+      display_name: "Minimum Amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Minimum payment amount for this method (if applicable)"
+      
+    - name: "maximum_amount"
+      display_name: "Maximum Amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Maximum payment amount for this method (if applicable)"
+
+    # --------------------------------------------------------------------------
+    # Availability
+    # --------------------------------------------------------------------------
+    - name: "available_online"
+      display_name: "Available Online"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether payment method is available through online portal"
+      
+    - name: "available_counter"
+      display_name: "Available at Counter"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether payment method is accepted at tax office counter"
+      
+    - name: "requires_registration"
+      display_name: "Requires Registration"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether payment method requires prior registration (e.g., direct debit mandate)"
+
+    # --------------------------------------------------------------------------
+    # Display
+    # --------------------------------------------------------------------------
+    - name: "sort_order"
+      display_name: "Sort Order"
+      data_type: "INT"
+      nullable: false
+      description: "Display sort order"
+      
+    - name: "is_active"
+      display_name: "Active Flag"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether payment method is currently accepted"
+
+    # --------------------------------------------------------------------------
+    # ETL Metadata
+    # --------------------------------------------------------------------------
+    - name: "etl_batch_id"
+      display_name: "ETL Batch ID"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for audit trail"
+      
+    - name: "etl_load_timestamp"
+      display_name: "ETL Load Timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when record was loaded"
+
+  # ============================================================================
+  # INDEXES
+  # ============================================================================
+  indexes:
+    - name: "pk_dim_payment_method"
+      columns: ["payment_method_key"]
+      primary: true
+      
+    - name: "uk_dim_payment_method_code"
+      columns: ["payment_method_code"]
+      unique: true
+      
+    - name: "idx_dim_payment_channel"
+      columns: ["payment_channel"]
+      description: "Support queries by payment channel"
+      
+    - name: "idx_dim_payment_electronic"
+      columns: ["is_electronic"]
+      description: "Support electronic vs manual payment analysis"
+
+  # ============================================================================
+  # REFERENCE DATA
+  # ============================================================================
+  reference_data:
+    # Bank Transfers
+    - code: "BANK_TRANSFER"
+      name: "Bank Transfer"
+      name_mt: "Trasferiment Bankarju"
+      channel: "BANK"
+      type: "TRANSFER"
+      electronic: true
+      real_time: false
+      reversible: false
+      automated: false
+      processing_days: 1
+      available_online: false
+      available_counter: false
+      description: "Electronic bank transfer via internet banking"
+      sort_order: 10
+      
+    - code: "SEPA_TRANSFER"
+      name: "SEPA Credit Transfer"
+      name_mt: "Trasferiment ta' Kreditu SEPA"
+      channel: "BANK"
+      type: "TRANSFER"
+      electronic: true
+      real_time: false
+      reversible: false
+      automated: false
+      processing_days: 1
+      available_online: false
+      available_counter: false
+      description: "SEPA credit transfer for EUR payments"
+      sort_order: 15
+      
+    # Direct Debits
+    - code: "DIRECT_DEBIT"
+      name: "Direct Debit"
+      name_mt: "Debitu Dirett"
+      channel: "BANK"
+      type: "DEBIT"
+      electronic: true
+      real_time: false
+      reversible: true
+      automated: true
+      processing_days: 3
+      requires_registration: true
+      available_online: true
+      available_counter: false
+      description: "Automated bank account debit with mandate"
+      sort_order: 20
+      
+    - code: "STANDING_ORDER"
+      name: "Standing Order"
+      name_mt: "Ordni Permanenti"
+      channel: "BANK"
+      type: "TRANSFER"
+      electronic: true
+      real_time: false
+      reversible: false
+      automated: true
+      processing_days: 2
+      requires_registration: true
+      available_online: false
+      available_counter: false
+      description: "Regular automated payment of fixed amount"
+      sort_order: 25
+      
+    # Card Payments
+    - code: "CARD_ONLINE"
+      name: "Card Payment (Online)"
+      name_mt: "Ħlas bil-Karta (Online)"
+      channel: "ONLINE"
+      type: "CARD"
+      electronic: true
+      real_time: true
+      reversible: true
+      automated: false
+      processing_days: 0
+      transaction_fee_applies: true
+      available_online: true
+      available_counter: false
+      description: "Credit/debit card payment via online portal"
+      sort_order: 30
+      
+    - code: "CARD_POS"
+      name: "Card Payment (POS)"
+      name_mt: "Ħlas bil-Karta (POS)"
+      channel: "COUNTER"
+      type: "CARD"
+      electronic: true
+      real_time: true
+      reversible: true
+      automated: false
+      processing_days: 0
+      transaction_fee_applies: true
+      available_online: false
+      available_counter: true
+      description: "Credit/debit card payment at tax office terminal"
+      sort_order: 35
+      
+    # Traditional Methods
+    - code: "CHEQUE"
+      name: "Cheque"
+      name_mt: "Ċekk"
+      channel: "BANK"
+      type: "CHEQUE"
+      electronic: false
+      real_time: false
+      reversible: true
+      automated: false
+      processing_days: 5
+      available_online: false
+      available_counter: true
+      description: "Bank cheque payment"
+      sort_order: 40
+      
+    - code: "CASH"
+      name: "Cash"
+      name_mt: "Flus Kontanti"
+      channel: "COUNTER"
+      type: "CASH"
+      electronic: false
+      real_time: true
+      reversible: false
+      automated: false
+      processing_days: 0
+      available_online: false
+      available_counter: true
+      maximum_amount: 5000.00
+      description: "Cash payment at tax office (limited to €5,000)"
+      sort_order: 50
+      
+    # Special Payment Types
+    - code: "OFFSET"
+      name: "Tax Offset"
+      name_mt: "Offset tat-Taxxa"
+      channel: "ONLINE"
+      type: "OFFSET"
+      electronic: true
+      real_time: true
+      reversible: false
+      automated: false
+      processing_days: 0
+      available_online: true
+      available_counter: true
+      description: "Payment via credit balance from another tax type"
+      sort_order: 60
+      
+    - code: "REFUND_OFFSET"
+      name: "Refund Offset"
+      name_mt: "Offset tar-Rifużjoni"
+      channel: "ONLINE"
+      type: "OFFSET"
+      electronic: true
+      real_time: true
+      reversible: false
+      automated: true
+      processing_days: 0
+      available_online: false
+      available_counter: false
+      description: "Automatic offset of refund against outstanding liability"
+      sort_order: 65
+      
+    - code: "GUARANTEE"
+      name: "Guarantee Deposit"
+      name_mt: "Depożitu ta' Garanzija"
+      channel: "BANK"
+      type: "OTHER"
+      electronic: true
+      real_time: false
+      reversible: false
+      automated: false
+      processing_days: 2
+      available_online: false
+      available_counter: true
+      description: "Bank guarantee or deposit for customs/tax purposes"
+      sort_order: 70
+      
+    - code: "DEFERRED"
+      name: "Deferred Payment"
+      name_mt: "Ħlas Diferit"
+      channel: "BANK"
+      type: "OTHER"
+      electronic: true
+      real_time: false
+      reversible: false
+      automated: false
+      processing_days: 0
+      requires_registration: true
+      available_online: false
+      available_counter: false
+      description: "Authorized deferred payment arrangement"
+      sort_order: 75
+      
+    - code: "EMPLOYER_WHT"
+      name: "Employer Withholding"
+      name_mt: "Żamma mill-Impjegatur"
+      channel: "EMPLOYER"
+      type: "TRANSFER"
+      electronic: true
+      real_time: false
+      reversible: false
+      automated: true
+      processing_days: 1
+      available_online: false
+      available_counter: false
+      description: "Tax withheld and remitted by employer (FSS/PAYE)"
+      sort_order: 80
+
+  # ============================================================================
+  # USAGE NOTES
+  # ============================================================================
+  usage_notes:
+    fact_tables:
+      - fact_payment: "Primary dimension for payment analysis"
+      - fact_refund: "Track refund disbursement method"
+      
+    common_queries:
+      - name: "Electronic vs Manual Payments"
+        pattern: "GROUP BY is_electronic"
+        
+      - name: "Payment Channel Distribution"
+        pattern: "GROUP BY payment_channel"
+        
+      - name: "Real-Time Payment Ratio"
+        pattern: "GROUP BY is_real_time"
+        
+    analysis_patterns:
+      - name: "Digital Transformation"
+        description: "Track increase in electronic payments over time"
+        
+      - name: "Processing Cost"
+        description: "Higher processing_days = higher operational cost"
+        
+      - name: "Cash Compliance"
+        description: "Monitor cash payments against €5,000 limit"
+
+# ==============================================================================
+# END OF SPECIFICATION
+# ==============================================================================

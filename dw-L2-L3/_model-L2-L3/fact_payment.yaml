@@ -1,0 +1,602 @@
+# =============================================================================
+# Malta L3 Warehouse: fact_payment Fact Table
+# =============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Phase: C - L3 Warehouse Model Development
+# Step: 11a - Fact Table Framework & Core Facts
+# =============================================================================
+
+fact_table:
+  name: "fact_payment"
+  schema: "warehouse"
+  description: |
+    Transactional fact table tracking all payment transactions.
+    Each row represents a single payment event.
+    Includes allocation breakdown showing how payments are applied
+    to tax principal, penalties, and interest.
+    
+  fact_type: "TRANSACTIONAL"
+  grain: "One row per payment transaction"
+  
+  business_context:
+    domain: "Payment & Refund"
+    primary_use: "Revenue collection analysis, payment compliance, method preferences"
+    usage_pattern: "Very high read volume for revenue dashboards"
+    refresh: "Daily incremental based on L2 modified_date"
+    
+  estimated_volume:
+    initial_rows: 10000000
+    annual_growth_rows: 1000000
+    average_daily_inserts: 3000
+    note: "Highest volume fact table - multiple payments per assessment"
+    
+  # ===========================================================================
+  # DIMENSION FOREIGN KEYS
+  # ===========================================================================
+  dimension_keys:
+    - name: "party_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_party"
+      description: "Payer (taxpayer making payment)"
+      
+    - name: "tax_type_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_tax_type"
+      description: "Type of tax being paid"
+      
+    - name: "tax_period_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_tax_period"
+      description: |
+        Tax period payment relates to.
+        NULL for ad-hoc or unallocated payments.
+      default_value: -1
+      note: "Use -1 for Unknown/Ad-hoc period"
+      
+    - name: "registration_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_registration"
+      description: "Payer's registration status"
+      
+    - name: "payment_method_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_payment_method"
+      description: "How payment was made"
+      
+    - name: "compliance_status_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_compliance_status"
+      description: "Payment compliance classification"
+
+  # ===========================================================================
+  # ROLE-PLAYING DATE KEYS
+  # ===========================================================================
+  date_keys:
+    - name: "payment_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Payment Date"
+      description: "Date payment was received"
+      format: "YYYYMMDD smart key"
+      source: "payment.payment_date"
+      
+    - name: "due_date_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Due Date"
+      description: "Payment due date (from related assessment)"
+      format: "YYYYMMDD smart key"
+      source: "assessment.due_date (via allocation)"
+      default_value: -1
+      
+    - name: "value_date_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Value Date"
+      description: "Bank value date (when funds cleared)"
+      format: "YYYYMMDD smart key"
+      source: "payment.value_date"
+      default_value: -1
+      
+    - name: "allocation_date_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Allocation Date"
+      description: "Date payment was allocated to liability"
+      format: "YYYYMMDD smart key"
+      source: "payment_allocation.allocation_date"
+      default_value: -1
+
+  # ===========================================================================
+  # DEGENERATE DIMENSIONS
+  # ===========================================================================
+  degenerate_dimensions:
+    - name: "payment_source_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "L2 payment_id - primary key from source"
+      source: "payment_refund.payment.payment_id"
+      role: "PRIMARY_KEY"
+      
+    - name: "payment_reference"
+      data_type: "VARCHAR(50)"
+      nullable: false
+      description: "Payment reference number (business key)"
+      source: "payment.payment_reference"
+      
+    - name: "bank_reference"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Bank transaction reference"
+      source: "payment.bank_reference"
+      
+    - name: "assessment_source_id"
+      data_type: "BIGINT"
+      nullable: true
+      description: |
+        Related assessment_id if payment is allocated.
+        Links to fact_assessment for payment-to-liability traceability.
+        NULL for unallocated or advance payments.
+      source: "payment_allocation.assessment_id"
+      cross_reference: "fact_assessment.assessment_source_id"
+      note: "Primary allocation - payment may have multiple allocations"
+      
+    - name: "payment_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Current status of the payment"
+      source: "payment.payment_status_code"
+      allowed_values: ["RECEIVED", "CLEARED", "ALLOCATED", "REVERSED", "REJECTED"]
+      
+    - name: "allocation_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Allocation status of the payment"
+      source: "Derived from payment_allocation records"
+      allowed_values: ["UNALLOCATED", "PARTIAL", "FULL", null]
+      
+    - name: "payment_channel"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "Channel through which payment was made"
+      source: "payment.payment_channel"
+      allowed_values: ["ONLINE", "BANK_TRANSFER", "COUNTER", "DIRECT_DEBIT", "CARD"]
+
+  # ===========================================================================
+  # ADDITIVE MEASURES - PAYMENT AMOUNTS
+  # ===========================================================================
+  measures_additive:
+    - name: "payment_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: "Total payment amount received"
+      source: "payment.payment_amount"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Primary revenue measure"
+      
+    - name: "allocated_to_tax"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Amount allocated to tax principal.
+        From payment_allocation where charge_type = 'PRINCIPAL'.
+      source: "SUM(payment_allocation.allocated_amount) WHERE charge_type_code = 'PRINCIPAL'"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "allocated_to_penalty"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Amount allocated to penalties.
+        From payment_allocation where charge_type = 'PENALTY'.
+      source: "SUM(payment_allocation.allocated_amount) WHERE charge_type_code = 'PENALTY'"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "allocated_to_interest"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Amount allocated to interest.
+        From payment_allocation where charge_type = 'INTEREST'.
+      source: "SUM(payment_allocation.allocated_amount) WHERE charge_type_code = 'INTEREST'"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "unallocated_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Amount not yet allocated to any liability.
+        May be held as credit or awaiting allocation.
+      source: "payment_amount - SUM(allocated amounts)"
+      unit: "EUR"
+      aggregation: "SUM"
+      derivation: "payment_amount - allocated_to_tax - allocated_to_penalty - allocated_to_interest"
+      
+    - name: "transaction_fee"
+      data_type: "DECIMAL(10,2)"
+      nullable: true
+      description: "Any processing fee charged on payment"
+      source: "payment.transaction_fee"
+      unit: "EUR"
+      aggregation: "SUM"
+
+  # ===========================================================================
+  # SEMI-ADDITIVE MEASURES
+  # ===========================================================================
+  measures_semi_additive:
+    - name: "days_after_due"
+      data_type: "INT"
+      nullable: true
+      description: |
+        Days between payment and due date:
+        - Positive = paid after due date (late)
+        - Zero = paid on due date
+        - Negative = paid before due date (early)
+      source: "DATEDIFF(payment_date, due_date)"
+      aggregation: "AVG across non-time dimensions"
+      
+    - name: "days_to_clear"
+      data_type: "INT"
+      nullable: true
+      description: "Days from payment receipt to bank clearance"
+      source: "DATEDIFF(value_date, payment_date)"
+      aggregation: "AVG"
+      
+    - name: "days_to_allocate"
+      data_type: "INT"
+      nullable: true
+      description: "Days from clearance to allocation"
+      source: "DATEDIFF(allocation_date, value_date)"
+      aggregation: "AVG"
+
+  # ===========================================================================
+  # FLAGS (BOOLEAN INDICATORS)
+  # ===========================================================================
+  flags:
+    - name: "is_paid_on_time"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if payment received on or before due date"
+      source: "payment_date <= due_date"
+      
+    - name: "is_full_payment"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if payment covers full liability"
+      source: "payment_amount >= assessment.total_amount_due"
+      
+    - name: "is_partial_payment"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if partial payment against liability"
+      source: "payment_amount < assessment.total_amount_due AND payment_amount > 0"
+      
+    - name: "is_advance_payment"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if payment made before assessment"
+      source: "assessment_source_id IS NULL AND allocation_status = 'UNALLOCATED'"
+      
+    - name: "is_installment"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if payment is part of installment plan"
+      source: "payment.installment_plan_id IS NOT NULL"
+      
+    - name: "is_reversed"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if payment has been reversed"
+      source: "payment_status_code = 'REVERSED'"
+
+  # ===========================================================================
+  # ETL METADATA
+  # ===========================================================================
+  metadata:
+    - name: "etl_batch_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for this load"
+      
+    - name: "etl_load_timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "When this record was loaded into warehouse"
+      default_value: "CURRENT_TIMESTAMP"
+      
+    - name: "source_system"
+      data_type: "VARCHAR(50)"
+      nullable: false
+      description: "Source system identifier"
+      default_value: "'SIGTAS'"
+      allowed_values: ["SIGTAS", "BANK_INTERFACE", "ONLINE_PORTAL"]
+
+  # ===========================================================================
+  # INDEXES
+  # ===========================================================================
+  indexes:
+    - name: "pk_fact_payment"
+      columns: ["payment_source_id"]
+      primary: true
+      description: "Primary key on L2 source ID"
+      
+    - name: "idx_fact_payment_party_date"
+      columns: ["party_key", "payment_date_key"]
+      description: "Party-centric queries with date"
+      
+    - name: "idx_fact_payment_tax"
+      columns: ["tax_type_key", "payment_date_key"]
+      description: "Tax type analysis over time"
+      
+    - name: "idx_fact_payment_method"
+      columns: ["payment_method_key", "payment_date_key"]
+      description: "Payment method analysis"
+      
+    - name: "idx_fact_payment_assessment"
+      columns: ["assessment_source_id"]
+      description: "Cross-reference to assessment fact"
+      where: "assessment_source_id IS NOT NULL"
+      
+    - name: "idx_fact_payment_compliance"
+      columns: ["compliance_status_key", "payment_date_key"]
+      description: "Compliance status analysis"
+
+  # ===========================================================================
+  # PARTITIONING STRATEGY
+  # ===========================================================================
+  partitioning:
+    enabled: true
+    strategy: "RANGE"
+    column: "payment_date_key"
+    interval: "MONTHLY"
+    description: "Partition by payment month"
+    retention_months: 120  # 10 years online
+
+  # ===========================================================================
+  # SOURCE MAPPING
+  # ===========================================================================
+  source_mapping:
+    primary_table: "payment_refund.payment"
+    alias: "p"
+    
+    joins:
+      # Dimension lookups
+      - table: "warehouse.dim_party"
+        alias: "dp"
+        type: "INNER"
+        condition: "p.party_id = dp.party_source_id AND dp.is_current_flag = TRUE"
+        
+      - table: "warehouse.dim_tax_type"
+        alias: "dtt"
+        type: "INNER"
+        condition: "p.tax_type_code = dtt.tax_type_code"
+        
+      - table: "warehouse.dim_tax_period"
+        alias: "dtp"
+        type: "LEFT"
+        condition: "p.tax_period_id = dtp.tax_period_source_id"
+        note: "LEFT join - period may be NULL for unallocated payments"
+        
+      - table: "warehouse.dim_payment_method"
+        alias: "dpm"
+        type: "INNER"
+        condition: "p.payment_method_code = dpm.payment_method_code"
+        
+      - table: "warehouse.dim_registration"
+        alias: "dr"
+        type: "INNER"
+        condition: |
+          p.party_id = dr.party_source_id 
+          AND p.tax_type_code = dr.tax_type_code
+          AND dr.is_current_flag = TRUE
+          
+      - table: "warehouse.dim_date"
+        alias: "dd_payment"
+        type: "INNER"
+        condition: "DATE_FORMAT(p.payment_date, '%Y%m%d') = dd_payment.date_key"
+        
+      # Payment allocation aggregation
+      - table: "payment_refund.payment_allocation"
+        alias: "pa"
+        type: "LEFT"
+        condition: "p.payment_id = pa.payment_id"
+        aggregation: |
+          SUM(CASE WHEN pa.charge_type_code = 'PRINCIPAL' THEN pa.allocated_amount ELSE 0 END) AS allocated_to_tax,
+          SUM(CASE WHEN pa.charge_type_code = 'PENALTY' THEN pa.allocated_amount ELSE 0 END) AS allocated_to_penalty,
+          SUM(CASE WHEN pa.charge_type_code = 'INTEREST' THEN pa.allocated_amount ELSE 0 END) AS allocated_to_interest,
+          MAX(pa.assessment_id) AS primary_assessment_id
+        
+      # Related assessment for due date
+      - table: "filing_assessment.assessment"
+        alias: "a"
+        type: "LEFT"
+        condition: "pa.assessment_id = a.assessment_id"
+        note: "For due_date lookup"
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+  business_rules:
+    - rule_id: "FP_001"
+      description: "Allocations must not exceed payment"
+      validation_sql: |
+        SELECT payment_source_id
+        FROM warehouse.fact_payment
+        WHERE (COALESCE(allocated_to_tax, 0) 
+               + COALESCE(allocated_to_penalty, 0) 
+               + COALESCE(allocated_to_interest, 0)
+               + COALESCE(unallocated_amount, 0)) > payment_amount + 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FP_002"
+      description: "On-time flag consistency"
+      validation_sql: |
+        SELECT payment_source_id
+        FROM warehouse.fact_payment
+        WHERE due_date_key IS NOT NULL 
+          AND due_date_key > 0
+          AND ((is_paid_on_time = TRUE AND days_after_due > 0)
+               OR (is_paid_on_time = FALSE AND days_after_due <= 0))
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FP_003"
+      description: "Reversed payments must not have valid allocations"
+      validation_sql: |
+        SELECT payment_source_id
+        FROM warehouse.fact_payment
+        WHERE is_reversed = TRUE
+          AND (COALESCE(allocated_to_tax, 0) + 
+               COALESCE(allocated_to_penalty, 0) + 
+               COALESCE(allocated_to_interest, 0)) > 0
+      expected_result: "0 rows"
+      severity: "WARNING"
+      note: "Reversed allocations should be zeroed out"
+      
+    - rule_id: "FP_004"
+      description: "Full/partial payment flags mutual exclusivity"
+      validation_sql: |
+        SELECT payment_source_id
+        FROM warehouse.fact_payment
+        WHERE is_full_payment = TRUE AND is_partial_payment = TRUE
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FP_005"
+      description: "Installment must have installment plan reference"
+      validation_sql: |
+        -- This validates consistency but can't check source
+        -- Full validation requires checking L2 payment.installment_plan_id
+        SELECT payment_source_id
+        FROM warehouse.fact_payment
+        WHERE is_installment = TRUE
+          AND payment_status_code = 'REVERSED'  -- Reversed installments should be flagged
+      expected_result: "Review rows"
+      severity: "WARNING"
+      
+    - rule_id: "FP_006"
+      description: "All dimension keys must be valid"
+      validation_sql: |
+        SELECT 'party' AS dimension, COUNT(*) AS missing
+        FROM warehouse.fact_payment fp
+        WHERE NOT EXISTS (SELECT 1 FROM warehouse.dim_party dp WHERE dp.party_key = fp.party_key)
+        UNION ALL
+        SELECT 'payment_method', COUNT(*)
+        FROM warehouse.fact_payment fp
+        WHERE NOT EXISTS (SELECT 1 FROM warehouse.dim_payment_method dpm WHERE dpm.payment_method_key = fp.payment_method_key)
+      expected_result: "All counts = 0"
+      severity: "CRITICAL"
+
+  # ===========================================================================
+  # SAMPLE QUERIES
+  # ===========================================================================
+  sample_queries:
+    - name: "Revenue by Payment Method"
+      description: "Payment volume and value by method over time"
+      sql: |
+        SELECT 
+            dpm.payment_method_name,
+            dpm.payment_channel,
+            dd.calendar_year_month,
+            COUNT(*) AS payment_count,
+            SUM(fp.payment_amount) AS total_collected,
+            AVG(fp.payment_amount) AS avg_payment,
+            SUM(fp.transaction_fee) AS total_fees
+        FROM warehouse.fact_payment fp
+        JOIN warehouse.dim_payment_method dpm ON fp.payment_method_key = dpm.payment_method_key
+        JOIN warehouse.dim_date dd ON fp.payment_date_key = dd.date_key
+        WHERE fp.is_reversed = FALSE
+        GROUP BY dpm.payment_method_name, dpm.payment_channel, dd.calendar_year_month
+        ORDER BY dd.calendar_year_month DESC, total_collected DESC;
+        
+    - name: "On-Time Payment Compliance"
+      description: "Payment compliance rate by taxpayer segment"
+      sql: |
+        SELECT 
+            dp.segment_name,
+            dtt.tax_type_name,
+            COUNT(*) AS total_payments,
+            SUM(CASE WHEN fp.is_paid_on_time THEN 1 ELSE 0 END) AS on_time_count,
+            ROUND(100.0 * SUM(CASE WHEN fp.is_paid_on_time THEN 1 ELSE 0 END) / COUNT(*), 2) AS on_time_rate,
+            AVG(fp.days_after_due) AS avg_days_late
+        FROM warehouse.fact_payment fp
+        JOIN warehouse.dim_party dp ON fp.party_key = dp.party_key
+        JOIN warehouse.dim_tax_type dtt ON fp.tax_type_key = dtt.tax_type_key
+        WHERE fp.is_reversed = FALSE
+          AND dp.is_current_flag = TRUE
+          AND fp.due_date_key > 0
+        GROUP BY dp.segment_name, dtt.tax_type_name
+        ORDER BY on_time_rate DESC;
+        
+    - name: "Payment Allocation Analysis"
+      description: "Breakdown of payments to principal, penalty, interest"
+      sql: |
+        SELECT 
+            dtt.tax_type_name,
+            SUM(fp.payment_amount) AS total_payments,
+            SUM(fp.allocated_to_tax) AS to_principal,
+            SUM(fp.allocated_to_penalty) AS to_penalty,
+            SUM(fp.allocated_to_interest) AS to_interest,
+            SUM(fp.unallocated_amount) AS unallocated,
+            ROUND(100.0 * SUM(fp.allocated_to_tax) / NULLIF(SUM(fp.payment_amount), 0), 2) AS principal_pct,
+            ROUND(100.0 * SUM(fp.allocated_to_penalty) / NULLIF(SUM(fp.payment_amount), 0), 2) AS penalty_pct
+        FROM warehouse.fact_payment fp
+        JOIN warehouse.dim_tax_type dtt ON fp.tax_type_key = dtt.tax_type_key
+        WHERE fp.is_reversed = FALSE
+        GROUP BY dtt.tax_type_name
+        ORDER BY total_payments DESC;
+        
+    - name: "Revenue Collection Trend"
+      description: "Daily revenue collection with cumulative"
+      sql: |
+        SELECT 
+            dd.calendar_date,
+            dd.day_of_week_name,
+            SUM(fp.payment_amount) AS daily_collection,
+            COUNT(*) AS transaction_count,
+            SUM(SUM(fp.payment_amount)) OVER (
+                PARTITION BY dd.calendar_year, dd.calendar_month 
+                ORDER BY dd.calendar_date
+            ) AS mtd_cumulative
+        FROM warehouse.fact_payment fp
+        JOIN warehouse.dim_date dd ON fp.payment_date_key = dd.date_key
+        WHERE fp.is_reversed = FALSE
+          AND dd.calendar_year = 2024
+        GROUP BY dd.calendar_date, dd.day_of_week_name
+        ORDER BY dd.calendar_date;
+        
+    - name: "Reconciliation Query"
+      description: "Cross-fact reconciliation: assessment vs payment"
+      sql: |
+        SELECT 
+            fa.assessment_source_id,
+            fa.assessment_reference,
+            fa.total_amount_due,
+            COALESCE(SUM(fp.payment_amount), 0) AS total_paid,
+            fa.total_amount_due - COALESCE(SUM(fp.payment_amount), 0) AS balance
+        FROM warehouse.fact_assessment fa
+        LEFT JOIN warehouse.fact_payment fp 
+            ON fa.assessment_source_id = fp.assessment_source_id
+            AND fp.is_reversed = FALSE
+        WHERE fa.is_final = TRUE
+        GROUP BY fa.assessment_source_id, fa.assessment_reference, fa.total_amount_due
+        HAVING fa.total_amount_due - COALESCE(SUM(fp.payment_amount), 0) <> 0;

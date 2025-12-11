@@ -1,0 +1,283 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Withholding Tax Domain
+# Generated from: SIGTAS TAX_WITHHELD_PAYE__OTHER schema + tax-capabilities.docx
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    Value Added Tax Domain
+
+
+    Domain Dependencies:
+    - party_management: Employer and employee party records
+    - tax_framework: tax types, tax periods
+    - registration: VAT liable taxpayer registration
+    - accounting: VAT transactions and balances
+    - filing_assessment: Integration with overall assessment process
+    - payment_refund: Remittance of VAT refunds
+    - reference_data: ???
+
+    Volume Characteristics: ???
+
+    Security Considerations: ???
+
+  authors:
+    - "GovStack TA-RDM Working Group"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Registration Building Block"
+    - "Payment Building Block"
+    - "Digital Registries Building Block"
+    - "Identity Building Block"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+# =============================================================================
+# DOMAIN DEFINITION
+# =============================================================================
+
+domains:
+  - name: "vat_management"
+    code: "VAT"
+    display_name: "VAT Management"
+    description: |
+      Value Added Tax management extending core filing-assessment domain.
+      Handles input/output VAT, cross-border transactions, and reverse charge.
+
+    dependencies:
+      - "party_management"
+      - "tax_framework"
+      - "registration"        # For vat_registration
+      - "filing_assessment"   # â† EXTENDS THIS
+
+    schemas:
+      - schema_name: "vat"
+
+        tables:
+          # ===========================================================
+          # PATTERN 1: EXTENSION TABLE
+          # ===========================================================
+
+          - name: vat_return
+            description: |
+              VAT-specific return extending core tax_return.
+              Contains VAT-specific summary fields (input/output/net).
+
+            columns:
+              - name: vat_return_id
+                type: bigint
+                constraints:
+                  primary_key: true
+
+              - name: tax_return_id
+                type: bigint
+                description: "Extension point to core tax_return"
+                constraints:
+                  not_null: true
+                  unique: true  # One-to-one
+                  foreign_key:
+                    table: "filing_assessment.tax_return"
+                    column: "tax_return_id"
+                    on_delete: "CASCADE"
+
+              - name: vat_registration_id
+                type: bigint
+                description: "VAT registration for this taxpayer"
+                constraints:
+                  foreign_key:
+                    table: "registration.vat_registration"
+                    column: "vat_registration_id"
+
+              # VAT-SPECIFIC SUMMARY FIELDS
+              - name: total_sales
+                type: decimal(19,2)
+                description: "Total sales value (before VAT)"
+
+              - name: total_output_vat
+                type: decimal(19,2)
+                description: "Total VAT charged on sales (output VAT)"
+                constraints:
+                  not_null: true
+
+              - name: total_purchases
+                type: decimal(19,2)
+                description: "Total purchase value (before VAT)"
+
+              - name: total_input_vat
+                type: decimal(19,2)
+                description: "Total VAT paid on purchases (input VAT - reclaimable)"
+                constraints:
+                  not_null: true
+
+              - name: net_vat_due
+                type: decimal(19,2)
+                description: "Net VAT payable or refundable (output - input)"
+                constraints:
+                  not_null: true
+
+              - name: total_reverse_charge_amount
+                type: decimal(19,2)
+                description: "VAT under reverse charge mechanism"
+
+              - name: adjustment_amount
+                type: decimal(19,2)
+                description: "Adjustments from previous periods"
+
+          # ===========================================================
+          # PATTERN 2: DETAIL TABLES
+          # ===========================================================
+
+          - name: vat_transaction
+            description: |
+              Individual VAT transaction (sale or purchase).
+              Detailed breakdown of VAT return beyond generic tax_return_line.
+
+            estimated_rows:
+              initial: 50000000  # 50M transactions
+              annual_growth: 10000000
+
+            columns:
+              - name: vat_transaction_id
+                type: bigint
+                constraints:
+                  primary_key: true
+
+              - name: vat_return_id
+                type: bigint
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "vat.vat_return"
+                    column: "vat_return_id"
+                    on_delete: "CASCADE"
+
+              - name: transaction_type
+                type: varchar(20)
+                description: "INPUT (purchase) or OUTPUT (sale)"
+                constraints:
+                  not_null: true
+                  check: "transaction_type IN ('INPUT', 'OUTPUT')"
+
+              - name: invoice_number
+                type: varchar(50)
+                description: "Invoice number"
+                constraints:
+                  not_null: true
+
+              - name: invoice_date
+                type: date
+                constraints:
+                  not_null: true
+
+              - name: supplier_customer_party_id
+                type: bigint
+                description: "Supplier (INPUT) or Customer (OUTPUT)"
+                constraints:
+                  foreign_key:
+                    table: "party.party"
+                    column: "party_id"
+
+              - name: supplier_customer_tin
+                type: varchar(50)
+                description: "TIN of supplier/customer"
+
+              - name: invoice_amount
+                type: decimal(19,2)
+                description: "Total invoice amount (including VAT)"
+                constraints:
+                  not_null: true
+
+              - name: taxable_amount
+                type: decimal(19,2)
+                description: "Amount before VAT"
+
+              - name: vat_rate_applied
+                type: decimal(5,2)
+                description: "VAT rate % applied (0, 5, 20, etc.)"
+                constraints:
+                  not_null: true
+
+              - name: vat_amount
+                type: decimal(19,2)
+                description: "VAT amount"
+                constraints:
+                  not_null: true
+
+              - name: is_cross_border
+                type: boolean
+                description: "True if intra-EU or international"
+
+              - name: country_code
+                type: char(3)
+                description: "Country for cross-border (ISO 3166-1)"
+
+              - name: is_reverse_charge
+                type: boolean
+                description: "True if reverse charge applies"
+
+            indexes:
+              - name: idx_vat_transaction_return
+                columns: ["vat_return_id"]
+
+              - name: idx_vat_transaction_type_date
+                columns: ["transaction_type", "invoice_date"]
+
+          # ===========================================================
+          # CROSS-BORDER TRANSACTIONS
+          # ===========================================================
+
+          - name: cross_border_supply
+            description: |
+              Cross-border VAT transactions (intra-EU, export, import).
+              Additional detail for international VAT.
+
+            columns:
+              - name: cross_border_supply_id
+                type: bigint
+                constraints:
+                  primary_key: true
+
+              - name: vat_transaction_id
+                type: bigint
+                constraints:
+                  foreign_key:
+                    table: "vat.vat_transaction"
+                    column: "vat_transaction_id"
+
+              - name: supply_type
+                type: varchar(20)
+                description: "EXPORT, IMPORT, INTRA_EU_SUPPLY, INTRA_EU_ACQUISITION"
+
+              - name: country_of_supply
+                type: char(3)
+
+              - name: country_of_destination
+                type: char(3)
+
+              - name: customs_declaration_number
+                type: varchar(50)
+
+              - name: is_triangulation
+                type: boolean
+                description: "True if triangular transaction"

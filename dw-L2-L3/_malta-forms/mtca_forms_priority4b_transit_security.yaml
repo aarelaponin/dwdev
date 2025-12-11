@@ -1,0 +1,2037 @@
+# ============================================================================
+# MTCA Forms - Priority 4B: Transit & Safety/Security Declarations
+# Forms: T1, T2, T2L/T2LF, TIR, ENS, EXS, AN, PN, TSD
+# Version: 1.0
+# Date: 2025-12-06
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# EU Systems: NCTS-P5, ICS2, AES (EXS), AN/PN/TS
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # T1: External Union Transit Declaration
+  # Non-Union goods transit per Art. 226 UCC
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "T1"
+        form_name_en: "External Union Transit Declaration"
+        form_name_mt: "Dikjarazzjoni ta' Transitu Estern tal-Unjoni"
+        version: "2024"
+        effective_from: "2023-11-16"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Union Customs Code"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446"
+          - "Commission Implementing Regulation (EU) 2015/2447"
+          - "NCTS-P5 Functional and Technical Specifications"
+          - "Customs Ordinance Cap. 37"
+        administering_authority: "MTCA Customs"
+        tax_type: "Transit Procedure"
+        taxpayer_category: "Economic Operator / Principal"
+        filing_frequency: "Per transit movement"
+        filing_deadline: "Before movement commences"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "NCTS-P5"
+        eu_system_interface: "Trans-European NCTS Phase 5"
+        source_url: "https://customs.gov.mt/transit"
+        xml_schema_ref: "DDNXA / NCTS-P5 DDNTA"
+        message_types:
+          - "IE015 - Declaration data"
+          - "IE028 - MRN allocated"
+          - "IE029 - Release for transit"
+          - "IE043 - Unloading permission"
+          - "IE044 - Unloading remarks"
+          - "IE045 - Write-off notification"
+          - "IE051 - No release for transit"
+          - "IE055 - Guarantee not valid"
+          - "IE060 - Control decision notification"
+        notes: |
+          External Union transit (T1) for non-Union goods moving through EU
+          customs territory without payment of customs duties. NCTS Phase 5
+          mandatory since 16/11/2023. Requires comprehensive guarantee.
+          Principal liable for customs debt if goods not presented.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Declaration Header
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSIT_HEADER"
+          section_name: "Transit Declaration Header"
+          section_description: "Basic declaration identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "declaration_type_transit"
+              field_code: "DE 1/1"
+              field_name_en: "Declaration Type"
+              field_name_mt: "Tip ta' Dikjarazzjoni"
+              field_description: "Type of transit declaration (T1 external)"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "T1"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_001"
+                  rule_type: "codelist"
+                  rule_description: "Valid transit type"
+                  rule_expression: "IN('T1','T2','T2F','T2L','T2LF','TIR')"
+                  error_message_en: "Invalid transit declaration type"
+                  error_message_mt: "Tip ta' dikjarazzjoni ta' transitu mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "T1"
+                  description_en: "External Union transit"
+                - code: "T2"
+                  description_en: "Internal Union transit"
+                - code: "T2F"
+                  description_en: "Internal Union transit - special fiscal territories"
+                - code: "T2L"
+                  description_en: "Proof of Union status"
+                - code: "T2LF"
+                  description_en: "Proof of Union status - special fiscal"
+                - code: "TIR"
+                  description_en: "TIR Convention"
+              reference_table: "eu_transit_types"
+              eu_data_element: "11 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "transit_type"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "declaration_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "mrn_transit"
+              field_code: "DE 2/1"
+              field_name_en: "Movement Reference Number"
+              field_name_mt: "Numru ta' Referenza tal-Moviment"
+              field_description: "Unique transit MRN assigned by NCTS"
+              data_type: "MRN"
+              format: "YYCCnnnnnnnnnnnnnnC"
+              max_length: 18
+              precision: null
+              scale: null
+              required: true
+              required_condition: "System-generated upon acceptance"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules:
+                - rule_id: "T1_002"
+                  rule_type: "pattern"
+                  rule_description: "Valid MRN format"
+                  rule_expression: "^[0-9]{2}[A-Z]{2}[A-Z0-9]{13}[0-9]$"
+                  error_message_en: "Invalid MRN format"
+                  error_message_mt: "Format MRN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "21 05 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "mrn"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "mrn"
+                data_type: "FixedString(18)"
+
+            - field_id: "lrn_transit"
+              field_code: "DE 2/4"
+              field_name_en: "Local Reference Number"
+              field_name_mt: "Numru ta' Referenza Lokali"
+              field_description: "Trader's unique reference"
+              data_type: "STRING"
+              format: null
+              max_length: 22
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_003"
+                  rule_type: "pattern"
+                  rule_description: "Alphanumeric only"
+                  rule_expression: "^[A-Za-z0-9]{1,22}$"
+                  error_message_en: "Invalid LRN format"
+                  error_message_mt: "Format LRN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "21 05 002 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "lrn"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "lrn"
+                data_type: "String"
+
+            - field_id: "transit_status"
+              field_code: "Status"
+              field_name_en: "Transit Status"
+              field_name_mt: "Status ta' Transitu"
+              field_description: "Current status of transit operation"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "DECLARED"
+              calculated: true
+              calculation_formula: "System status tracking"
+              validation_rules: []
+              allowed_values:
+                - code: "DECLARED"
+                  description_en: "Declaration submitted"
+                - code: "ACCEPTED"
+                  description_en: "Declaration accepted"
+                - code: "RELEASED"
+                  description_en: "Released for transit"
+                - code: "INCONTROL"
+                  description_en: "Under control"
+                - code: "INTRANSIT"
+                  description_en: "In transit"
+                - code: "ARRIVED"
+                  description_en: "Arrived at destination"
+                - code: "UNLOADING"
+                  description_en: "Unloading permitted"
+                - code: "COMPLETED"
+                  description_en: "Transit completed"
+                - code: "CANCELLED"
+                  description_en: "Cancelled"
+                - code: "WRITEOFF"
+                  description_en: "Written off"
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "status"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "transit_status"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Offices Involved
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSIT_OFFICES"
+          section_name: "Customs Offices"
+          section_description: "Departure, transit and destination offices"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "office_of_departure"
+              field_code: "DE 5/4"
+              field_name_en: "Office of Departure"
+              field_name_mt: "UffiÄ‹Ä‹ju ta' Tluq"
+              field_description: "Customs office where transit begins"
+              data_type: "CODE"
+              format: "CCNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_010"
+                  rule_type: "lookup"
+                  rule_description: "Valid NCTS office code"
+                  rule_expression: "EXISTS(ncts_customs_offices.code)"
+                  error_message_en: "Invalid customs office code"
+                  error_message_mt: "KodiÄ‹i tal-uffiÄ‹Ä‹ju doganali mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "ncts_customs_offices"
+              eu_data_element: "17 04 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "office_departure"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "office_of_departure"
+                data_type: "FixedString(8)"
+
+            - field_id: "office_of_destination"
+              field_code: "DE 5/6"
+              field_name_en: "Office of Destination"
+              field_name_mt: "UffiÄ‹Ä‹ju tad-Destinazzjoni"
+              field_description: "Customs office where transit ends"
+              data_type: "CODE"
+              format: "CCNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_011"
+                  rule_type: "lookup"
+                  rule_description: "Valid NCTS office code"
+                  rule_expression: "EXISTS(ncts_customs_offices.code)"
+                  error_message_en: "Invalid customs office code"
+                  error_message_mt: "KodiÄ‹i tal-uffiÄ‹Ä‹ju doganali mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "ncts_customs_offices"
+              eu_data_element: "17 05 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "office_destination"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "office_of_destination"
+                data_type: "FixedString(8)"
+
+            - field_id: "offices_of_transit"
+              field_code: "DE 5/5"
+              field_name_en: "Office(s) of Transit"
+              field_name_mt: "UffiÄ‹Ä‹ju(s) ta' Transitu"
+              field_description: "Customs offices at borders crossed"
+              data_type: "ARRAY"
+              format: "CCNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if crossing external EU border"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "ncts_customs_offices"
+              eu_data_element: "17 06 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit_offices"
+                column: "office_transit"
+              ors_mapping:
+                table: "mtca_ors.transit_offices"
+                column: "office_of_transit"
+                data_type: "Array(FixedString(8))"
+
+            - field_id: "limit_date"
+              field_code: "DE 5/26"
+              field_name_en: "Limit Date"
+              field_name_mt: "Data Limitu"
+              field_description: "Deadline for presentation at destination"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "departure_date + calculated_transit_time"
+              validation_rules:
+                - rule_id: "T1_012"
+                  rule_type: "date"
+                  rule_description: "Limit date must be in future"
+                  rule_expression: "limit_date >= CURRENT_DATE"
+                  error_message_en: "Limit date must be in the future"
+                  error_message_mt: "Data limitu trid tkun fil-futur"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "17 05 044 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "limit_date"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "limit_date"
+                data_type: "Date"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Principal (Holder of Transit Procedure)
+        # ----------------------------------------------------------------------
+        - section_id: "PRINCIPAL"
+          section_name: "Principal"
+          section_description: "Holder of the transit procedure"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "principal_eori"
+              field_code: "DE 3/18"
+              field_name_en: "Principal EORI"
+              field_name_mt: "EORI tal-PrinÄ‹ipal"
+              field_description: "EORI of the holder of the transit procedure"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_020"
+                  rule_type: "pattern"
+                  rule_description: "Valid EORI format"
+                  rule_expression: "^[A-Z]{2}[A-Z0-9]{1,15}$"
+                  error_message_en: "Invalid EORI format"
+                  error_message_mt: "Format EORI mhux validu"
+                  severity: "error"
+                - rule_id: "T1_021"
+                  rule_type: "lookup"
+                  rule_description: "Principal must have valid guarantee"
+                  rule_expression: "EXISTS(gum_guarantees.principal_eori)"
+                  error_message_en: "No valid guarantee found for principal"
+                  error_message_mt: "Ebda garanzija valida ma nstabet gÄ§all-prinÄ‹ipal"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_eori_registry"
+              eu_data_element: "13 05 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "principal_eori"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "principal_eori"
+                data_type: "String"
+
+            - field_id: "principal_name"
+              field_code: "DE 3/18(name)"
+              field_name_en: "Principal Name"
+              field_name_mt: "Isem tal-PrinÄ‹ipal"
+              field_description: "Name of the principal"
+              data_type: "STRING"
+              format: null
+              max_length: 70
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "13 05 016 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "principal_name"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "principal_name"
+                data_type: "String"
+
+            - field_id: "principal_tin"
+              field_code: "DE 3/18(TIN)"
+              field_name_en: "Principal TIN"
+              field_name_mt: "TIN tal-PrinÄ‹ipal"
+              field_description: "Tax identification number of principal"
+              data_type: "TIN"
+              format: null
+              max_length: 17
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if different from EORI"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "13 05 017 000"
+              cross_form_reference: "VAT_FORM_1.vat_number"
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "principal_tin"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "principal_tin"
+                data_type: "Nullable(String)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Guarantee Information
+        # ----------------------------------------------------------------------
+        - section_id: "GUARANTEE"
+          section_name: "Guarantee"
+          section_description: "Guarantee details for transit operation"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          max_occurrences: 9
+          fields:
+            - field_id: "guarantee_type"
+              field_code: "DE 8/1"
+              field_name_en: "Guarantee Type"
+              field_name_mt: "Tip ta' Garanzija"
+              field_description: "Type of guarantee provided"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_030"
+                  rule_type: "codelist"
+                  rule_description: "Valid guarantee type"
+                  rule_expression: "IN('0','1','2','3','4','5','6','7','8','9','A','B','C','D','H','J','R')"
+                  error_message_en: "Invalid guarantee type"
+                  error_message_mt: "Tip ta' garanzija mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "0"
+                  description_en: "Guarantee waiver"
+                - code: "1"
+                  description_en: "Comprehensive guarantee"
+                - code: "2"
+                  description_en: "Individual guarantee by guarantor"
+                - code: "3"
+                  description_en: "Cash deposit or equivalent"
+                - code: "4"
+                  description_en: "Individual guarantee by voucher"
+                - code: "5"
+                  description_en: "Guarantee waiver - secured by undertaking"
+                - code: "6"
+                  description_en: "Guarantee not required - public bodies"
+                - code: "7"
+                  description_en: "Guarantee not required - goods exempt"
+                - code: "8"
+                  description_en: "Guarantee not required - Convention"
+                - code: "9"
+                  description_en: "Individual guarantee with multiple usage"
+                - code: "A"
+                  description_en: "Guarantee waiver (Art. 95(2))"
+                - code: "B"
+                  description_en: "Guarantee covering Union goods (T2)"
+                - code: "R"
+                  description_en: "Guarantee for goods under customs seal"
+              reference_table: "eu_guarantee_types"
+              eu_data_element: "15 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_guarantees"
+                column: "guarantee_type"
+              ors_mapping:
+                table: "mtca_ors.transit_guarantees"
+                column: "guarantee_type"
+                data_type: "FixedString(1)"
+
+            - field_id: "grn"
+              field_code: "DE 8/3"
+              field_name_en: "Guarantee Reference Number (GRN)"
+              field_name_mt: "Numru ta' Referenza tal-Garanzija"
+              field_description: "Unique guarantee reference from GUM"
+              data_type: "STRING"
+              format: null
+              max_length: 24
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Required for types 0, 1, 2, 4, 9, B"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_031"
+                  rule_type: "lookup"
+                  rule_description: "GRN must be valid in GUM"
+                  rule_expression: "EXISTS(gum_guarantees.grn) AND status = 'VALID'"
+                  error_message_en: "Invalid or expired GRN"
+                  error_message_mt: "GRN mhux validu jew skadut"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "gum_guarantees"
+              eu_data_element: "15 03 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_guarantees"
+                column: "grn"
+              ors_mapping:
+                table: "mtca_ors.transit_guarantees"
+                column: "grn"
+                data_type: "String"
+
+            - field_id: "access_code"
+              field_code: "DE 8/4"
+              field_name_en: "Access Code"
+              field_name_mt: "KodiÄ‹i ta' AÄ‹Ä‹ess"
+              field_description: "Access code for the guarantee"
+              data_type: "STRING"
+              format: null
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Required for types with GRN"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "15 03 002 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_guarantees"
+                column: "access_code"
+              ors_mapping:
+                table: "mtca_ors.transit_guarantees"
+                column: "access_code"
+                data_type: "FixedString(4)"
+
+            - field_id: "guarantee_amount"
+              field_code: "DE 8/5"
+              field_name_en: "Amount to be Covered"
+              field_name_mt: "Ammont li Jrid Ikun Kopert"
+              field_description: "Amount covered by this guarantee reference"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.##"
+              max_length: null
+              precision: 16
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(item_customs_value) + SUM(potential_duties)"
+              validation_rules:
+                - rule_id: "T1_032"
+                  rule_type: "comparison"
+                  rule_description: "Amount must not exceed available balance"
+                  rule_expression: "guarantee_amount <= available_balance"
+                  error_message_en: "Guarantee amount exceeds available balance"
+                  error_message_mt: "Ammont tal-garanzija jeÄ‹Ä‹edi l-bilanÄ‹ disponibbli"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "15 02 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_guarantees"
+                column: "amount_eur"
+              ors_mapping:
+                table: "mtca_ors.transit_guarantees"
+                column: "guarantee_amount_eur"
+                data_type: "Decimal(16,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Consignment/Goods Information
+        # ----------------------------------------------------------------------
+        - section_id: "CONSIGNMENT"
+          section_name: "Consignment"
+          section_description: "Goods and transport information"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_gross_mass"
+              field_code: "DE 6/5"
+              field_name_en: "Total Gross Mass (kg)"
+              field_name_mt: "Massa Grossa Totali (kg)"
+              field_description: "Total gross weight of all goods"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 16
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_040"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "total_gross_mass > 0"
+                  error_message_en: "Total gross mass must be positive"
+                  error_message_mt: "Massa grossa totali trid tkun poÅ¼ittiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "16 06 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "total_gross_mass"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "total_gross_mass_kg"
+                data_type: "Decimal(16,3)"
+
+            - field_id: "total_packages"
+              field_code: "DE 6/9"
+              field_name_en: "Total Number of Packages"
+              field_name_mt: "Numru Totali ta' Pakketti"
+              field_description: "Total count of packages"
+              data_type: "INTEGER"
+              format: "######"
+              max_length: 7
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_041"
+                  rule_type: "range"
+                  rule_description: "Must be at least 1"
+                  rule_expression: "total_packages >= 1"
+                  error_message_en: "Must have at least one package"
+                  error_message_mt: "Irid ikun hemm mill-inqas pakkett wieÄ§ed"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "16 07 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "total_packages"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "total_packages"
+                data_type: "UInt32"
+
+            - field_id: "country_of_dispatch"
+              field_code: "DE 5/8"
+              field_name_en: "Country of Dispatch"
+              field_name_mt: "PajjiÅ¼ ta' DistpaÄ‹Ä‹"
+              field_description: "Country from which goods are dispatched"
+              data_type: "COUNTRY_CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_countries"
+              eu_data_element: "16 02 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "country_dispatch"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "country_of_dispatch"
+                data_type: "FixedString(2)"
+
+            - field_id: "country_of_destination"
+              field_code: "DE 5/9"
+              field_name_en: "Country of Destination"
+              field_name_mt: "PajjiÅ¼ tad-Destinazzjoni"
+              field_description: "Country of final destination"
+              data_type: "COUNTRY_CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_countries"
+              eu_data_element: "16 03 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "country_dest"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "country_of_destination"
+                data_type: "FixedString(2)"
+
+        # ----------------------------------------------------------------------
+        # Section 6: Goods Items
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSIT_ITEMS"
+          section_name: "Goods Items"
+          section_description: "Individual goods items in transit"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          max_occurrences: 999
+          fields:
+            - field_id: "item_number_transit"
+              field_code: "DE 1/6"
+              field_name_en: "Item Number"
+              field_name_mt: "Numru tal-OÄ¡Ä¡ett"
+              field_description: "Sequential item number"
+              data_type: "INTEGER"
+              format: "NNN"
+              max_length: 5
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "AUTO_INCREMENT"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "16 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_items"
+                column: "item_no"
+              ors_mapping:
+                table: "mtca_ors.transit_items"
+                column: "item_number"
+                data_type: "UInt16"
+
+            - field_id: "goods_description_transit"
+              field_code: "DE 6/8"
+              field_name_en: "Goods Description"
+              field_name_mt: "Deskrizzjoni tal-Merkanzija"
+              field_description: "Description of goods"
+              data_type: "STRING"
+              format: null
+              max_length: 512
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "18 05 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_items"
+                column: "goods_desc"
+              ors_mapping:
+                table: "mtca_ors.transit_items"
+                column: "goods_description"
+                data_type: "String"
+
+            - field_id: "commodity_code_transit"
+              field_code: "DE 6/14"
+              field_name_en: "Commodity Code (HS6)"
+              field_name_mt: "KodiÄ‹i tal-Merkanzija (HS6)"
+              field_description: "HS 6-digit code for transit"
+              data_type: "HS_CODE"
+              format: "NNNNNN"
+              max_length: 6
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_050"
+                  rule_type: "pattern"
+                  rule_description: "Must be 6 digits"
+                  rule_expression: "^[0-9]{6}$"
+                  error_message_en: "HS code must be 6 digits"
+                  error_message_mt: "KodiÄ‹i HS irid ikun 6 numri"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taric_hs_codes"
+              eu_data_element: "18 01 002 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_items"
+                column: "hs_code"
+              ors_mapping:
+                table: "mtca_ors.transit_items"
+                column: "commodity_code_hs"
+                data_type: "FixedString(6)"
+
+            - field_id: "item_gross_mass"
+              field_code: "DE 6/5 item"
+              field_name_en: "Item Gross Mass (kg)"
+              field_name_mt: "Massa Grossa tal-OÄ¡Ä¡ett (kg)"
+              field_description: "Gross weight of this item"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 16
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "T1_051"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "item_gross_mass > 0"
+                  error_message_en: "Gross mass must be positive"
+                  error_message_mt: "Massa grossa trid tkun poÅ¼ittiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "16 06 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_items"
+                column: "gross_mass"
+              ors_mapping:
+                table: "mtca_ors.transit_items"
+                column: "gross_mass_kg"
+                data_type: "Decimal(16,3)"
+
+        # ----------------------------------------------------------------------
+        # Section 7: Seal Information
+        # ----------------------------------------------------------------------
+        - section_id: "SEALS"
+          section_name: "Seals"
+          section_description: "Customs seal identification"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          max_occurrences: 99
+          fields:
+            - field_id: "seal_number"
+              field_code: "DE 7/3"
+              field_name_en: "Seal Number"
+              field_name_mt: "Numru tas-SiÄ¡ill"
+              field_description: "Identification of customs seal"
+              data_type: "STRING"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if goods under seal"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "18 08 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_seals"
+                column: "seal_no"
+              ors_mapping:
+                table: "mtca_ors.transit_seals"
+                column: "seal_number"
+                data_type: "String"
+
+            - field_id: "seals_count"
+              field_code: "DE 7/5"
+              field_name_en: "Number of Seals"
+              field_name_mt: "Numru ta' SiÄ¡illi"
+              field_description: "Total count of seals used"
+              data_type: "INTEGER"
+              format: "NN"
+              max_length: 4
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "18 08 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "seals_count"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "seals_count"
+                data_type: "Nullable(UInt16)"
+
+      eu_system_integration:
+        trans_european_system: "NCTS Phase 5"
+        message_exchange: "S2S (XML/EDIFACT)"
+        interface_specification: "DDNXA Appendix Q2 / NCTS P5 DDNTA"
+        connected_systems:
+          - system: "GUM"
+            purpose: "Guarantee validation"
+          - system: "CS/RD2"
+            purpose: "Reference data"
+          - system: "UUM&DS"
+            purpose: "Authentication"
+          - system: "AES/AIS"
+            purpose: "Prior/subsequent procedures"
+
+      submission_workflow:
+        authentication_required: "UUM&DS / EORI-based"
+        signature_required: false
+        guarantee_required: true
+        payment_integration: false
+        acknowledgment_type: "MRN"
+        processing_stages:
+          - stage: "Declaration submitted (IE015)"
+            description: "Principal submits transit declaration"
+          - stage: "MRN allocated (IE028)"
+            description: "System assigns MRN"
+          - stage: "Release for transit (IE029)"
+            description: "Goods released for movement"
+          - stage: "Arrival notification (IE007)"
+            description: "Arrival at destination reported"
+          - stage: "Unloading permission (IE043)"
+            description: "Permission to unload granted"
+          - stage: "Unloading remarks (IE044)"
+            description: "Results of unloading reported"
+          - stage: "Write-off (IE045)"
+            description: "Transit discharged"
+
+  # ==========================================================================
+  # T2: Internal Union Transit Declaration
+  # Union goods transit per Art. 227 UCC
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "T2"
+        form_name_en: "Internal Union Transit Declaration"
+        form_name_mt: "Dikjarazzjoni ta' Transitu Intern tal-Unjoni"
+        version: "2024"
+        effective_from: "2023-11-16"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Union Customs Code"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446"
+          - "NCTS-P5 Functional and Technical Specifications"
+        administering_authority: "MTCA Customs"
+        tax_type: "Transit Procedure"
+        taxpayer_category: "Economic Operator / Principal"
+        filing_frequency: "Per transit movement"
+        filing_deadline: "Before movement commences"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "NCTS-P5"
+        eu_system_interface: "Trans-European NCTS Phase 5"
+        source_url: "https://customs.gov.mt/transit"
+        xml_schema_ref: "DDNXA / NCTS-P5 DDNTA"
+        notes: |
+          Internal Union transit (T2) for Union goods moving through third 
+          country territory or special fiscal territories. Preserves Union
+          customs status. Same structure as T1 but different status treatment.
+
+      sections:
+        - section_id: "T2_HEADER"
+          section_name: "T2 Declaration Header"
+          section_description: "Internal transit declaration"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "t2_declaration_type"
+              field_code: "DE 1/1"
+              field_name_en: "Declaration Type"
+              field_name_mt: "Tip ta' Dikjarazzjoni"
+              field_description: "Internal Union transit type"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "T2"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "T2"
+                  description_en: "Internal Union transit"
+                - code: "T2F"
+                  description_en: "Internal transit - special fiscal territories"
+              reference_table: "eu_transit_types"
+              eu_data_element: "11 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ncts_transit"
+                column: "transit_type"
+              ors_mapping:
+                table: "mtca_ors.transit_declarations"
+                column: "declaration_type"
+                data_type: "FixedString(3)"
+
+      related_forms:
+        - form_code: "T2L"
+          relationship: "Proof of Union status"
+          eu_system: "NCTS-P5"
+
+  # ==========================================================================
+  # ENS: Entry Summary Declaration (ICS2)
+  # Pre-arrival safety/security per Art. 127 UCC
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "ENS"
+        form_name_en: "Entry Summary Declaration"
+        form_name_mt: "Dikjarazzjoni ta' Sommarju ta' DÄ§ul"
+        version: "2024"
+        effective_from: "2021-03-15"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Art. 127-128"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446"
+          - "ICS2 Functional and Technical Specifications"
+          - "Commission Implementing Regulation (EU) 2023/1231"
+        administering_authority: "MTCA Customs"
+        tax_type: "Safety and Security"
+        taxpayer_category: "Carrier / Freight Forwarder"
+        filing_frequency: "Per consignment arrival"
+        filing_deadline: "Time-dependent on transport mode"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "ICS2 / STI (Shared Trader Interface)"
+        eu_system_interface: "Trans-European ICS2"
+        source_url: "https://customs.gov.mt/ics2"
+        xml_schema_ref: "ICS2 Technical Specifications"
+        message_types:
+          - "IE3F12 - ENS filing (F12)"
+          - "IE3F13 - ENS filing (F13)"
+          - "IE3F14 - ENS filing (F14)"
+          - "IE3F15 - ENS filing (F15)"
+          - "IE3R01 - Registration response"
+          - "IE3R02 - Risk notification"
+          - "IE3A11 - Arrival notification"
+          - "IE3P01 - Presentation notification"
+        notes: |
+          Pre-arrival safety/security declaration required for all goods entering
+          EU customs territory. Multi-filing model with different filings for
+          carrier (F10-F14) and house-level (F20-F25). Time limits depend on
+          transport mode (maritime: 24h before loading, air: before departure).
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: ENS Header
+        # ----------------------------------------------------------------------
+        - section_id: "ENS_HEADER"
+          section_name: "ENS Header Information"
+          section_description: "Entry summary declaration identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "mrn_ens"
+              field_code: "MRN"
+              field_name_en: "Entry MRN"
+              field_name_mt: "MRN ta' DÄ§ul"
+              field_description: "Movement Reference Number for ENS"
+              data_type: "MRN"
+              format: "YYCCnnnnnnnnnnnnnnC"
+              max_length: 18
+              precision: null
+              scale: null
+              required: true
+              required_condition: "System-generated"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "21 05 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_ens"
+                column: "mrn"
+              ors_mapping:
+                table: "mtca_ors.ens_declarations"
+                column: "mrn"
+                data_type: "FixedString(18)"
+
+            - field_id: "filing_type"
+              field_code: "Filing"
+              field_name_en: "Filing Type"
+              field_name_mt: "Tip ta' Sottomissjoni"
+              field_description: "ICS2 filing type code"
+              data_type: "CODE"
+              format: "FNN"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "F10"
+                  description_en: "Master - cargo in master"
+                - code: "F11"
+                  description_en: "Master - cargo in house"
+                - code: "F12"
+                  description_en: "Master - partial cargo in house"
+                - code: "F13"
+                  description_en: "Master - mixed cargo"
+                - code: "F14"
+                  description_en: "Master - no cargo"
+                - code: "F15"
+                  description_en: "Master - bulk/uncontainerized"
+                - code: "F20"
+                  description_en: "House consignment"
+                - code: "F21"
+                  description_en: "Simple house"
+                - code: "F22"
+                  description_en: "House with master details"
+                - code: "F30"
+                  description_en: "Direct filing (road/rail)"
+              reference_table: "ics2_filing_types"
+              eu_data_element: "11 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_ens"
+                column: "filing_type"
+              ors_mapping:
+                table: "mtca_ors.ens_declarations"
+                column: "filing_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "first_entry_office"
+              field_code: "DE 5/29"
+              field_name_en: "First Office of Entry"
+              field_name_mt: "L-Ewwel UffiÄ‹Ä‹ju ta' DÄ§ul"
+              field_description: "Customs office of first entry into EU"
+              data_type: "CODE"
+              format: "CCNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ENS_010"
+                  rule_type: "lookup"
+                  rule_description: "Valid ICS2 customs office"
+                  rule_expression: "EXISTS(ics2_customs_offices.code)"
+                  error_message_en: "Invalid first entry office"
+                  error_message_mt: "L-ewwel uffiÄ‹Ä‹ju ta' dÄ§ul mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "ics2_customs_offices"
+              eu_data_element: "17 09 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_ens"
+                column: "first_entry_office"
+              ors_mapping:
+                table: "mtca_ors.ens_declarations"
+                column: "first_entry_office"
+                data_type: "FixedString(8)"
+
+            - field_id: "expected_arrival_datetime"
+              field_code: "DE 5/32"
+              field_name_en: "Expected Date and Time of Arrival"
+              field_name_mt: "Data u Ä¦in Mistenni tal-Wasla"
+              field_description: "Expected arrival at first entry office"
+              data_type: "DATETIME"
+              format: "YYYY-MM-DDTHH:MM:SS"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ENS_011"
+                  rule_type: "date"
+                  rule_description: "Expected arrival must be in future"
+                  rule_expression: "expected_arrival_datetime > NOW()"
+                  error_message_en: "Expected arrival must be in the future"
+                  error_message_mt: "Wasla mistennija trid tkun fil-futur"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "17 09 044 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_ens"
+                column: "expected_arrival"
+              ors_mapping:
+                table: "mtca_ors.ens_declarations"
+                column: "expected_arrival_datetime"
+                data_type: "DateTime"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Carrier Information
+        # ----------------------------------------------------------------------
+        - section_id: "CARRIER"
+          section_name: "Carrier"
+          section_description: "Carrier identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "carrier_eori"
+              field_code: "DE 3/37"
+              field_name_en: "Carrier EORI"
+              field_name_mt: "EORI tal-Carrier"
+              field_description: "EORI of the carrier"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ENS_020"
+                  rule_type: "pattern"
+                  rule_description: "Valid EORI format"
+                  rule_expression: "^[A-Z]{2}[A-Z0-9]{1,15}$"
+                  error_message_en: "Invalid EORI format"
+                  error_message_mt: "Format EORI mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_eori_registry"
+              eu_data_element: "13 07 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_ens"
+                column: "carrier_eori"
+              ors_mapping:
+                table: "mtca_ors.ens_declarations"
+                column: "carrier_eori"
+                data_type: "String"
+
+            - field_id: "transport_mode_ens"
+              field_code: "DE 7/4"
+              field_name_en: "Mode of Transport at Border"
+              field_name_mt: "Mod ta' Trasport fil-Fruntiera"
+              field_description: "Mode of transport crossing border"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "1"
+                  description_en: "Sea transport"
+                  time_limit: "24h before loading at departure port"
+                - code: "2"
+                  description_en: "Rail transport"
+                  time_limit: "2h before arrival"
+                - code: "3"
+                  description_en: "Road transport"
+                  time_limit: "1h before arrival"
+                - code: "4"
+                  description_en: "Air transport"
+                  time_limit: "Before departure from third country"
+                - code: "8"
+                  description_en: "Inland waterway"
+                  time_limit: "4h before arrival"
+              reference_table: "eu_transport_modes"
+              eu_data_element: "19 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_ens"
+                column: "transport_mode"
+              ors_mapping:
+                table: "mtca_ors.ens_declarations"
+                column: "transport_mode"
+                data_type: "FixedString(1)"
+
+            - field_id: "conveyance_reference"
+              field_code: "DE 7/7"
+              field_name_en: "Conveyance Reference Number"
+              field_name_mt: "Numru ta' Referenza tal-Mezz ta' Trasport"
+              field_description: "IMO number, flight number, or vehicle registration"
+              data_type: "STRING"
+              format: null
+              max_length: 35
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "19 07 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_ens"
+                column: "conveyance_ref"
+              ors_mapping:
+                table: "mtca_ors.ens_declarations"
+                column: "conveyance_reference"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Consignment Level
+        # ----------------------------------------------------------------------
+        - section_id: "ENS_CONSIGNMENT"
+          section_name: "Consignment"
+          section_description: "ENS consignment details"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          max_occurrences: 9999
+          fields:
+            - field_id: "consignment_reference"
+              field_code: "DE 2/8"
+              field_name_en: "Consignment Reference (MBL/HBL)"
+              field_name_mt: "Referenza tal-Kunsinna"
+              field_description: "Master or House Bill of Lading reference"
+              data_type: "STRING"
+              format: null
+              max_length: 35
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "21 06 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_consignments"
+                column: "consignment_ref"
+              ors_mapping:
+                table: "mtca_ors.ens_consignments"
+                column: "consignment_reference"
+                data_type: "String"
+
+            - field_id: "consignor_ens"
+              field_code: "DE 3/1"
+              field_name_en: "Consignor Name and Address"
+              field_name_mt: "Isem u Indirizz tal-Konsenjatur"
+              field_description: "Full name and address of consignor"
+              data_type: "STRING"
+              format: null
+              max_length: 512
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "13 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_consignments"
+                column: "consignor_details"
+              ors_mapping:
+                table: "mtca_ors.ens_consignments"
+                column: "consignor_details"
+                data_type: "String"
+
+            - field_id: "consignee_ens"
+              field_code: "DE 3/9"
+              field_name_en: "Consignee Name and Address"
+              field_name_mt: "Isem u Indirizz tal-Konsenjatarju"
+              field_description: "Full name and address of consignee"
+              data_type: "STRING"
+              format: null
+              max_length: 512
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "13 02 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_consignments"
+                column: "consignee_details"
+              ors_mapping:
+                table: "mtca_ors.ens_consignments"
+                column: "consignee_details"
+                data_type: "String"
+
+            - field_id: "goods_description_ens"
+              field_code: "DE 6/8"
+              field_name_en: "Goods Description"
+              field_name_mt: "Deskrizzjoni tal-Merkanzija"
+              field_description: "Plain text description of goods"
+              data_type: "STRING"
+              format: null
+              max_length: 512
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ENS_030"
+                  rule_type: "format"
+                  rule_description: "Description must be meaningful (not generic)"
+                  rule_expression: "NOT IN('FAK','SAID TO CONTAIN','GENERAL CARGO')"
+                  error_message_en: "Generic descriptions not accepted for safety/security"
+                  error_message_mt: "Deskrizzjonijiet Ä¡eneriÄ‹i mhux aÄ‹Ä‹ettati gÄ§as-sigurtÃ "
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "18 05 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_consignments"
+                column: "goods_desc"
+              ors_mapping:
+                table: "mtca_ors.ens_consignments"
+                column: "goods_description"
+                data_type: "String"
+
+            - field_id: "commodity_code_ens"
+              field_code: "DE 6/14"
+              field_name_en: "Commodity Code (HS6)"
+              field_name_mt: "KodiÄ‹i tal-Merkanzija (HS6)"
+              field_description: "6-digit HS code"
+              data_type: "HS_CODE"
+              format: "NNNNNN"
+              max_length: 6
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taric_hs_codes"
+              eu_data_element: "18 01 002 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_consignments"
+                column: "hs_code"
+              ors_mapping:
+                table: "mtca_ors.ens_consignments"
+                column: "commodity_code_hs"
+                data_type: "FixedString(6)"
+
+            - field_id: "gross_mass_ens"
+              field_code: "DE 6/5"
+              field_name_en: "Gross Mass (kg)"
+              field_name_mt: "Massa Grossa (kg)"
+              field_description: "Total gross weight"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 16
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "16 06 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_consignments"
+                column: "gross_mass"
+              ors_mapping:
+                table: "mtca_ors.ens_consignments"
+                column: "gross_mass_kg"
+                data_type: "Decimal(16,3)"
+
+            - field_id: "country_of_routing"
+              field_code: "DE 5/23"
+              field_name_en: "Countries of Routing"
+              field_name_mt: "PajjiÅ¼i tar-Rotta"
+              field_description: "Countries through which goods are routed"
+              data_type: "ARRAY"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_countries"
+              eu_data_element: "16 04 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "ics2_routing"
+                column: "country_code"
+              ors_mapping:
+                table: "mtca_ors.ens_consignments"
+                column: "countries_of_routing"
+                data_type: "Array(FixedString(2))"
+
+      eu_system_integration:
+        trans_european_system: "ICS2 (Import Control System 2)"
+        message_exchange: "S2S via STI (Shared Trader Interface)"
+        interface_specification: "ICS2 Technical Specifications v2.0"
+        connected_systems:
+          - system: "AIS"
+            purpose: "Subsequent import declaration"
+          - system: "CRMS"
+            purpose: "Risk management"
+          - system: "UUM&DS"
+            purpose: "Authentication"
+
+      submission_workflow:
+        authentication_required: "UUM&DS"
+        signature_required: false
+        guarantee_required: false
+        payment_integration: false
+        acknowledgment_type: "MRN"
+        time_limits:
+          - mode: "1"
+            description: "Sea (containerized)"
+            deadline: "24 hours before loading"
+          - mode: "1"
+            description: "Sea (bulk)"
+            deadline: "4 hours before arrival"
+          - mode: "4"
+            description: "Air (long-haul)"
+            deadline: "Before departure"
+          - mode: "4"
+            description: "Air (short-haul)"
+            deadline: "Before departure"
+          - mode: "3"
+            description: "Road"
+            deadline: "1 hour before arrival"
+          - mode: "2"
+            description: "Rail"
+            deadline: "2 hours before arrival"
+
+  # ==========================================================================
+  # EXS: Exit Summary Declaration
+  # Pre-departure safety/security per Art. 271 UCC
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "EXS"
+        form_name_en: "Exit Summary Declaration"
+        form_name_mt: "Dikjarazzjoni ta' Sommarju ta' Ä¦ruÄ¡"
+        version: "2024"
+        effective_from: "2011-01-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Art. 271"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446"
+        administering_authority: "MTCA Customs"
+        tax_type: "Safety and Security"
+        taxpayer_category: "Carrier / Exporter"
+        filing_frequency: "Per export/exit consignment"
+        filing_deadline: "Before goods leave customs territory"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "AES"
+        eu_system_interface: "Trans-European AES"
+        source_url: "https://customs.gov.mt/export"
+        xml_schema_ref: "EUCDM v3.11"
+        notes: |
+          Required when goods exit EU customs territory without export declaration.
+          Usually covered by export declaration or transit. Standalone EXS rare.
+
+      sections:
+        - section_id: "EXS_HEADER"
+          section_name: "EXS Header"
+          section_description: "Exit summary declaration details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "mrn_exs"
+              field_code: "MRN"
+              field_name_en: "Exit Summary MRN"
+              field_name_mt: "MRN tas-Sommarju ta' Ä¦ruÄ¡"
+              field_description: "Unique reference for EXS"
+              data_type: "MRN"
+              format: "YYCCnnnnnnnnnnnnnnC"
+              max_length: 18
+              precision: null
+              scale: null
+              required: true
+              required_condition: "System-generated"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "21 05 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "aes_exs"
+                column: "mrn"
+              ors_mapping:
+                table: "mtca_ors.exs_declarations"
+                column: "mrn"
+                data_type: "FixedString(18)"
+
+            - field_id: "office_of_exit_exs"
+              field_code: "DE 5/7"
+              field_name_en: "Office of Exit"
+              field_name_mt: "UffiÄ‹Ä‹ju tal-Ä¦ruÄ¡"
+              field_description: "Customs office where goods exit"
+              data_type: "CODE"
+              format: "CCNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eu_customs_offices"
+              eu_data_element: "17 03 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "aes_exs"
+                column: "office_exit"
+              ors_mapping:
+                table: "mtca_ors.exs_declarations"
+                column: "office_of_exit"
+                data_type: "FixedString(8)"
+
+      eu_system_integration:
+        trans_european_system: "AES"
+        message_exchange: "S2S"
+        interface_specification: "EUCDM v3.11"
+
+# ============================================================================
+# Reference Tables for Priority 4B: Transit & Security
+# ============================================================================
+reference_tables:
+  transit_types:
+    - code: "T1"
+      description_en: "External Union transit"
+      description_mt: "Transitu Estern tal-Unjoni"
+      goods_status: "Non-Union goods"
+    - code: "T2"
+      description_en: "Internal Union transit"
+      description_mt: "Transitu Intern tal-Unjoni"
+      goods_status: "Union goods"
+    - code: "T2F"
+      description_en: "Internal Union transit - special fiscal"
+      description_mt: "Transitu Intern - speÄ‹jali fiskali"
+      goods_status: "Union goods - special territories"
+    - code: "T2L"
+      description_en: "Proof of Union status"
+      description_mt: "Prova tal-istatus tal-Unjoni"
+      goods_status: "Documentary proof"
+    - code: "T2LF"
+      description_en: "Proof of Union status - special fiscal"
+      description_mt: "Prova - speÄ‹jali fiskali"
+      goods_status: "Documentary proof"
+    - code: "TIR"
+      description_en: "TIR Convention"
+      description_mt: "Konvenzjoni TIR"
+      goods_status: "Under TIR carnet"
+
+  guarantee_types:
+    - code: "0"
+      description_en: "Guarantee waiver"
+      comprehensive: false
+    - code: "1"
+      description_en: "Comprehensive guarantee"
+      comprehensive: true
+    - code: "2"
+      description_en: "Individual guarantee by guarantor"
+      comprehensive: false
+    - code: "3"
+      description_en: "Cash deposit or equivalent"
+      comprehensive: false
+    - code: "4"
+      description_en: "Individual guarantee by voucher"
+      comprehensive: false
+    - code: "9"
+      description_en: "Individual guarantee with multiple usage"
+      comprehensive: false
+
+  ncts_message_types:
+    - code: "IE015"
+      description: "Declaration data"
+      direction: "Trader -> Customs"
+    - code: "IE028"
+      description: "MRN allocated"
+      direction: "Customs -> Trader"
+    - code: "IE029"
+      description: "Release for transit"
+      direction: "Customs -> Trader"
+    - code: "IE043"
+      description: "Unloading permission"
+      direction: "Customs -> Trader"
+    - code: "IE044"
+      description: "Unloading remarks"
+      direction: "Trader -> Customs"
+    - code: "IE045"
+      description: "Write-off notification"
+      direction: "Customs -> Trader"
+    - code: "IE051"
+      description: "No release for transit"
+      direction: "Customs -> Trader"
+    - code: "IE055"
+      description: "Guarantee not valid"
+      direction: "Customs -> Trader"
+    - code: "IE060"
+      description: "Control decision notification"
+      direction: "Customs -> Trader"
+
+  ics2_filing_types:
+    - code: "F10"
+      description_en: "Master - all cargo in master level"
+      level: "Master"
+    - code: "F11"
+      description_en: "Master - all cargo in house level"
+      level: "Master"
+    - code: "F12"
+      description_en: "Master - partial cargo in house"
+      level: "Master"
+    - code: "F13"
+      description_en: "Master - mixed cargo"
+      level: "Master"
+    - code: "F14"
+      description_en: "Master - no cargo"
+      level: "Master"
+    - code: "F15"
+      description_en: "Master - bulk/uncontainerized"
+      level: "Master"
+    - code: "F20"
+      description_en: "House consignment"
+      level: "House"
+    - code: "F21"
+      description_en: "Simple house"
+      level: "House"
+    - code: "F22"
+      description_en: "House with master details"
+      level: "House"
+    - code: "F30"
+      description_en: "Direct filing"
+      level: "Direct"
+
+  ens_time_limits:
+    - transport_mode: "1"
+      mode_name: "Sea (containerized)"
+      time_limit: "24 hours before loading at departure port"
+    - transport_mode: "1"
+      mode_name: "Sea (bulk/break-bulk)"
+      time_limit: "4 hours before arrival"
+    - transport_mode: "4"
+      mode_name: "Air (long-haul >4h)"
+      time_limit: "Before departure from third country airport"
+    - transport_mode: "4"
+      mode_name: "Air (short-haul <4h)"
+      time_limit: "Before departure"
+    - transport_mode: "3"
+      mode_name: "Road"
+      time_limit: "1 hour before arrival"
+    - transport_mode: "2"
+      mode_name: "Rail"
+      time_limit: "2 hours before arrival"
+    - transport_mode: "8"
+      mode_name: "Inland waterway"
+      time_limit: "4 hours before arrival"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  customs_db:
+    tables:
+      - legacy_table: "ncts_transit"
+        ors_table: "mtca_ors.transit_declarations"
+        description: "Transit declaration headers"
+        key_columns:
+          - legacy: "mrn"
+            ors: "mrn"
+        volume_estimate: "~50,000 records/year"
+        
+      - legacy_table: "ncts_items"
+        ors_table: "mtca_ors.transit_items"
+        description: "Transit goods items"
+        key_columns:
+          - legacy: "mrn"
+            ors: "mrn"
+          - legacy: "item_no"
+            ors: "item_number"
+        volume_estimate: "~200,000 records/year"
+        
+      - legacy_table: "ncts_guarantees"
+        ors_table: "mtca_ors.transit_guarantees"
+        description: "Guarantee references"
+        key_columns:
+          - legacy: "mrn"
+            ors: "mrn"
+          - legacy: "grn"
+            ors: "grn"
+        volume_estimate: "~50,000 records/year"
+        
+      - legacy_table: "ics2_ens"
+        ors_table: "mtca_ors.ens_declarations"
+        description: "Entry summary declarations"
+        key_columns:
+          - legacy: "mrn"
+            ors: "mrn"
+        volume_estimate: "~300,000 records/year"
+        
+      - legacy_table: "ics2_consignments"
+        ors_table: "mtca_ors.ens_consignments"
+        description: "ENS consignment details"
+        key_columns:
+          - legacy: "mrn"
+            ors: "mrn"
+          - legacy: "consignment_ref"
+            ors: "consignment_reference"
+        volume_estimate: "~1,000,000 records/year"

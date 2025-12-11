@@ -1,0 +1,1140 @@
+# =============================================================================
+# TA-RDM L3 - Date Dimension (Generalized)
+# =============================================================================
+# Purpose: Calendar dimension supporting multiple fiscal year systems
+# Pattern: P6 (Configurable Fiscal Year), P7 (Externalized Holidays)
+# Priority: HIGH - Core conformed dimension
+# Version: 2.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4f of L3 Generalization Implementation
+# =============================================================================
+#
+# CHANGES FROM v1.0.0 (Malta-specific version):
+# - REMOVED: year_of_assessment (Malta-specific calculation)
+# - REMOVED: basis_year (Malta terminology)
+# - REMOVED: is_malta_public_holiday, malta_holiday_name, malta_holiday_name_mt
+# - REMOVED: day_of_week_name_mt, month_name_mt (Maltese translations)
+# - REMOVED: vat_period_code, fss_period_code (Malta-specific period codes)
+# - ADDED: Pre-calculated fiscal year columns for common patterns
+# - ADDED: Holiday lookup via ref_country_holiday at query time
+# - ADDED: Generic period keys for joining to dim_tax_period
+#
+# Design Principles:
+# - Date dimension is country-agnostic (no country_key column)
+# - Fiscal year variations handled via pre-calculated columns
+# - Holidays externalized to ref_country_holiday (query-time lookup)
+# - Translations handled via ref_localized_text (Pattern P8)
+# - Role-playing aliases enabled for different date contexts
+#
+# =============================================================================
+
+metadata:
+  dimension_name: dim_date
+  schema: warehouse
+  version: "2.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P6 - Configurable Fiscal Year, P7 - Externalized Holidays"
+  previous_version: "1.0.0 (Malta-specific)"
+  description: |
+    Conformed date dimension with configurable fiscal year support.
+    Holiday information externalized to ref_country_holiday.
+    
+    This dimension does NOT contain country_key because:
+    - It is a conformed dimension shared across all countries
+    - Country-specific fiscal years are derived at query time
+    - Holidays are resolved via ref_country_holiday join
+    
+    Pre-calculated fiscal year columns support common patterns:
+    - fiscal_year_jan: January-December (most countries)
+    - fiscal_year_jan_offset1: January-December with +1 year offset (Malta YA)
+    - fiscal_year_apr: April-March (Sri Lanka, UK)
+    - fiscal_year_jul: July-June (Australia)
+    
+    For countries with non-standard fiscal years, use the v_date_fiscal_year
+    view which derives fiscal year from dim_country configuration.
+
+# =============================================================================
+# Column Removal Documentation
+# =============================================================================
+
+removed_columns:
+  - name: year_of_assessment
+    reason: "Malta-specific calculation (CY+1)"
+    replacement: "Use fiscal_year_jan_offset1 for Malta, or derive from dim_country"
+    migration: |
+      -- For Malta queries, use:
+      SELECT fiscal_year_jan_offset1 AS year_of_assessment FROM dim_date
+      
+  - name: basis_year
+    reason: "Malta terminology for tax basis period"
+    replacement: "Use calendar_year or fiscal_year_jan depending on context"
+    migration: |
+      -- For Malta queries:
+      SELECT calendar_year AS basis_year FROM dim_date
+      
+  - name: is_malta_public_holiday
+    reason: "Explicit Malta reference"
+    replacement: "Use ref_country_holiday at query time"
+    migration: |
+      -- See Query Pattern for Holidays section below
+      
+  - name: malta_holiday_name
+    reason: "Explicit Malta reference"
+    replacement: "Moved to ref_country_holiday.holiday_name"
+    
+  - name: malta_holiday_name_mt
+    reason: "Maltese translation embedded in dimension"
+    replacement: "Moved to ref_country_holiday.holiday_name_local or ref_localized_text"
+    
+  - name: day_of_week_name_mt
+    reason: "Maltese translation embedded in dimension"
+    replacement: "Use ref_localized_text with object_type='DIM_DATE', attribute_name='day_name'"
+    
+  - name: month_name_mt
+    reason: "Maltese translation embedded in dimension"
+    replacement: "Use ref_localized_text with object_type='DIM_DATE', attribute_name='month_name'"
+    
+  - name: vat_period_code
+    reason: "Malta VAT period format (2024Q1)"
+    replacement: "Use year_quarter_key or derive from calendar columns"
+    migration: |
+      -- For Malta VAT period format:
+      SELECT CONCAT(calendar_year, 'Q', calendar_quarter) AS vat_period_code FROM dim_date
+      
+  - name: fss_period_code
+    reason: "Malta FSS (Final Settlement System) specific"
+    replacement: "Use year_month_key or derive from calendar columns"
+    migration: |
+      -- For Malta FSS period format:
+      SELECT CONCAT(calendar_year, 'M', LPAD(calendar_month, 2, '0')) AS fss_period_code FROM dim_date
+      
+  - name: income_tax_period_code
+    reason: "Malta-specific YA prefix pattern"
+    replacement: "Derive using fiscal_year_jan_offset1 with country prefix"
+    migration: |
+      -- For Malta income tax period:
+      SELECT CONCAT('YA', fiscal_year_jan_offset1) AS income_tax_period_code FROM dim_date
+
+# =============================================================================
+# Dimension Specification
+# =============================================================================
+
+dimension:
+  name: dim_date
+  schema: warehouse
+  type: dimension
+  scd_type: 0  # Static - calendar dates don't change
+  
+  grain: "One row per calendar day"
+  natural_key: [date_key]
+  surrogate_key: date_key
+  
+  business_context:
+    domain: "Time"
+    usage: |
+      Conformed date dimension for all date-based analysis.
+      Role-playing supported via aliases (filing_date_key, due_date_key, etc.)
+    refresh: "STATIC"  # Pre-populated for 50+ years
+    priority: "CRITICAL"
+  
+  description: |
+    Conformed dimension for calendar dates. This dimension supports:
+    - Multiple fiscal year patterns via pre-calculated columns
+    - Country-specific holidays via ref_country_holiday lookup
+    - Multi-language support via ref_localized_text
+    - Role-playing for different date contexts in fact tables
+  
+  columns:
+    # ==========================================================================
+    # Keys
+    # ==========================================================================
+    - name: date_key
+      data_type: Int32
+      nullable: false
+      description: "Surrogate key in YYYYMMDD format (smart key)"
+      role: SURROGATE_KEY
+      example: 20241215
+    
+    - name: calendar_date
+      data_type: Date
+      nullable: false
+      description: "Actual date value"
+      role: NATURAL_KEY
+      example: "2024-12-15"
+    
+    # ==========================================================================
+    # Calendar Attributes - Core
+    # ==========================================================================
+    - name: calendar_year
+      data_type: Int16
+      nullable: false
+      description: "Calendar year (2020, 2024, 2025, etc.)"
+      example: 2024
+    
+    - name: calendar_quarter
+      data_type: UInt8
+      nullable: false
+      description: "Calendar quarter (1-4)"
+      constraints:
+        check: "calendar_quarter BETWEEN 1 AND 4"
+      example: 4
+    
+    - name: calendar_month
+      data_type: UInt8
+      nullable: false
+      description: "Calendar month (1-12)"
+      constraints:
+        check: "calendar_month BETWEEN 1 AND 12"
+      example: 12
+    
+    - name: day_of_month
+      data_type: UInt8
+      nullable: false
+      description: "Day of month (1-31)"
+      constraints:
+        check: "day_of_month BETWEEN 1 AND 31"
+      example: 15
+    
+    - name: day_of_year
+      data_type: Int16
+      nullable: false
+      description: "Day of year (1-366)"
+      constraints:
+        check: "day_of_year BETWEEN 1 AND 366"
+      example: 350
+    
+    - name: day_of_week
+      data_type: UInt8
+      nullable: false
+      description: "Day of week (1=Monday, 7=Sunday, ISO standard)"
+      constraints:
+        check: "day_of_week BETWEEN 1 AND 7"
+      example: 7  # Sunday
+    
+    # ==========================================================================
+    # Week Attributes
+    # ==========================================================================
+    - name: week_of_year
+      data_type: UInt8
+      nullable: false
+      description: "ISO week number (1-53)"
+      constraints:
+        check: "week_of_year BETWEEN 1 AND 53"
+      example: 50
+    
+    - name: iso_week_year
+      data_type: Int16
+      nullable: false
+      description: "ISO week year (may differ from calendar year at year boundaries)"
+      note: "Week 1 is the week containing first Thursday of year"
+      example: 2024
+    
+    - name: week_of_month
+      data_type: UInt8
+      nullable: false
+      description: "Week of month (1-5)"
+      constraints:
+        check: "week_of_month BETWEEN 1 AND 5"
+      example: 3
+    
+    # ==========================================================================
+    # Day Names (English only - translations via localization)
+    # ==========================================================================
+    - name: day_of_week_name
+      data_type: String
+      length: 20
+      nullable: false
+      description: "Full day name in English (Monday, Tuesday, etc.)"
+      example: "Sunday"
+    
+    - name: day_of_week_name_short
+      data_type: String
+      length: 3
+      nullable: false
+      description: "Abbreviated day name (Mon, Tue, etc.)"
+      example: "Sun"
+    
+    # ==========================================================================
+    # Month Names (English only - translations via localization)
+    # ==========================================================================
+    - name: month_name
+      data_type: String
+      length: 20
+      nullable: false
+      description: "Full month name in English"
+      example: "December"
+    
+    - name: month_name_short
+      data_type: String
+      length: 3
+      nullable: false
+      description: "Abbreviated month name (Jan, Feb, etc.)"
+      example: "Dec"
+    
+    - name: quarter_name
+      data_type: String
+      length: 2
+      nullable: false
+      description: "Quarter name (Q1, Q2, Q3, Q4)"
+      example: "Q4"
+    
+    # ==========================================================================
+    # Period Boundary Dates
+    # ==========================================================================
+    - name: month_start_date
+      data_type: Date
+      nullable: false
+      description: "First day of the month"
+      example: "2024-12-01"
+    
+    - name: month_end_date
+      data_type: Date
+      nullable: false
+      description: "Last day of the month"
+      example: "2024-12-31"
+    
+    - name: quarter_start_date
+      data_type: Date
+      nullable: false
+      description: "First day of the quarter"
+      example: "2024-10-01"
+    
+    - name: quarter_end_date
+      data_type: Date
+      nullable: false
+      description: "Last day of the quarter"
+      example: "2024-12-31"
+    
+    - name: year_start_date
+      data_type: Date
+      nullable: false
+      description: "First day of the calendar year"
+      example: "2024-01-01"
+    
+    - name: year_end_date
+      data_type: Date
+      nullable: false
+      description: "Last day of the calendar year"
+      example: "2024-12-31"
+    
+    - name: days_in_month
+      data_type: UInt8
+      nullable: false
+      description: "Number of days in the month (28-31)"
+      example: 31
+    
+    - name: days_in_year
+      data_type: Int16
+      nullable: false
+      description: "Number of days in the year (365 or 366)"
+      example: 366  # 2024 is leap year
+    
+    # ==========================================================================
+    # Pre-calculated Fiscal Years (Common Patterns)
+    # ==========================================================================
+    - name: fiscal_year_jan
+      data_type: Int16
+      nullable: false
+      description: |
+        Fiscal year for January-December countries.
+        Same as calendar_year. Most countries use this pattern.
+      derivation: "calendar_year"
+      example: 2024
+      usage_countries:
+        - "MLT (Malta - for VAT)"
+        - "MDA (Moldova)"
+        - "UKR (Ukraine)"
+        - "Most European countries"
+    
+    - name: fiscal_year_jan_offset1
+      data_type: Int16
+      nullable: false
+      description: |
+        Fiscal year for Jan-Dec with +1 year offset.
+        Used for Malta's Year of Assessment (YA) system where CY 2024 = YA 2025.
+        This is the Malta income tax year convention.
+      derivation: "calendar_year + 1"
+      example: 2025  # For calendar year 2024
+      usage_countries:
+        - "MLT (Malta - for income tax Year of Assessment)"
+    
+    - name: fiscal_year_apr
+      data_type: Int16
+      nullable: false
+      description: |
+        Fiscal year for April-March countries.
+        April-December = calendar_year, January-March = calendar_year - 1.
+        Used by Sri Lanka, UK, India, and several Commonwealth countries.
+      derivation: "CASE WHEN calendar_month >= 4 THEN calendar_year ELSE calendar_year - 1 END"
+      example: 2024  # April 2024 - March 2025 = FY 2024
+      usage_countries:
+        - "LKA (Sri Lanka)"
+        - "GBR (United Kingdom)"
+        - "IND (India)"
+    
+    - name: fiscal_year_jul
+      data_type: Int16
+      nullable: false
+      description: |
+        Fiscal year for July-June countries.
+        July-December = calendar_year, January-June = calendar_year - 1.
+        Used by Australia, New Zealand, and several African countries.
+      derivation: "CASE WHEN calendar_month >= 7 THEN calendar_year ELSE calendar_year - 1 END"
+      example: 2024  # July 2024 - June 2025 = FY 2024
+      usage_countries:
+        - "AUS (Australia)"
+        - "NZL (New Zealand)"
+        - "KEN (Kenya)"
+        - "EGY (Egypt)"
+    
+    - name: fiscal_year_oct
+      data_type: Int16
+      nullable: false
+      description: |
+        Fiscal year for October-September countries.
+        October-December = calendar_year, January-September = calendar_year - 1.
+        Used by US Federal Government, some US states.
+      derivation: "CASE WHEN calendar_month >= 10 THEN calendar_year ELSE calendar_year - 1 END"
+      example: 2024  # October 2024 - September 2025 = FY 2024
+      usage_countries:
+        - "USA (Federal Government)"
+    
+    # ==========================================================================
+    # Pre-calculated Fiscal Quarters
+    # ==========================================================================
+    - name: fiscal_quarter_jan
+      data_type: UInt8
+      nullable: false
+      description: "Quarter for Jan-Dec fiscal year (same as calendar_quarter)"
+      derivation: "calendar_quarter"
+      example: 4
+    
+    - name: fiscal_quarter_apr
+      data_type: UInt8
+      nullable: false
+      description: "Quarter for Apr-Mar fiscal year (Q1=Apr-Jun, Q2=Jul-Sep, Q3=Oct-Dec, Q4=Jan-Mar)"
+      derivation: "CASE WHEN calendar_month >= 4 THEN ((calendar_month - 4) DIV 3) + 1 ELSE ((calendar_month + 8) DIV 3) + 1 END"
+      example: 3  # December is Q3 in Apr-Mar fiscal year
+    
+    - name: fiscal_quarter_jul
+      data_type: UInt8
+      nullable: false
+      description: "Quarter for Jul-Jun fiscal year (Q1=Jul-Sep, Q2=Oct-Dec, Q3=Jan-Mar, Q4=Apr-Jun)"
+      derivation: "CASE WHEN calendar_month >= 7 THEN ((calendar_month - 7) DIV 3) + 1 ELSE ((calendar_month + 5) DIV 3) + 1 END"
+      example: 2  # December is Q2 in Jul-Jun fiscal year
+    
+    # ==========================================================================
+    # Fiscal Period Attributes
+    # ==========================================================================
+    - name: fiscal_month_jan
+      data_type: UInt8
+      nullable: false
+      description: "Month within fiscal year for Jan-Dec (1-12, same as calendar_month)"
+      derivation: "calendar_month"
+      example: 12
+    
+    - name: fiscal_month_apr
+      data_type: UInt8
+      nullable: false
+      description: "Month within fiscal year for Apr-Mar (1=Apr, 12=Mar)"
+      derivation: "CASE WHEN calendar_month >= 4 THEN calendar_month - 3 ELSE calendar_month + 9 END"
+      example: 9  # December is month 9 in Apr-Mar fiscal year
+    
+    # ==========================================================================
+    # Period Keys (for joining to dim_tax_period)
+    # ==========================================================================
+    - name: year_month_key
+      data_type: Int32
+      nullable: false
+      description: "YYYYMM format for monthly period joins"
+      derivation: "calendar_year * 100 + calendar_month"
+      example: 202412
+    
+    - name: year_quarter_key
+      data_type: Int32
+      nullable: false
+      description: "YYYYQ format for quarterly period joins"
+      derivation: "calendar_year * 10 + calendar_quarter"
+      example: 20244
+    
+    - name: year_week_key
+      data_type: Int32
+      nullable: false
+      description: "YYYYWW format for weekly period joins (ISO week)"
+      derivation: "iso_week_year * 100 + week_of_year"
+      example: 202450
+    
+    # ==========================================================================
+    # Period End/Start Flags
+    # ==========================================================================
+    - name: is_first_day_of_month
+      data_type: UInt8
+      nullable: false
+      description: "Is first day of calendar month (1=Yes)"
+      derivation: "day_of_month = 1"
+      example: 0
+    
+    - name: is_last_day_of_month
+      data_type: UInt8
+      nullable: false
+      description: "Is last day of calendar month (1=Yes)"
+      derivation: "calendar_date = month_end_date"
+      example: 0
+    
+    - name: is_first_day_of_quarter
+      data_type: UInt8
+      nullable: false
+      description: "Is first day of calendar quarter (1=Yes)"
+      derivation: "calendar_date = quarter_start_date"
+      example: 0
+    
+    - name: is_last_day_of_quarter
+      data_type: UInt8
+      nullable: false
+      description: "Is last day of calendar quarter (1=Yes)"
+      derivation: "calendar_date = quarter_end_date"
+      example: 0
+    
+    - name: is_first_day_of_year
+      data_type: UInt8
+      nullable: false
+      description: "Is January 1 (1=Yes)"
+      derivation: "calendar_month = 1 AND day_of_month = 1"
+      example: 0
+    
+    - name: is_last_day_of_year
+      data_type: UInt8
+      nullable: false
+      description: "Is December 31 (1=Yes)"
+      derivation: "calendar_month = 12 AND day_of_month = 31"
+      example: 0
+    
+    # ==========================================================================
+    # Weekend/Business Day Flags (Generic - no holiday info)
+    # ==========================================================================
+    - name: is_weekend
+      data_type: UInt8
+      nullable: false
+      description: "Is Saturday or Sunday (1=Yes)"
+      derivation: "day_of_week IN (6, 7)"
+      example: 1  # Sunday
+      note: "Some countries have different weekend days (Fri-Sat). Use is_workday for country-specific."
+    
+    - name: is_weekday
+      data_type: UInt8
+      nullable: false
+      description: "Is Monday through Friday (1=Yes)"
+      derivation: "day_of_week BETWEEN 1 AND 5"
+      example: 0  # Sunday
+    
+    - name: is_leap_year
+      data_type: UInt8
+      nullable: false
+      description: "Is this date in a leap year (1=Yes)"
+      derivation: "(calendar_year % 4 = 0 AND calendar_year % 100 != 0) OR calendar_year % 400 = 0"
+      example: 1  # 2024 is leap year
+    
+    # ==========================================================================
+    # Prior Period Keys (for period-over-period comparisons)
+    # ==========================================================================
+    - name: prior_day_date_key
+      data_type: Int32
+      nullable: true
+      description: "date_key of previous day"
+      example: 20241214
+    
+    - name: prior_week_date_key
+      data_type: Int32
+      nullable: true
+      description: "date_key of same weekday in previous week"
+      example: 20241208
+    
+    - name: prior_month_date_key
+      data_type: Int32
+      nullable: true
+      description: "date_key of same day in previous month (NULL if day doesn't exist)"
+      example: 20241115
+      note: "NULL for Feb 29 to Jan, or day 31 in months with fewer days"
+    
+    - name: prior_quarter_date_key
+      data_type: Int32
+      nullable: true
+      description: "date_key of same day in previous quarter (NULL if day doesn't exist)"
+      example: 20240915
+    
+    - name: prior_year_date_key
+      data_type: Int32
+      nullable: true
+      description: "date_key of same day in previous year (NULL for Feb 29 in non-leap year)"
+      example: 20231215
+    
+    # ==========================================================================
+    # Relative Date Flags (Dynamic - updated daily via scheduled process)
+    # ==========================================================================
+    - name: is_today
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is this date today (updated daily via ETL)"
+      note: "Dynamic column - updated by daily ETL process"
+    
+    - name: is_yesterday
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is this date yesterday (updated daily via ETL)"
+      note: "Dynamic column - updated by daily ETL process"
+    
+    - name: is_current_week
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is date in current ISO week (updated daily)"
+      note: "Dynamic column - updated by daily ETL process"
+    
+    - name: is_current_month
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is date in current month (updated daily)"
+      note: "Dynamic column - updated by daily ETL process"
+    
+    - name: is_current_quarter
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is date in current quarter (updated daily)"
+      note: "Dynamic column - updated by daily ETL process"
+    
+    - name: is_current_year
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is date in current calendar year (updated daily)"
+      note: "Dynamic column - updated by daily ETL process"
+    
+    # ==========================================================================
+    # ETL Metadata
+    # ==========================================================================
+    - name: etl_batch_id
+      data_type: Int64
+      nullable: false
+      description: "ETL batch identifier for traceability"
+    
+    - name: etl_load_timestamp
+      data_type: DateTime
+      nullable: false
+      description: "Timestamp when record was loaded/updated"
+      default: "CURRENT_TIMESTAMP"
+
+  # ============================================================================
+  # Indexes
+  # ============================================================================
+  indexes:
+    - name: pk_dim_date
+      columns: [date_key]
+      type: PRIMARY
+    
+    - name: uk_dim_date_calendar
+      columns: [calendar_date]
+      type: UNIQUE
+      description: "Ensure one row per calendar date"
+    
+    - name: idx_dim_date_year_month
+      columns: [calendar_year, calendar_month]
+      description: "Monthly reporting queries"
+    
+    - name: idx_dim_date_year_quarter
+      columns: [calendar_year, calendar_quarter]
+      description: "Quarterly reporting queries"
+    
+    - name: idx_dim_date_year_month_key
+      columns: [year_month_key]
+      description: "Monthly period joins"
+    
+    - name: idx_dim_date_year_quarter_key
+      columns: [year_quarter_key]
+      description: "Quarterly period joins"
+    
+    - name: idx_dim_date_fiscal_jan
+      columns: [fiscal_year_jan]
+      description: "Jan-Dec fiscal year queries"
+    
+    - name: idx_dim_date_fiscal_apr
+      columns: [fiscal_year_apr]
+      description: "Apr-Mar fiscal year queries"
+    
+    - name: idx_dim_date_fiscal_jan_offset
+      columns: [fiscal_year_jan_offset1]
+      description: "Malta Year of Assessment queries"
+    
+    - name: idx_dim_date_weekend
+      columns: [is_weekend, calendar_date]
+      description: "Weekend/weekday filtering"
+
+# ==============================================================================
+# Query Patterns
+# ==============================================================================
+
+query_patterns:
+  fiscal_year_by_country:
+    description: "Get correct fiscal year for any country using dim_country configuration"
+    sql: |
+      -- Dynamic fiscal year based on country configuration
+      SELECT 
+          d.date_key,
+          d.calendar_date,
+          d.calendar_year,
+          c.country_code,
+          c.country_name,
+          CASE c.tax_year_type
+              WHEN 'CALENDAR' THEN d.fiscal_year_jan + c.fiscal_year_offset_years
+              WHEN 'FISCAL_APR' THEN d.fiscal_year_apr + c.fiscal_year_offset_years
+              WHEN 'FISCAL_JUL' THEN d.fiscal_year_jul + c.fiscal_year_offset_years
+              WHEN 'FISCAL_OCT' THEN d.fiscal_year_oct + c.fiscal_year_offset_years
+              ELSE d.fiscal_year_jan + c.fiscal_year_offset_years
+          END AS fiscal_year,
+          REPLACE(c.fiscal_year_label_pattern, '{YEAR}', 
+              CAST(calculated_fiscal_year AS CHAR)) AS fiscal_year_label
+      FROM warehouse.dim_date d
+      CROSS JOIN warehouse.dim_country c
+      WHERE c.country_code = :country_code;
+  
+  malta_year_of_assessment:
+    description: "Get Malta Year of Assessment (CY + 1)"
+    sql: |
+      SELECT 
+          d.calendar_date,
+          d.calendar_year AS basis_year,
+          d.fiscal_year_jan_offset1 AS year_of_assessment,
+          CONCAT('YA', d.fiscal_year_jan_offset1) AS ya_period_code
+      FROM warehouse.dim_date d
+      WHERE d.calendar_year = 2024;
+  
+  sri_lanka_fiscal_year:
+    description: "Get Sri Lanka fiscal year (April-March)"
+    sql: |
+      SELECT 
+          d.calendar_date,
+          d.calendar_year,
+          d.fiscal_year_apr AS fiscal_year,
+          d.fiscal_quarter_apr AS fiscal_quarter,
+          CONCAT('FY', d.fiscal_year_apr, '/', RIGHT(CAST(d.fiscal_year_apr + 1 AS CHAR), 2)) AS fy_label
+      FROM warehouse.dim_date d
+      WHERE d.calendar_date BETWEEN '2024-04-01' AND '2025-03-31';
+  
+  holidays_for_country:
+    description: "Get dates with holiday information for a specific country"
+    sql: |
+      -- Join to ref_country_holiday for country-specific holidays
+      SELECT 
+          d.date_key,
+          d.calendar_date,
+          d.day_of_week_name,
+          d.is_weekend,
+          h.holiday_code,
+          h.holiday_name,
+          h.holiday_name_local,
+          h.holiday_type,
+          CASE WHEN h.holiday_date IS NOT NULL THEN 1 ELSE 0 END AS is_public_holiday,
+          CASE 
+              WHEN d.is_weekend = 1 THEN 0
+              WHEN h.holiday_date IS NOT NULL THEN 0
+              ELSE 1 
+          END AS is_business_day
+      FROM warehouse.dim_date d
+      LEFT JOIN reference.ref_country_holiday h 
+          ON d.calendar_date = h.holiday_date
+          AND h.country_code = :country_code
+      WHERE d.calendar_year = :year
+      ORDER BY d.calendar_date;
+  
+  business_days_per_month:
+    description: "Count business days per month for a country"
+    sql: |
+      SELECT 
+          d.calendar_year,
+          d.calendar_month,
+          d.month_name,
+          COUNT(*) AS total_days,
+          SUM(d.is_weekday) AS weekdays,
+          SUM(d.is_weekend) AS weekend_days,
+          SUM(CASE WHEN h.holiday_date IS NOT NULL AND d.is_weekday = 1 THEN 1 ELSE 0 END) AS holidays_on_weekdays,
+          SUM(CASE 
+              WHEN d.is_weekend = 0 AND h.holiday_date IS NULL THEN 1 
+              ELSE 0 
+          END) AS business_days
+      FROM warehouse.dim_date d
+      LEFT JOIN reference.ref_country_holiday h 
+          ON d.calendar_date = h.holiday_date
+          AND h.country_code = :country_code
+      WHERE d.calendar_year = :year
+      GROUP BY d.calendar_year, d.calendar_month, d.month_name
+      ORDER BY d.calendar_month;
+  
+  vat_period_code_derivation:
+    description: "Derive Malta VAT period code from calendar columns"
+    sql: |
+      SELECT 
+          d.calendar_date,
+          CONCAT(d.calendar_year, 'Q', d.calendar_quarter) AS vat_period_code,
+          d.quarter_start_date AS vat_period_start,
+          d.quarter_end_date AS vat_period_end
+      FROM warehouse.dim_date d
+      WHERE d.calendar_year = 2024
+        AND d.is_last_day_of_quarter = 1;
+
+# ==============================================================================
+# View Definition: v_date_fiscal_year
+# ==============================================================================
+
+views:
+  - name: v_date_fiscal_year
+    schema: warehouse
+    description: "Date dimension with calculated fiscal year based on country configuration"
+    definition: |
+      CREATE VIEW warehouse.v_date_fiscal_year AS
+      SELECT 
+          d.date_key,
+          d.calendar_date,
+          d.calendar_year,
+          d.calendar_quarter,
+          d.calendar_month,
+          d.day_of_month,
+          c.country_key,
+          c.country_code,
+          c.country_name,
+          -- Calculate fiscal year based on country config
+          CASE c.tax_year_type
+              WHEN 'CALENDAR' THEN d.fiscal_year_jan
+              WHEN 'FISCAL_APR' THEN d.fiscal_year_apr
+              WHEN 'FISCAL_JUL' THEN d.fiscal_year_jul
+              WHEN 'FISCAL_OCT' THEN d.fiscal_year_oct
+              ELSE d.fiscal_year_jan
+          END + c.fiscal_year_offset_years AS fiscal_year,
+          -- Calculate fiscal quarter
+          CASE c.tax_year_type
+              WHEN 'CALENDAR' THEN d.fiscal_quarter_jan
+              WHEN 'FISCAL_APR' THEN d.fiscal_quarter_apr
+              WHEN 'FISCAL_JUL' THEN d.fiscal_quarter_jul
+              ELSE d.fiscal_quarter_jan
+          END AS fiscal_quarter,
+          -- Format fiscal year label
+          REPLACE(
+              REPLACE(c.fiscal_year_label_pattern, '{YEAR}', 
+                  CAST(CASE c.tax_year_type
+                      WHEN 'CALENDAR' THEN d.fiscal_year_jan
+                      WHEN 'FISCAL_APR' THEN d.fiscal_year_apr
+                      WHEN 'FISCAL_JUL' THEN d.fiscal_year_jul
+                      ELSE d.fiscal_year_jan
+                  END + c.fiscal_year_offset_years AS CHAR)),
+              '{NEXT_YEAR_SHORT}', 
+              RIGHT(CAST(CASE c.tax_year_type
+                  WHEN 'CALENDAR' THEN d.fiscal_year_jan
+                  WHEN 'FISCAL_APR' THEN d.fiscal_year_apr
+                  WHEN 'FISCAL_JUL' THEN d.fiscal_year_jul
+                  ELSE d.fiscal_year_jan
+              END + c.fiscal_year_offset_years + 1 AS CHAR), 2)
+          ) AS fiscal_year_label
+      FROM warehouse.dim_date d
+      CROSS JOIN warehouse.dim_country c
+      WHERE c.is_active = 1;
+  
+  - name: v_date_with_holidays
+    schema: warehouse
+    description: "Date dimension with holiday information for a specific country (use with country_code filter)"
+    definition: |
+      CREATE VIEW warehouse.v_date_with_holidays AS
+      SELECT 
+          d.date_key,
+          d.calendar_date,
+          d.calendar_year,
+          d.calendar_quarter,
+          d.calendar_month,
+          d.day_of_month,
+          d.day_of_week,
+          d.day_of_week_name,
+          d.month_name,
+          d.is_weekend,
+          d.is_weekday,
+          h.country_code,
+          h.holiday_code,
+          h.holiday_name,
+          h.holiday_name_local,
+          h.holiday_type,
+          CASE WHEN h.holiday_date IS NOT NULL THEN 1 ELSE 0 END AS is_public_holiday,
+          CASE 
+              WHEN d.is_weekend = 1 THEN 0
+              WHEN h.holiday_date IS NOT NULL THEN 0
+              ELSE 1 
+          END AS is_business_day
+      FROM warehouse.dim_date d
+      LEFT JOIN reference.ref_country_holiday h 
+          ON d.calendar_date = h.holiday_date;
+
+# ==============================================================================
+# Business Rules
+# ==============================================================================
+
+business_rules:
+  - rule_id: BR_DATE_001
+    description: "All dates must have valid calendar attributes"
+    severity: ERROR
+    validation_sql: |
+      SELECT date_key
+      FROM warehouse.dim_date
+      WHERE calendar_month NOT BETWEEN 1 AND 12
+         OR calendar_quarter NOT BETWEEN 1 AND 4
+         OR day_of_month NOT BETWEEN 1 AND 31
+    expected_result: "0 rows"
+  
+  - rule_id: BR_DATE_002
+    description: "Fiscal year Jan must equal calendar year"
+    severity: ERROR
+    validation_sql: |
+      SELECT date_key
+      FROM warehouse.dim_date
+      WHERE fiscal_year_jan != calendar_year
+    expected_result: "0 rows"
+  
+  - rule_id: BR_DATE_003
+    description: "Fiscal year Jan offset must equal calendar year + 1"
+    severity: ERROR
+    validation_sql: |
+      SELECT date_key
+      FROM warehouse.dim_date
+      WHERE fiscal_year_jan_offset1 != calendar_year + 1
+    expected_result: "0 rows"
+  
+  - rule_id: BR_DATE_004
+    description: "Fiscal year April must be correct for Apr-Mar boundary"
+    severity: ERROR
+    validation_sql: |
+      SELECT date_key, calendar_date, calendar_year, calendar_month, fiscal_year_apr
+      FROM warehouse.dim_date
+      WHERE (calendar_month >= 4 AND fiscal_year_apr != calendar_year)
+         OR (calendar_month < 4 AND fiscal_year_apr != calendar_year - 1)
+    expected_result: "0 rows"
+  
+  - rule_id: BR_DATE_005
+    description: "Year-month key must be correctly derived"
+    severity: ERROR
+    validation_sql: |
+      SELECT date_key
+      FROM warehouse.dim_date
+      WHERE year_month_key != calendar_year * 100 + calendar_month
+    expected_result: "0 rows"
+  
+  - rule_id: BR_DATE_006
+    description: "Prior day date key must be previous day"
+    severity: WARNING
+    validation_sql: |
+      SELECT d.date_key
+      FROM warehouse.dim_date d
+      WHERE d.prior_day_date_key IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM warehouse.dim_date p
+          WHERE p.date_key = d.prior_day_date_key
+            AND p.calendar_date = DATE_SUB(d.calendar_date, INTERVAL 1 DAY)
+        )
+    expected_result: "0 rows"
+
+# ==============================================================================
+# ETL Configuration
+# ==============================================================================
+
+etl_config:
+  load_strategy: "FULL_LOAD"  # One-time load for date range
+  load_frequency: "INITIAL_PLUS_DAILY_FLAGS"
+  
+  date_range:
+    start_date: "2000-01-01"
+    end_date: "2050-12-31"
+    total_rows: 18628  # Approximately 51 years
+  
+  daily_update:
+    description: "Daily process to update relative date flags"
+    columns_to_update:
+      - is_today
+      - is_yesterday
+      - is_current_week
+      - is_current_month
+      - is_current_quarter
+      - is_current_year
+    schedule: "Daily at 00:01 local time"
+  
+  generation_notes: |
+    1. Generate date range from start_date to end_date
+    2. Calculate all calendar attributes
+    3. Calculate pre-calculated fiscal years using derivation formulas
+    4. Calculate period boundary dates
+    5. Generate period keys
+    6. Calculate prior period keys (with NULL handling for edge cases)
+    7. Initialize relative date flags to 0
+    8. Run daily flag update process
+
+# ==============================================================================
+# ClickHouse DDL
+# ==============================================================================
+
+clickhouse_ddl:
+  database: "{country}_dw"  # Placeholder for country-specific database
+  engine: MergeTree()
+  order_by: [date_key]
+  primary_key: date_key
+  partition_by: null  # No partitioning for static dimension
+  
+  ddl: |
+    CREATE TABLE IF NOT EXISTS {database}.dim_date
+    (
+        -- Keys
+        date_key Int32,
+        calendar_date Date,
+        
+        -- Calendar Attributes
+        calendar_year Int16,
+        calendar_quarter UInt8,
+        calendar_month UInt8,
+        day_of_month UInt8,
+        day_of_year Int16,
+        day_of_week UInt8,
+        
+        -- Week Attributes
+        week_of_year UInt8,
+        iso_week_year Int16,
+        week_of_month UInt8,
+        
+        -- Names (English)
+        day_of_week_name LowCardinality(String),
+        day_of_week_name_short LowCardinality(FixedString(3)),
+        month_name LowCardinality(String),
+        month_name_short LowCardinality(FixedString(3)),
+        quarter_name LowCardinality(FixedString(2)),
+        
+        -- Period Boundaries
+        month_start_date Date,
+        month_end_date Date,
+        quarter_start_date Date,
+        quarter_end_date Date,
+        year_start_date Date,
+        year_end_date Date,
+        days_in_month UInt8,
+        days_in_year Int16,
+        
+        -- Pre-calculated Fiscal Years
+        fiscal_year_jan Int16,
+        fiscal_year_jan_offset1 Int16,
+        fiscal_year_apr Int16,
+        fiscal_year_jul Int16,
+        fiscal_year_oct Int16,
+        fiscal_quarter_jan UInt8,
+        fiscal_quarter_apr UInt8,
+        fiscal_quarter_jul UInt8,
+        fiscal_month_jan UInt8,
+        fiscal_month_apr UInt8,
+        
+        -- Period Keys
+        year_month_key Int32,
+        year_quarter_key Int32,
+        year_week_key Int32,
+        
+        -- Period Flags
+        is_first_day_of_month UInt8,
+        is_last_day_of_month UInt8,
+        is_first_day_of_quarter UInt8,
+        is_last_day_of_quarter UInt8,
+        is_first_day_of_year UInt8,
+        is_last_day_of_year UInt8,
+        
+        -- Weekend/Weekday Flags
+        is_weekend UInt8,
+        is_weekday UInt8,
+        is_leap_year UInt8,
+        
+        -- Prior Period Keys
+        prior_day_date_key Nullable(Int32),
+        prior_week_date_key Nullable(Int32),
+        prior_month_date_key Nullable(Int32),
+        prior_quarter_date_key Nullable(Int32),
+        prior_year_date_key Nullable(Int32),
+        
+        -- Relative Date Flags (updated daily)
+        is_today UInt8 DEFAULT 0,
+        is_yesterday UInt8 DEFAULT 0,
+        is_current_week UInt8 DEFAULT 0,
+        is_current_month UInt8 DEFAULT 0,
+        is_current_quarter UInt8 DEFAULT 0,
+        is_current_year UInt8 DEFAULT 0,
+        
+        -- ETL Metadata
+        etl_batch_id Int64,
+        etl_load_timestamp DateTime DEFAULT now()
+    )
+    ENGINE = MergeTree()
+    ORDER BY (date_key)
+    SETTINGS index_granularity = 8192;
+
+# ==============================================================================
+# Migration Notes
+# ==============================================================================
+
+migration_notes:
+  from_malta_version: |
+    -- Migration script to rename/transform Malta-specific columns
+    
+    -- 1. year_of_assessment → fiscal_year_jan_offset1
+    -- This is already calculated, no data migration needed
+    -- Update queries to use: fiscal_year_jan_offset1 AS year_of_assessment
+    
+    -- 2. basis_year → calendar_year
+    -- Update queries to use: calendar_year AS basis_year
+    
+    -- 3. is_malta_public_holiday → query ref_country_holiday
+    -- See v_date_with_holidays view
+    
+    -- 4. malta_holiday_name → ref_country_holiday.holiday_name
+    -- Data migrated to ref_country_holiday table
+    
+    -- 5. vat_period_code → derive from calendar columns
+    -- CONCAT(calendar_year, 'Q', calendar_quarter) AS vat_period_code
+    
+    -- 6. fss_period_code → derive from calendar columns
+    -- CONCAT(calendar_year, 'M', LPAD(calendar_month, 2, '0')) AS fss_period_code
+  
+  backward_compatibility_view: |
+    -- Create view for backward compatibility with Malta queries
+    CREATE VIEW warehouse.v_dim_date_malta_compat AS
+    SELECT 
+        d.*,
+        d.fiscal_year_jan_offset1 AS year_of_assessment,
+        d.calendar_year AS basis_year,
+        CONCAT(d.calendar_year, 'Q', d.calendar_quarter) AS vat_period_code,
+        CONCAT(d.calendar_year, 'M', LPAD(d.calendar_month, 2, '0')) AS fss_period_code,
+        CONCAT('YA', d.fiscal_year_jan_offset1) AS income_tax_period_code,
+        CONCAT('YA', d.fiscal_year_jan_offset1) AS ya_period_code,
+        h.holiday_name AS malta_holiday_name,
+        h.holiday_name_local AS malta_holiday_name_mt,
+        CASE WHEN h.holiday_date IS NOT NULL THEN 1 ELSE 0 END AS is_malta_public_holiday
+    FROM warehouse.dim_date d
+    LEFT JOIN reference.ref_country_holiday h 
+        ON d.calendar_date = h.holiday_date
+        AND h.country_code = 'MLT';
+
+# ==============================================================================
+# Validation Criteria
+# ==============================================================================
+# | Check                           | Expected                            |
+# |---------------------------------|-------------------------------------|
+# | Malta columns removed           | 8 columns (see removed_columns)     |
+# | Pre-calculated fiscal years     | Jan, Apr, Jul, Oct patterns         |
+# | Fiscal quarters added           | Jan, Apr, Jul                       |
+# | Period keys                     | year_month_key, year_quarter_key    |
+# | Holidays externalized           | No is_public_holiday column         |
+# | Translations externalized       | No _mt suffix columns               |
+# | Query patterns documented       | 6 patterns                          |
+# | Views defined                   | v_date_fiscal_year, v_date_with_holidays |
+# | Backward compatibility          | v_dim_date_malta_compat view        |
+# | ETL daily update defined        | Relative date flags                 |
+# ==============================================================================

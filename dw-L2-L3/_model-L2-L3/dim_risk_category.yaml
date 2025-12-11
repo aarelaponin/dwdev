@@ -1,0 +1,589 @@
+# ==============================================================================
+# Malta L3 Warehouse Model: dim_risk_category
+# Step 10c: Reference & Analytical Dimensions
+# ==============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Purpose: Risk category classification dimension for compliance risk management
+# ==============================================================================
+
+dimension:
+  name: "dim_risk_category"
+  schema: "warehouse"
+  display_name: "Risk Category Dimension"
+  description: |
+    Classification dimension for taxpayer compliance risk categories.
+    Supports risk-based audit selection, treatment strategies, and
+    compliance monitoring.
+    
+    Risk categories align with OECD Compliance Risk Management (CRM)
+    framework, measuring tax gap in monetary terms rather than abstract
+    risk scores. Focuses on voluntary compliance improvement.
+    
+  scd_type: 1
+  scd_type_description: "Type 1 - Overwrite on change (reference data rarely changes)"
+  
+  natural_key: ["risk_category_code"]
+  surrogate_key: "risk_category_key"
+  
+  grain: "One row per risk category"
+  estimated_rows: 30
+  
+  source_system:
+    primary_table: "reference.ref_risk_category"
+    
+  refresh_frequency: "Annual (or on risk model updates)"
+  
+  crm_framework: "OECD Compliance Risk Management"
+  
+  # ============================================================================
+  # COLUMNS
+  # ============================================================================
+  columns:
+    # --------------------------------------------------------------------------
+    # Surrogate Key
+    # --------------------------------------------------------------------------
+    - name: "risk_category_key"
+      display_name: "Risk Category Key"
+      data_type: "INT"
+      nullable: false
+      description: "Surrogate key for risk category dimension"
+      constraints:
+        primary_key: true
+        auto_increment: true
+
+    # --------------------------------------------------------------------------
+    # Natural Key & Names
+    # --------------------------------------------------------------------------
+    - name: "risk_category_code"
+      display_name: "Risk Category Code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Short code for risk category"
+      constraints:
+        unique: true
+      examples: ["VERY_LOW", "LOW", "MEDIUM", "HIGH", "VERY_HIGH", "REG_RISK", "FILING_RISK"]
+      
+    - name: "risk_category_name"
+      display_name: "Risk Category Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Full name of the risk category"
+      examples: ["Very Low Risk", "Low Risk", "Medium Risk", "High Risk", "Very High Risk"]
+      
+    - name: "risk_category_name_mt"
+      display_name: "Risk Category Name (Maltese)"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Risk category name in Maltese"
+      examples: ["Riskju Baxx Ħafna", "Riskju Baxx", "Riskju Medju", "Riskju Għoli", "Riskju Għoli Ħafna"]
+      
+    - name: "risk_category_description"
+      display_name: "Risk Category Description"
+      data_type: "VARCHAR(500)"
+      nullable: true
+      description: "Detailed description of the risk category and typical characteristics"
+
+    # --------------------------------------------------------------------------
+    # Classification
+    # --------------------------------------------------------------------------
+    - name: "risk_domain"
+      display_name: "Risk Domain"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "Tax administration risk domain"
+      constraints:
+        check: "risk_domain IN ('OVERALL', 'REGISTRATION', 'FILING', 'PAYMENT', 'ACCURACY', 'FRAUD', 'EVASION', 'TRANSFER_PRICING')"
+      examples: ["OVERALL", "REGISTRATION", "FILING", "PAYMENT", "FRAUD"]
+      
+    - name: "risk_domain_name"
+      display_name: "Risk Domain Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Display name for risk domain"
+      examples: ["Overall Risk", "Registration Risk", "Filing Risk", "Payment Risk", "Fraud Risk"]
+      
+    - name: "risk_type"
+      display_name: "Risk Type"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "Type of risk classification"
+      constraints:
+        check: "risk_type IN ('SCORE_BASED', 'DOMAIN_BASED', 'BEHAVIOR_BASED', 'INDICATOR_BASED')"
+      examples: ["SCORE_BASED", "DOMAIN_BASED"]
+
+    # --------------------------------------------------------------------------
+    # Risk Level
+    # --------------------------------------------------------------------------
+    - name: "risk_level"
+      display_name: "Risk Level"
+      data_type: "SMALLINT"
+      nullable: false
+      description: "Numeric risk level: 1=Very Low, 2=Low, 3=Medium, 4=High, 5=Very High"
+      constraints:
+        check: "risk_level BETWEEN 1 AND 5"
+      examples: [1, 2, 3, 4, 5]
+      
+    - name: "risk_level_name"
+      display_name: "Risk Level Name"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Display name for risk level"
+      constraints:
+        check: "risk_level_name IN ('Very Low', 'Low', 'Medium', 'High', 'Very High')"
+      examples: ["Very Low", "Low", "Medium", "High", "Very High"]
+
+    # --------------------------------------------------------------------------
+    # Score Ranges (for score-based categories)
+    # --------------------------------------------------------------------------
+    - name: "score_range_min"
+      display_name: "Score Range (Min)"
+      data_type: "INT"
+      nullable: true
+      description: "Minimum risk score for this category (0-100 scale)"
+      
+    - name: "score_range_max"
+      display_name: "Score Range (Max)"
+      data_type: "INT"
+      nullable: true
+      description: "Maximum risk score for this category (0-100 scale)"
+
+    # --------------------------------------------------------------------------
+    # Tax Gap Impact (OECD CRM approach)
+    # --------------------------------------------------------------------------
+    - name: "estimated_tax_gap_pct"
+      display_name: "Estimated Tax Gap %"
+      data_type: "DECIMAL(5,2)"
+      nullable: true
+      description: "Estimated percentage of tax gap attributable to this risk category"
+      
+    - name: "population_pct"
+      display_name: "Population %"
+      data_type: "DECIMAL(5,2)"
+      nullable: true
+      description: "Estimated percentage of taxpayer population in this category"
+
+    # --------------------------------------------------------------------------
+    # Treatment Strategy
+    # --------------------------------------------------------------------------
+    - name: "recommended_action"
+      display_name: "Recommended Action"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Primary recommended treatment action"
+      examples: ["Standard Service", "Enhanced Service", "Increased Monitoring", "Audit Selection", "Investigation"]
+      
+    - name: "treatment_strategy"
+      display_name: "Treatment Strategy"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "High-level treatment strategy code"
+      constraints:
+        check: "treatment_strategy IN ('MAKE_IT_EASY', 'ASSIST', 'DETER', 'ENFORCE')"
+      examples: ["MAKE_IT_EASY", "ASSIST", "DETER", "ENFORCE"]
+      
+    - name: "treatment_strategy_name"
+      display_name: "Treatment Strategy Name"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "OECD Compliance Pyramid treatment strategy name"
+      examples: ["Make it Easy to Comply", "Assist to Comply", "Deter by Detection", "Use Full Force of Law"]
+      
+    - name: "review_frequency"
+      display_name: "Review Frequency"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Recommended frequency for risk profile review"
+      constraints:
+        check: "review_frequency IN ('DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUAL', 'AD_HOC')"
+      examples: ["MONTHLY", "QUARTERLY", "ANNUAL"]
+
+    # --------------------------------------------------------------------------
+    # Action Triggers
+    # --------------------------------------------------------------------------
+    - name: "requires_audit"
+      display_name: "Requires Audit"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this risk category typically triggers audit selection"
+      
+    - name: "requires_investigation"
+      display_name: "Requires Investigation"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this risk category may trigger investigation"
+      
+    - name: "requires_enhanced_monitoring"
+      display_name: "Requires Enhanced Monitoring"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this risk category requires enhanced monitoring"
+      
+    - name: "auto_selection_candidate"
+      display_name: "Auto Selection Candidate"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether taxpayers in this category are candidates for automated audit selection"
+
+    # --------------------------------------------------------------------------
+    # Display & Visualization
+    # --------------------------------------------------------------------------
+    - name: "color_code"
+      display_name: "Color Code"
+      data_type: "VARCHAR(10)"
+      nullable: true
+      description: "Color for dashboard visualization"
+      constraints:
+        check: "color_code IN ('GREEN', 'LIGHT_GREEN', 'YELLOW', 'ORANGE', 'RED', 'BLACK')"
+      examples: ["GREEN", "YELLOW", "ORANGE", "RED"]
+      
+    - name: "icon_name"
+      display_name: "Icon Name"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Icon identifier for UI display"
+      examples: ["shield-check", "shield", "shield-exclamation", "shield-x"]
+      
+    - name: "priority_order"
+      display_name: "Priority Order"
+      data_type: "INT"
+      nullable: true
+      description: "Priority order for case selection (1 = highest priority)"
+      
+    - name: "sort_order"
+      display_name: "Sort Order"
+      data_type: "INT"
+      nullable: false
+      description: "Display sort order"
+      
+    - name: "is_active"
+      display_name: "Active Flag"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether risk category is currently in use"
+
+    # --------------------------------------------------------------------------
+    # ETL Metadata
+    # --------------------------------------------------------------------------
+    - name: "etl_batch_id"
+      display_name: "ETL Batch ID"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for audit trail"
+      
+    - name: "etl_load_timestamp"
+      display_name: "ETL Load Timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when record was loaded"
+
+  # ============================================================================
+  # INDEXES
+  # ============================================================================
+  indexes:
+    - name: "pk_dim_risk_category"
+      columns: ["risk_category_key"]
+      primary: true
+      
+    - name: "uk_dim_risk_category_code"
+      columns: ["risk_category_code"]
+      unique: true
+      
+    - name: "idx_dim_risk_domain"
+      columns: ["risk_domain"]
+      description: "Support queries by risk domain"
+      
+    - name: "idx_dim_risk_level"
+      columns: ["risk_level"]
+      description: "Support risk level analysis"
+      
+    - name: "idx_dim_risk_treatment"
+      columns: ["treatment_strategy"]
+      description: "Support treatment strategy analysis"
+
+  # ============================================================================
+  # REFERENCE DATA
+  # ============================================================================
+  reference_data:
+    # -------------------------------------------------------------------------
+    # OVERALL RISK LEVELS (Score-Based)
+    # -------------------------------------------------------------------------
+    - code: "VERY_LOW"
+      name: "Very Low Risk"
+      name_mt: "Riskju Baxx Ħafna"
+      domain: "OVERALL"
+      type: "SCORE_BASED"
+      level: 1
+      level_name: "Very Low"
+      score_min: 0
+      score_max: 20
+      population_pct: 40
+      tax_gap_pct: 5
+      treatment: "MAKE_IT_EASY"
+      treatment_name: "Make it Easy to Comply"
+      action: "Standard Service"
+      review: "ANNUAL"
+      requires_audit: false
+      color: "GREEN"
+      icon: "shield-check"
+      description: "Consistently compliant taxpayers with minimal risk indicators"
+      sort_order: 10
+      
+    - code: "LOW"
+      name: "Low Risk"
+      name_mt: "Riskju Baxx"
+      domain: "OVERALL"
+      type: "SCORE_BASED"
+      level: 2
+      level_name: "Low"
+      score_min: 21
+      score_max: 40
+      population_pct: 30
+      tax_gap_pct: 10
+      treatment: "MAKE_IT_EASY"
+      treatment_name: "Make it Easy to Comply"
+      action: "Standard Service"
+      review: "ANNUAL"
+      requires_audit: false
+      color: "LIGHT_GREEN"
+      icon: "shield"
+      description: "Generally compliant taxpayers with minor risk indicators"
+      sort_order: 20
+      
+    - code: "MEDIUM"
+      name: "Medium Risk"
+      name_mt: "Riskju Medju"
+      domain: "OVERALL"
+      type: "SCORE_BASED"
+      level: 3
+      level_name: "Medium"
+      score_min: 41
+      score_max: 60
+      population_pct: 20
+      tax_gap_pct: 25
+      treatment: "ASSIST"
+      treatment_name: "Assist to Comply"
+      action: "Enhanced Service"
+      review: "QUARTERLY"
+      requires_audit: false
+      enhanced_monitoring: true
+      color: "YELLOW"
+      icon: "shield-exclamation"
+      description: "Taxpayers with moderate risk indicators requiring assistance"
+      sort_order: 30
+      
+    - code: "HIGH"
+      name: "High Risk"
+      name_mt: "Riskju Għoli"
+      domain: "OVERALL"
+      type: "SCORE_BASED"
+      level: 4
+      level_name: "High"
+      score_min: 61
+      score_max: 80
+      population_pct: 8
+      tax_gap_pct: 30
+      treatment: "DETER"
+      treatment_name: "Deter by Detection"
+      action: "Audit Selection"
+      review: "MONTHLY"
+      requires_audit: true
+      enhanced_monitoring: true
+      auto_selection: true
+      priority: 2
+      color: "ORANGE"
+      icon: "shield-x"
+      description: "Taxpayers with significant risk indicators requiring audit"
+      sort_order: 40
+      
+    - code: "VERY_HIGH"
+      name: "Very High Risk"
+      name_mt: "Riskju Għoli Ħafna"
+      domain: "OVERALL"
+      type: "SCORE_BASED"
+      level: 5
+      level_name: "Very High"
+      score_min: 81
+      score_max: 100
+      population_pct: 2
+      tax_gap_pct: 30
+      treatment: "ENFORCE"
+      treatment_name: "Use Full Force of Law"
+      action: "Investigation"
+      review: "WEEKLY"
+      requires_audit: true
+      requires_investigation: true
+      enhanced_monitoring: true
+      auto_selection: true
+      priority: 1
+      color: "RED"
+      icon: "shield-x"
+      description: "Taxpayers with severe risk indicators or suspected evasion"
+      sort_order: 50
+
+    # -------------------------------------------------------------------------
+    # DOMAIN-SPECIFIC RISK CATEGORIES
+    # -------------------------------------------------------------------------
+    - code: "REG_RISK"
+      name: "Registration Risk"
+      name_mt: "Riskju tar-Reġistrazzjoni"
+      domain: "REGISTRATION"
+      type: "DOMAIN_BASED"
+      level: 3
+      level_name: "Medium"
+      treatment: "DETER"
+      action: "Registration Verification"
+      review: "QUARTERLY"
+      requires_audit: false
+      enhanced_monitoring: true
+      color: "YELLOW"
+      description: "Risk of operating without proper registration"
+      sort_order: 60
+      
+    - code: "FILING_RISK"
+      name: "Filing Non-Compliance"
+      name_mt: "Nuqqas ta' Konformità fil-Fajljar"
+      domain: "FILING"
+      type: "DOMAIN_BASED"
+      level: 3
+      level_name: "Medium"
+      treatment: "ASSIST"
+      action: "Filing Reminder Campaign"
+      review: "MONTHLY"
+      requires_audit: false
+      enhanced_monitoring: true
+      color: "YELLOW"
+      description: "Pattern of late or missing filings"
+      sort_order: 70
+      
+    - code: "PAYMENT_RISK"
+      name: "Payment Risk"
+      name_mt: "Riskju ta' Ħlas"
+      domain: "PAYMENT"
+      type: "DOMAIN_BASED"
+      level: 3
+      level_name: "Medium"
+      treatment: "DETER"
+      action: "Collection Case"
+      review: "MONTHLY"
+      requires_audit: false
+      enhanced_monitoring: true
+      color: "ORANGE"
+      description: "Pattern of late or missing payments"
+      sort_order: 80
+      
+    - code: "ACCURACY_RISK"
+      name: "Reporting Accuracy Risk"
+      name_mt: "Riskju ta' Eżattezza fir-Rappurtar"
+      domain: "ACCURACY"
+      type: "DOMAIN_BASED"
+      level: 3
+      level_name: "Medium"
+      treatment: "DETER"
+      action: "Desk Audit"
+      review: "QUARTERLY"
+      requires_audit: true
+      enhanced_monitoring: true
+      color: "YELLOW"
+      description: "Risk of inaccurate or understated reporting"
+      sort_order: 90
+      
+    - code: "FRAUD_RISK"
+      name: "Fraud Indicator"
+      name_mt: "Indikatur ta' Frodi"
+      domain: "FRAUD"
+      type: "INDICATOR_BASED"
+      level: 5
+      level_name: "Very High"
+      treatment: "ENFORCE"
+      action: "Investigation"
+      review: "DAILY"
+      requires_audit: true
+      requires_investigation: true
+      enhanced_monitoring: true
+      auto_selection: true
+      priority: 1
+      color: "RED"
+      description: "Strong indicators of fraudulent activity"
+      sort_order: 100
+      
+    - code: "EVASION_RISK"
+      name: "Evasion Indicator"
+      name_mt: "Indikatur ta' Evażjoni"
+      domain: "EVASION"
+      type: "INDICATOR_BASED"
+      level: 5
+      level_name: "Very High"
+      treatment: "ENFORCE"
+      action: "Investigation"
+      review: "DAILY"
+      requires_audit: true
+      requires_investigation: true
+      enhanced_monitoring: true
+      auto_selection: true
+      priority: 1
+      color: "BLACK"
+      description: "Strong indicators of tax evasion"
+      sort_order: 110
+      
+    - code: "TP_RISK"
+      name: "Transfer Pricing Risk"
+      name_mt: "Riskju ta' Prezzijiet ta' Trasferiment"
+      domain: "TRANSFER_PRICING"
+      type: "DOMAIN_BASED"
+      level: 4
+      level_name: "High"
+      treatment: "DETER"
+      action: "TP Audit"
+      review: "QUARTERLY"
+      requires_audit: true
+      enhanced_monitoring: true
+      auto_selection: true
+      priority: 2
+      color: "ORANGE"
+      description: "Risk of non-arm's length pricing in related party transactions"
+      sort_order: 120
+
+  # ============================================================================
+  # USAGE NOTES
+  # ============================================================================
+  usage_notes:
+    fact_tables:
+      - fact_compliance: "Primary dimension for risk-based analysis"
+      - fact_audit: "Audit case selection analysis"
+      
+    common_queries:
+      - name: "Risk Distribution"
+        pattern: "GROUP BY risk_level_name ORDER BY risk_level"
+        
+      - name: "Tax Gap by Risk Category"
+        pattern: "SUM(tax_amount * estimated_tax_gap_pct / 100) GROUP BY risk_category_name"
+        
+      - name: "Audit Candidates"
+        pattern: "WHERE requires_audit = true AND auto_selection_candidate = true"
+        
+      - name: "Treatment Strategy Analysis"
+        pattern: "GROUP BY treatment_strategy_name"
+        
+    analysis_patterns:
+      - name: "Risk-Based Audit Selection"
+        description: "Select audit cases prioritizing HIGH and VERY_HIGH risk categories"
+        
+      - name: "Tax Gap Estimation"
+        description: "Estimate tax gap by multiplying population in each risk category by estimated gap percentage"
+        
+      - name: "Compliance Pyramid Reporting"
+        description: "Map taxpayer population to OECD compliance pyramid layers"
+        
+      - name: "Treatment Effectiveness"
+        description: "Track movement between risk categories over time to measure treatment effectiveness"
+
+# ==============================================================================
+# END OF SPECIFICATION
+# ==============================================================================

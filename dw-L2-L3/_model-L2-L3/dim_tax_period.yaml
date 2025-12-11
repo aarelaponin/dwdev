@@ -1,0 +1,1157 @@
+# =============================================================================
+# TA-RDM L3 - Tax Period Dimension (Generalized)
+# =============================================================================
+# Purpose: Tax/fiscal periods supporting multiple fiscal year systems
+# Pattern: P6 (Configurable Fiscal Year) from L3 Generalization Catalog
+# Priority: MEDIUM - Required for multi-country tax period support
+# Version: 2.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4f of L3 Generalization Implementation
+# =============================================================================
+#
+# CHANGES FROM v1.0.0 (Malta-specific version):
+# - ADDED: country_key (FK to dim_country) - CRITICAL
+# - ADDED: country_code (denormalized for convenience)
+# - MODIFIED: fiscal_year derived from dim_country configuration
+# - MODIFIED: year_of_assessment derived using country offset
+# - MODIFIED: Natural key now includes country_code
+# - REMOVED: Malta-specific period code formats (kept generic)
+# - REMOVED: Malta-specific deadline logic (moved to dim_tax_scheme)
+# - REMOVED: fss_period_code (Malta FSS specific)
+#
+# Design Principles:
+# - Each tax period is country-specific (has country_key)
+# - Period codes remain consistent format across countries
+# - Fiscal year derivation uses dim_country configuration
+# - Filing deadlines come from dim_tax_scheme
+# - Supports all period types: ANNUAL, QUARTERLY, MONTHLY, etc.
+#
+# =============================================================================
+
+metadata:
+  dimension_name: dim_tax_period
+  schema: warehouse
+  version: "2.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P6 - Configurable Fiscal Year"
+  previous_version: "1.0.0 (Malta-specific)"
+  description: |
+    Tax period dimension supporting multiple countries with different
+    fiscal year conventions. Each period is country-specific.
+    
+    Key generalizations:
+    - country_key added for multi-country support
+    - fiscal_year derived from dim_country configuration
+    - Filing deadlines reference dim_tax_scheme
+    - Period type and code formats standardized
+
+# =============================================================================
+# Column Changes Documentation
+# =============================================================================
+
+column_changes:
+  added:
+    - name: country_key
+      reason: "Critical for multi-country support - links to dim_country"
+      impact: "Natural key changes to [country_code, period_code, tax_type_code]"
+    
+    - name: country_code
+      reason: "Denormalized for query convenience and period identification"
+      impact: "Part of natural key, enables filtering without join"
+    
+    - name: fiscal_year_offset_applied
+      reason: "Track if country's fiscal year offset was applied"
+      impact: "Audit trail for year_of_assessment calculation"
+    
+    - name: scheme_key
+      reason: "Link to dim_tax_scheme for deadlines and rules"
+      impact: "Deadline information comes from scheme dimension"
+  
+  modified:
+    - name: fiscal_year
+      change: "No longer hardcoded, derived from dim_country.tax_year_type"
+      derivation: |
+        Based on country's tax_year_type:
+        - CALENDAR: calendar_year
+        - FISCAL_APR: Apr-Mar fiscal year
+        - FISCAL_JUL: Jul-Jun fiscal year
+    
+    - name: year_of_assessment
+      change: "Now derived using country's fiscal_year_offset_years"
+      derivation: "fiscal_year + dim_country.fiscal_year_offset_years"
+      note: "Malta: fiscal_year + 1, Most countries: fiscal_year + 0"
+    
+    - name: filing_due_date
+      change: "Now references dim_tax_scheme instead of hardcoded Malta rules"
+      note: "Join to dim_tax_scheme for deadline information"
+  
+  removed:
+    - name: fss_period_code
+      reason: "Malta FSS-specific format"
+      replacement: "Use period_code for FSS periods, type='MONTHLY'"
+    
+    - name: malta_specific_deadline_logic
+      reason: "Malta rules embedded in dimension"
+      replacement: "Use dim_tax_scheme for country-specific deadlines"
+
+# =============================================================================
+# Dimension Specification
+# =============================================================================
+
+dimension:
+  name: dim_tax_period
+  schema: warehouse
+  type: dimension
+  scd_type: 0  # Static - tax periods don't change after creation
+  
+  grain: "One row per country per tax type per period"
+  natural_key: [country_code, period_code, tax_type_code]
+  surrogate_key: tax_period_key
+  
+  business_context:
+    domain: "Time / Tax Administration"
+    usage: |
+      Central dimension for tax period analysis.
+      Enables filtering by period type, fiscal year, tax type.
+      Provides deadline information via dim_tax_scheme link.
+    refresh: "ANNUAL"  # New periods generated annually
+    priority: "HIGH"
+  
+  description: |
+    Conformed dimension for tax periods supporting multiple countries.
+    
+    Key features:
+    - Country-specific fiscal year handling
+    - Multiple period types (annual, quarterly, monthly)
+    - Prior period navigation for YoY/QoQ analysis
+    - Integration with dim_tax_scheme for deadlines
+    
+    Period types:
+    - ANNUAL: Yearly tax periods (income tax, corporate tax)
+    - QUARTERLY: Quarterly periods (VAT)
+    - MONTHLY: Monthly periods (FSS, payroll taxes)
+    - BI_WEEKLY: Bi-weekly periods (some payroll)
+    - SEMI_ANNUAL: Half-yearly periods
+  
+  columns:
+    # ==========================================================================
+    # Keys
+    # ==========================================================================
+    - name: tax_period_key
+      data_type: Int32
+      nullable: false
+      description: "Surrogate key for dimension"
+      role: SURROGATE_KEY
+    
+    # ==========================================================================
+    # Country Context (NEW)
+    # ==========================================================================
+    - name: country_key
+      data_type: Int32
+      nullable: false
+      description: "Country this period applies to"
+      foreign_key: warehouse.dim_country(country_key)
+      role: FOREIGN_KEY
+      note: "CRITICAL ADDITION - enables multi-country support"
+    
+    - name: country_code
+      data_type: String
+      length: 3
+      nullable: false
+      description: "ISO 3166-1 alpha-3 country code (denormalized for convenience)"
+      role: NATURAL_KEY_PART
+      example: "MLT"
+    
+    # ==========================================================================
+    # Period Identification
+    # ==========================================================================
+    - name: period_code
+      data_type: String
+      length: 20
+      nullable: false
+      description: |
+        Unique period identifier within country and tax type.
+        Formats:
+        - Annual: "2024", "YA2025", "FY2024-25"
+        - Quarterly: "2024Q1", "2024Q2", "2024Q3", "2024Q4"
+        - Monthly: "2024M01", "2024M02", etc.
+      role: NATURAL_KEY_PART
+      examples:
+        - "2024"       # Annual (calendar year basis)
+        - "YA2025"     # Malta Year of Assessment
+        - "FY2024-25"  # Sri Lanka fiscal year
+        - "2024Q1"     # Quarterly
+        - "2024M07"    # Monthly
+    
+    - name: period_name
+      data_type: String
+      length: 50
+      nullable: false
+      description: "Human-readable period name"
+      examples:
+        - "Year of Assessment 2025"
+        - "Quarter 1 2024"
+        - "July 2024"
+    
+    - name: period_name_short
+      data_type: String
+      length: 20
+      nullable: false
+      description: "Short period name for display"
+      examples:
+        - "YA2025"
+        - "2024 Q1"
+        - "Jul 2024"
+    
+    - name: tax_type_code
+      data_type: String
+      length: 20
+      nullable: false
+      description: "Tax type this period applies to"
+      foreign_key: warehouse.dim_tax_type(tax_type_code)
+      role: NATURAL_KEY_PART
+      examples:
+        - "CIT"   # Corporate Income Tax
+        - "PIT"   # Personal Income Tax
+        - "VAT"   # Value Added Tax
+        - "FSS"   # Final Settlement System
+    
+    - name: period_type
+      data_type: String
+      length: 20
+      nullable: false
+      description: "Period frequency type"
+      constraints:
+        check: "period_type IN ('ANNUAL', 'QUARTERLY', 'MONTHLY', 'BI_WEEKLY', 'SEMI_ANNUAL', 'CUSTOM')"
+      example: "QUARTERLY"
+    
+    # ==========================================================================
+    # Calendar Attributes
+    # ==========================================================================
+    - name: calendar_year
+      data_type: Int16
+      nullable: false
+      description: |
+        Calendar year for period start.
+        For annual periods, this is the basis year (year of income/activity).
+      example: 2024
+    
+    - name: calendar_quarter
+      data_type: UInt8
+      description: "Calendar quarter (1-4) for quarterly and monthly periods"
+      constraints:
+        check: "calendar_quarter IS NULL OR calendar_quarter BETWEEN 1 AND 4"
+    
+    - name: calendar_month
+      data_type: UInt8
+      description: "Calendar month (1-12) for monthly periods"
+      constraints:
+        check: "calendar_month IS NULL OR calendar_month BETWEEN 1 AND 12"
+    
+    # ==========================================================================
+    # Fiscal Year Attributes (Configurable)
+    # ==========================================================================
+    - name: fiscal_year
+      data_type: Int16
+      nullable: false
+      description: |
+        Fiscal year for this period, derived from country configuration.
+        
+        Derivation:
+        - CALENDAR countries: same as calendar_year
+        - FISCAL_APR countries: Apr-Mar fiscal year
+        - FISCAL_JUL countries: Jul-Jun fiscal year
+        
+        This is the BASE fiscal year before any offset is applied.
+      example: 2024
+      derivation: |
+        CASE dim_country.tax_year_type
+          WHEN 'CALENDAR' THEN calendar_year
+          WHEN 'FISCAL_APR' THEN CASE WHEN period_start_month >= 4 THEN calendar_year ELSE calendar_year - 1 END
+          WHEN 'FISCAL_JUL' THEN CASE WHEN period_start_month >= 7 THEN calendar_year ELSE calendar_year - 1 END
+          ELSE calendar_year
+        END
+    
+    - name: year_of_assessment
+      data_type: Int16
+      nullable: false
+      description: |
+        Year of assessment / tax year label.
+        Derived by applying country's fiscal_year_offset_years to fiscal_year.
+        
+        Examples:
+        - Malta CIT: fiscal_year + 1 (CY2024 activity → YA2025)
+        - Malta VAT: fiscal_year + 0 (same as fiscal year)
+        - Sri Lanka: fiscal_year + 0 (FY2024-25 is YoA 2024)
+        - Most countries: fiscal_year + 0
+      example: 2025
+      derivation: "fiscal_year + dim_country.fiscal_year_offset_years"
+    
+    - name: fiscal_year_offset_applied
+      data_type: Int8
+      nullable: false
+      default: 0
+      description: "Offset applied to get year_of_assessment (for audit)"
+      example: 1  # Malta income tax
+    
+    - name: fiscal_year_label
+      data_type: String
+      length: 20
+      description: |
+        Formatted fiscal year label based on country pattern.
+        Examples: "YA2025", "FY2024-25", "TY2024"
+      derivation: "Apply dim_country.fiscal_year_label_pattern"
+    
+    # ==========================================================================
+    # Period Dates
+    # ==========================================================================
+    - name: period_start_date
+      data_type: Date
+      nullable: false
+      description: "First day of the tax period"
+      example: "2024-01-01"
+    
+    - name: period_end_date
+      data_type: Date
+      nullable: false
+      description: "Last day of the tax period"
+      example: "2024-03-31"
+    
+    - name: period_start_date_key
+      data_type: Int32
+      nullable: false
+      description: "FK to dim_date for period start"
+      foreign_key: warehouse.dim_date(date_key)
+    
+    - name: period_end_date_key
+      data_type: Int32
+      nullable: false
+      description: "FK to dim_date for period end"
+      foreign_key: warehouse.dim_date(date_key)
+    
+    - name: period_days
+      data_type: Int16
+      nullable: false
+      description: "Number of days in the period"
+      derivation: "DATEDIFF(period_end_date, period_start_date) + 1"
+    
+    # ==========================================================================
+    # Filing and Payment Deadlines
+    # ==========================================================================
+    - name: scheme_key
+      data_type: Int32
+      description: "FK to dim_tax_scheme for deadline rules"
+      foreign_key: warehouse.dim_tax_scheme(scheme_key)
+      note: "NEW - deadlines now come from dim_tax_scheme"
+    
+    - name: filing_due_date
+      data_type: Date
+      description: |
+        Standard filing due date for this period.
+        Source: dim_tax_scheme or generated based on tax rules.
+      note: "Can be NULL if deadline varies or requires lookup"
+    
+    - name: filing_due_date_key
+      data_type: Int32
+      description: "FK to dim_date for filing due date"
+      foreign_key: warehouse.dim_date(date_key)
+    
+    - name: payment_due_date
+      data_type: Date
+      description: "Standard payment due date (often same as filing)"
+    
+    - name: payment_due_date_key
+      data_type: Int32
+      description: "FK to dim_date for payment due date"
+      foreign_key: warehouse.dim_date(date_key)
+    
+    - name: extended_due_date
+      data_type: Date
+      description: "Extended due date if granted"
+      note: "For specific taxpayer categories or circumstances"
+    
+    - name: preliminary_payment_due_date
+      data_type: Date
+      description: "Preliminary/advance payment due date for annual taxes"
+      applicable_when: "period_type = 'ANNUAL' AND tax requires advance payments"
+    
+    - name: final_payment_due_date
+      data_type: Date
+      description: "Final payment due date (may differ from filing)"
+      applicable_when: "period_type = 'ANNUAL'"
+    
+    # ==========================================================================
+    # Period Sequence and Navigation
+    # ==========================================================================
+    - name: period_sequence
+      data_type: Int32
+      nullable: false
+      description: "Sequential number for ordering periods within tax type and country"
+      note: "Enables chronological ordering without date comparison"
+    
+    - name: prior_period_key
+      data_type: Int32
+      description: "Previous period of same type for PoP comparison"
+      foreign_key: warehouse.dim_tax_period(tax_period_key)
+      example: "2024Q1 → 2023Q4"
+    
+    - name: same_period_prior_year_key
+      data_type: Int32
+      description: "Same period in prior year for YoY comparison"
+      foreign_key: warehouse.dim_tax_period(tax_period_key)
+      example: "2024Q1 → 2023Q1"
+    
+    - name: parent_period_key
+      data_type: Int32
+      description: "Parent period for hierarchical periods"
+      foreign_key: warehouse.dim_tax_period(tax_period_key)
+      example: "Monthly period → Quarterly parent"
+    
+    # ==========================================================================
+    # Status Flags
+    # ==========================================================================
+    - name: is_current_period
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is this the current active period (updated daily)"
+      note: "Dynamic flag updated by ETL process"
+    
+    - name: is_open_for_filing
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is filing window open for this period"
+      derivation: "period_end_date < CURRENT_DATE AND filing_due_date >= CURRENT_DATE"
+    
+    - name: is_past_due
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is filing deadline past"
+      derivation: "filing_due_date < CURRENT_DATE"
+    
+    - name: is_locked
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is period locked for amendments"
+      note: "Set when period is closed for corrections"
+    
+    - name: is_active
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Is this period record active"
+    
+    # ==========================================================================
+    # Hierarchy Level
+    # ==========================================================================
+    - name: hierarchy_level
+      data_type: UInt8
+      nullable: false
+      description: "Level in period hierarchy (1=Year, 2=Quarter, 3=Month)"
+      constraints:
+        check: "hierarchy_level BETWEEN 1 AND 4"
+    
+    # ==========================================================================
+    # ETL Metadata
+    # ==========================================================================
+    - name: etl_batch_id
+      data_type: Int64
+      nullable: false
+    
+    - name: etl_load_timestamp
+      data_type: DateTime
+      nullable: false
+      default: "CURRENT_TIMESTAMP"
+    
+    - name: etl_source_system
+      data_type: String
+      length: 50
+      description: "System that provided period data"
+
+  # ============================================================================
+  # Indexes
+  # ============================================================================
+  indexes:
+    - name: pk_dim_tax_period
+      columns: [tax_period_key]
+      type: PRIMARY
+    
+    - name: uk_dim_tax_period
+      columns: [country_code, period_code, tax_type_code]
+      type: UNIQUE
+      description: "Unique period per country per tax type"
+    
+    - name: idx_tax_period_country
+      columns: [country_key, tax_type_code]
+      description: "Periods by country and tax type"
+    
+    - name: idx_tax_period_dates
+      columns: [period_start_date, period_end_date]
+      description: "Date range queries"
+    
+    - name: idx_tax_period_fiscal_year
+      columns: [country_code, fiscal_year, tax_type_code]
+      description: "Fiscal year lookups"
+    
+    - name: idx_tax_period_ya
+      columns: [country_code, year_of_assessment, tax_type_code]
+      description: "Year of assessment lookups"
+    
+    - name: idx_tax_period_current
+      columns: [is_current_period, country_code, tax_type_code]
+      where: "is_current_period = 1"
+      description: "Current period lookup"
+    
+    - name: idx_tax_period_prior
+      columns: [prior_period_key]
+      description: "Prior period navigation"
+    
+    - name: idx_tax_period_filing
+      columns: [filing_due_date, country_code]
+      description: "Filing deadline queries"
+
+# =============================================================================
+# Sample Data
+# =============================================================================
+
+sample_data:
+  # ============================================================================
+  # Malta 2024-2025 Tax Periods
+  # ============================================================================
+  malta_annual:
+    - tax_period_key: 1
+      country_key: 1
+      country_code: "MLT"
+      period_code: "YA2025"
+      period_name: "Year of Assessment 2025"
+      period_name_short: "YA2025"
+      tax_type_code: "CIT"
+      period_type: "ANNUAL"
+      calendar_year: 2024
+      fiscal_year: 2024
+      year_of_assessment: 2025
+      fiscal_year_offset_applied: 1
+      fiscal_year_label: "YA2025"
+      period_start_date: "2024-01-01"
+      period_end_date: "2024-12-31"
+      period_days: 366
+      filing_due_date: "2025-09-30"
+      payment_due_date: "2025-09-30"
+      period_sequence: 1
+      hierarchy_level: 1
+      is_current_period: 1
+    
+    - tax_period_key: 2
+      country_key: 1
+      country_code: "MLT"
+      period_code: "YA2025"
+      period_name: "Year of Assessment 2025"
+      period_name_short: "YA2025"
+      tax_type_code: "PIT"
+      period_type: "ANNUAL"
+      calendar_year: 2024
+      fiscal_year: 2024
+      year_of_assessment: 2025
+      fiscal_year_offset_applied: 1
+      fiscal_year_label: "YA2025"
+      period_start_date: "2024-01-01"
+      period_end_date: "2024-12-31"
+      period_days: 366
+      filing_due_date: "2025-06-30"
+      preliminary_payment_due_date: "2025-04-30"
+      final_payment_due_date: "2025-08-31"
+      period_sequence: 1
+      hierarchy_level: 1
+      is_current_period: 1
+  
+  malta_quarterly:
+    - tax_period_key: 100
+      country_key: 1
+      country_code: "MLT"
+      period_code: "2024Q1"
+      period_name: "Quarter 1 2024"
+      period_name_short: "2024 Q1"
+      tax_type_code: "VAT"
+      period_type: "QUARTERLY"
+      calendar_year: 2024
+      calendar_quarter: 1
+      fiscal_year: 2024
+      year_of_assessment: 2024
+      fiscal_year_offset_applied: 0
+      period_start_date: "2024-01-01"
+      period_end_date: "2024-03-31"
+      period_days: 91
+      filing_due_date: "2024-05-15"
+      payment_due_date: "2024-05-15"
+      period_sequence: 1
+      hierarchy_level: 2
+      prior_period_key: 99  # 2023Q4
+      same_period_prior_year_key: 80  # 2023Q1
+      parent_period_key: 1  # YA2025
+    
+    - tax_period_key: 101
+      country_key: 1
+      country_code: "MLT"
+      period_code: "2024Q2"
+      period_name: "Quarter 2 2024"
+      period_name_short: "2024 Q2"
+      tax_type_code: "VAT"
+      period_type: "QUARTERLY"
+      calendar_year: 2024
+      calendar_quarter: 2
+      fiscal_year: 2024
+      year_of_assessment: 2024
+      period_start_date: "2024-04-01"
+      period_end_date: "2024-06-30"
+      period_days: 91
+      filing_due_date: "2024-08-15"
+      payment_due_date: "2024-08-15"
+      period_sequence: 2
+      hierarchy_level: 2
+      prior_period_key: 100  # 2024Q1
+      same_period_prior_year_key: 81  # 2023Q2
+  
+  malta_monthly:
+    - tax_period_key: 200
+      country_key: 1
+      country_code: "MLT"
+      period_code: "2024M07"
+      period_name: "July 2024"
+      period_name_short: "Jul 2024"
+      tax_type_code: "FSS"
+      period_type: "MONTHLY"
+      calendar_year: 2024
+      calendar_quarter: 3
+      calendar_month: 7
+      fiscal_year: 2024
+      year_of_assessment: 2024
+      period_start_date: "2024-07-01"
+      period_end_date: "2024-07-31"
+      period_days: 31
+      filing_due_date: "2024-08-15"
+      payment_due_date: "2024-08-15"
+      period_sequence: 7
+      hierarchy_level: 3
+      prior_period_key: 199  # 2024M06
+      same_period_prior_year_key: 187  # 2023M07
+      parent_period_key: 101  # 2024Q3
+
+  # ============================================================================
+  # Sri Lanka 2024-25 Tax Periods (April-March fiscal year)
+  # ============================================================================
+  sri_lanka_annual:
+    - tax_period_key: 500
+      country_key: 2
+      country_code: "LKA"
+      period_code: "FY2024-25"
+      period_name: "Fiscal Year 2024-25"
+      period_name_short: "FY2024/25"
+      tax_type_code: "VAT"
+      period_type: "ANNUAL"
+      calendar_year: 2024
+      fiscal_year: 2024
+      year_of_assessment: 2024
+      fiscal_year_offset_applied: 0
+      fiscal_year_label: "FY2024/25"
+      period_start_date: "2024-04-01"
+      period_end_date: "2025-03-31"
+      period_days: 365
+      filing_due_date: "2025-04-30"
+      period_sequence: 1
+      hierarchy_level: 1
+      is_current_period: 1
+  
+  sri_lanka_quarterly:
+    - tax_period_key: 510
+      country_key: 2
+      country_code: "LKA"
+      period_code: "FY2024-25-Q1"
+      period_name: "Quarter 1 FY2024-25"
+      period_name_short: "FY24-25 Q1"
+      tax_type_code: "VAT"
+      period_type: "QUARTERLY"
+      calendar_year: 2024
+      calendar_quarter: 2  # Calendar Q2 = Sri Lanka fiscal Q1
+      fiscal_year: 2024
+      year_of_assessment: 2024
+      period_start_date: "2024-04-01"
+      period_end_date: "2024-06-30"
+      period_days: 91
+      filing_due_date: "2024-07-20"
+      period_sequence: 1
+      hierarchy_level: 2
+      parent_period_key: 500
+
+  # ============================================================================
+  # Moldova 2024 Tax Periods (Calendar year)
+  # ============================================================================
+  moldova_annual:
+    - tax_period_key: 700
+      country_key: 3
+      country_code: "MDA"
+      period_code: "2024"
+      period_name: "Tax Year 2024"
+      period_name_short: "TY2024"
+      tax_type_code: "CIT"
+      period_type: "ANNUAL"
+      calendar_year: 2024
+      fiscal_year: 2024
+      year_of_assessment: 2024
+      fiscal_year_offset_applied: 0
+      fiscal_year_label: "FY2024"
+      period_start_date: "2024-01-01"
+      period_end_date: "2024-12-31"
+      period_days: 366
+      filing_due_date: "2025-03-31"
+      period_sequence: 1
+      hierarchy_level: 1
+      is_current_period: 1
+  
+  moldova_quarterly:
+    - tax_period_key: 710
+      country_key: 3
+      country_code: "MDA"
+      period_code: "2024Q1"
+      period_name: "Quarter 1 2024"
+      period_name_short: "2024 Q1"
+      tax_type_code: "VAT"
+      period_type: "QUARTERLY"
+      calendar_year: 2024
+      calendar_quarter: 1
+      fiscal_year: 2024
+      year_of_assessment: 2024
+      period_start_date: "2024-01-01"
+      period_end_date: "2024-03-31"
+      period_days: 91
+      filing_due_date: "2024-04-25"
+      period_sequence: 1
+      hierarchy_level: 2
+      parent_period_key: 700
+
+# =============================================================================
+# Query Patterns
+# =============================================================================
+
+query_patterns:
+  current_period_by_country:
+    description: "Get current period for each tax type in a country"
+    sql: |
+      SELECT 
+          p.tax_period_key,
+          p.period_code,
+          p.period_name,
+          p.tax_type_code,
+          p.period_type,
+          p.period_start_date,
+          p.period_end_date,
+          p.filing_due_date
+      FROM warehouse.dim_tax_period p
+      WHERE p.country_code = :country_code
+        AND p.is_current_period = 1
+      ORDER BY p.tax_type_code;
+  
+  periods_for_fiscal_year:
+    description: "Get all periods for a fiscal year"
+    sql: |
+      SELECT 
+          p.tax_period_key,
+          p.period_code,
+          p.tax_type_code,
+          p.period_type,
+          p.calendar_year,
+          p.fiscal_year,
+          p.year_of_assessment,
+          p.period_start_date,
+          p.period_end_date
+      FROM warehouse.dim_tax_period p
+      WHERE p.country_code = :country_code
+        AND p.fiscal_year = :fiscal_year
+      ORDER BY p.tax_type_code, p.period_sequence;
+  
+  period_with_country_config:
+    description: "Get period with country fiscal year configuration"
+    sql: |
+      SELECT 
+          p.tax_period_key,
+          p.period_code,
+          p.tax_type_code,
+          p.calendar_year,
+          p.fiscal_year,
+          p.year_of_assessment,
+          c.fiscal_year_label_pattern,
+          c.fiscal_year_offset_years,
+          c.tax_year_type
+      FROM warehouse.dim_tax_period p
+      JOIN warehouse.dim_country c ON p.country_key = c.country_key
+      WHERE p.country_code = :country_code
+        AND p.period_code = :period_code
+        AND p.tax_type_code = :tax_type_code;
+  
+  upcoming_deadlines:
+    description: "Get upcoming filing deadlines across all countries"
+    sql: |
+      SELECT 
+          p.country_code,
+          c.country_name,
+          p.period_code,
+          p.tax_type_code,
+          p.period_name,
+          p.filing_due_date,
+          DATEDIFF(p.filing_due_date, CURRENT_DATE) AS days_until_due
+      FROM warehouse.dim_tax_period p
+      JOIN warehouse.dim_country c ON p.country_key = c.country_key
+      WHERE p.filing_due_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY)
+        AND p.is_active = 1
+      ORDER BY p.filing_due_date;
+  
+  year_over_year_comparison:
+    description: "Get periods for YoY comparison"
+    sql: |
+      SELECT 
+          curr.period_code AS current_period,
+          curr.period_name AS current_name,
+          curr.period_start_date AS current_start,
+          curr.period_end_date AS current_end,
+          prior.period_code AS prior_year_period,
+          prior.period_name AS prior_year_name,
+          prior.period_start_date AS prior_start,
+          prior.period_end_date AS prior_end
+      FROM warehouse.dim_tax_period curr
+      JOIN warehouse.dim_tax_period prior 
+          ON curr.same_period_prior_year_key = prior.tax_period_key
+      WHERE curr.country_code = :country_code
+        AND curr.tax_type_code = :tax_type_code
+        AND curr.fiscal_year = :fiscal_year;
+  
+  malta_ya_periods:
+    description: "Get Malta Year of Assessment periods"
+    sql: |
+      SELECT 
+          p.period_code,
+          p.period_name,
+          p.tax_type_code,
+          p.calendar_year AS basis_year,
+          p.year_of_assessment,
+          p.period_start_date,
+          p.period_end_date,
+          p.filing_due_date
+      FROM warehouse.dim_tax_period p
+      WHERE p.country_code = 'MLT'
+        AND p.year_of_assessment = :year_of_assessment
+        AND p.period_type = 'ANNUAL'
+      ORDER BY p.tax_type_code;
+
+# =============================================================================
+# Hierarchies
+# =============================================================================
+
+hierarchies:
+  - name: period_time_hierarchy
+    type: LEVEL_BASED
+    description: "Time-based period hierarchy within country/tax type"
+    levels:
+      - level: 1
+        name: "Fiscal Year"
+        columns: [fiscal_year, year_of_assessment]
+      - level: 2
+        name: "Quarter"
+        column: calendar_quarter
+        applicable_when: "period_type IN ('QUARTERLY', 'MONTHLY')"
+      - level: 3
+        name: "Month"
+        column: calendar_month
+        applicable_when: "period_type = 'MONTHLY'"
+      - level: 4
+        name: "Period"
+        column: period_code
+  
+  - name: tax_type_period_hierarchy
+    type: LEVEL_BASED
+    description: "Tax type and period hierarchy"
+    levels:
+      - level: 1
+        name: "Country"
+        column: country_code
+      - level: 2
+        name: "Tax Type"
+        column: tax_type_code
+      - level: 3
+        name: "Period Type"
+        column: period_type
+      - level: 4
+        name: "Period"
+        column: period_code
+
+# =============================================================================
+# Business Rules
+# =============================================================================
+
+business_rules:
+  - rule_id: BR_PERIOD_001
+    description: "Period end date must be after start date"
+    severity: ERROR
+    validation_sql: |
+      SELECT tax_period_key, period_code, period_start_date, period_end_date
+      FROM warehouse.dim_tax_period
+      WHERE period_end_date < period_start_date
+    expected_result: "0 rows"
+  
+  - rule_id: BR_PERIOD_002
+    description: "Filing due date must be after period end"
+    severity: WARNING
+    validation_sql: |
+      SELECT tax_period_key, period_code, period_end_date, filing_due_date
+      FROM warehouse.dim_tax_period
+      WHERE filing_due_date IS NOT NULL
+        AND filing_due_date < period_end_date
+    expected_result: "0 rows"
+    note: "Due dates should follow period end"
+  
+  - rule_id: BR_PERIOD_003
+    description: "No overlapping periods for same country/tax type"
+    severity: ERROR
+    validation_sql: |
+      SELECT a.tax_period_key, b.tax_period_key, a.country_code, a.tax_type_code
+      FROM warehouse.dim_tax_period a
+      JOIN warehouse.dim_tax_period b
+        ON a.country_code = b.country_code
+        AND a.tax_type_code = b.tax_type_code
+        AND a.period_type = b.period_type
+        AND a.tax_period_key < b.tax_period_key
+      WHERE a.period_start_date <= b.period_end_date
+        AND b.period_start_date <= a.period_end_date
+    expected_result: "0 rows"
+  
+  - rule_id: BR_PERIOD_004
+    description: "Year of assessment must be >= fiscal year"
+    severity: ERROR
+    validation_sql: |
+      SELECT tax_period_key, country_code, fiscal_year, year_of_assessment
+      FROM warehouse.dim_tax_period
+      WHERE year_of_assessment < fiscal_year
+    expected_result: "0 rows"
+  
+  - rule_id: BR_PERIOD_005
+    description: "Country key must match country code"
+    severity: ERROR
+    validation_sql: |
+      SELECT p.tax_period_key, p.country_key, p.country_code, c.country_code AS expected
+      FROM warehouse.dim_tax_period p
+      JOIN warehouse.dim_country c ON p.country_key = c.country_key
+      WHERE p.country_code != c.country_code
+    expected_result: "0 rows"
+  
+  - rule_id: BR_PERIOD_006
+    description: "Only one current period per country/tax type/period type"
+    severity: ERROR
+    validation_sql: |
+      SELECT country_code, tax_type_code, period_type, COUNT(*) AS cnt
+      FROM warehouse.dim_tax_period
+      WHERE is_current_period = 1
+      GROUP BY country_code, tax_type_code, period_type
+      HAVING COUNT(*) > 1
+    expected_result: "0 rows"
+  
+  - rule_id: BR_PERIOD_007
+    description: "Malta income tax periods must have YA offset of 1"
+    severity: ERROR
+    validation_sql: |
+      SELECT tax_period_key, period_code, fiscal_year_offset_applied
+      FROM warehouse.dim_tax_period
+      WHERE country_code = 'MLT'
+        AND tax_type_code IN ('CIT', 'PIT', 'PIT_SE')
+        AND period_type = 'ANNUAL'
+        AND fiscal_year_offset_applied != 1
+    expected_result: "0 rows"
+
+# =============================================================================
+# ETL Configuration
+# =============================================================================
+
+etl_config:
+  load_strategy: "INCREMENTAL"
+  load_frequency: "ANNUAL"
+  
+  generation_process:
+    description: |
+      Annual process to generate tax periods for upcoming year.
+      Must respect country-specific fiscal year configurations.
+    
+    steps:
+      - step: 1
+        name: "Get active countries"
+        sql: |
+          SELECT country_key, country_code, tax_year_type, 
+                 fiscal_year_start_month, fiscal_year_offset_years
+          FROM warehouse.dim_country
+          WHERE is_active = 1
+      
+      - step: 2
+        name: "Generate annual periods"
+        description: "Create annual tax periods for CIT, PIT based on country fiscal year"
+      
+      - step: 3
+        name: "Generate quarterly periods"
+        description: "Create quarterly periods for VAT aligned to fiscal year"
+      
+      - step: 4
+        name: "Generate monthly periods"
+        description: "Create monthly periods for FSS, payroll taxes"
+      
+      - step: 5
+        name: "Link prior periods"
+        description: "Set prior_period_key and same_period_prior_year_key"
+      
+      - step: 6
+        name: "Update current period flags"
+        description: "Mark current periods based on dates"
+  
+  daily_update:
+    description: "Daily process to update status flags"
+    columns_to_update:
+      - is_current_period
+      - is_open_for_filing
+      - is_past_due
+
+# =============================================================================
+# ClickHouse DDL
+# =============================================================================
+
+clickhouse_ddl:
+  database: "{country}_dw"
+  engine: MergeTree()
+  order_by: [country_code, tax_type_code, period_code]
+  
+  ddl: |
+    CREATE TABLE IF NOT EXISTS warehouse.dim_tax_period
+    (
+        -- Keys
+        tax_period_key Int32,
+        
+        -- Country Context
+        country_key Int32,
+        country_code FixedString(3),
+        
+        -- Period Identification
+        period_code String,
+        period_name String,
+        period_name_short String,
+        tax_type_code LowCardinality(String),
+        period_type LowCardinality(String),
+        
+        -- Calendar Attributes
+        calendar_year Int16,
+        calendar_quarter Nullable(UInt8),
+        calendar_month Nullable(UInt8),
+        
+        -- Fiscal Year
+        fiscal_year Int16,
+        year_of_assessment Int16,
+        fiscal_year_offset_applied Int8 DEFAULT 0,
+        fiscal_year_label Nullable(String),
+        
+        -- Period Dates
+        period_start_date Date,
+        period_end_date Date,
+        period_start_date_key Int32,
+        period_end_date_key Int32,
+        period_days Int16,
+        
+        -- Deadlines
+        scheme_key Nullable(Int32),
+        filing_due_date Nullable(Date),
+        filing_due_date_key Nullable(Int32),
+        payment_due_date Nullable(Date),
+        payment_due_date_key Nullable(Int32),
+        extended_due_date Nullable(Date),
+        preliminary_payment_due_date Nullable(Date),
+        final_payment_due_date Nullable(Date),
+        
+        -- Navigation
+        period_sequence Int32,
+        prior_period_key Nullable(Int32),
+        same_period_prior_year_key Nullable(Int32),
+        parent_period_key Nullable(Int32),
+        
+        -- Status Flags
+        is_current_period UInt8 DEFAULT 0,
+        is_open_for_filing UInt8 DEFAULT 0,
+        is_past_due UInt8 DEFAULT 0,
+        is_locked UInt8 DEFAULT 0,
+        is_active UInt8 DEFAULT 1,
+        
+        -- Hierarchy
+        hierarchy_level UInt8,
+        
+        -- ETL Metadata
+        etl_batch_id Int64,
+        etl_load_timestamp DateTime DEFAULT now(),
+        etl_source_system Nullable(String)
+    )
+    ENGINE = MergeTree()
+    ORDER BY (country_code, tax_type_code, period_code)
+    SETTINGS index_granularity = 8192;
+
+# =============================================================================
+# Migration Notes
+# =============================================================================
+
+migration_notes:
+  from_malta_version: |
+    -- Migration script to add country context to existing Malta periods
+    
+    -- 1. Add country columns to existing table
+    ALTER TABLE warehouse.dim_tax_period
+      ADD COLUMN country_key Int32 DEFAULT 1,
+      ADD COLUMN country_code FixedString(3) DEFAULT 'MLT',
+      ADD COLUMN fiscal_year_offset_applied Int8 DEFAULT 0;
+    
+    -- 2. Update fiscal_year_offset_applied for income tax
+    UPDATE warehouse.dim_tax_period
+    SET fiscal_year_offset_applied = 1
+    WHERE tax_type_code IN ('CIT', 'PIT', 'PIT_SE')
+      AND period_type = 'ANNUAL';
+    
+    -- 3. Update unique constraint
+    -- Drop old: uk_dim_tax_period (period_code, tax_type_code)
+    -- Add new: uk_dim_tax_period (country_code, period_code, tax_type_code)
+    
+    -- 4. FSS period code migration
+    -- The fss_period_code column is removed, but period_code continues
+    -- to use the same format: 2024M01, 2024M02, etc.
+  
+  backward_compatibility_view: |
+    -- Create view for backward compatibility with Malta queries
+    CREATE VIEW warehouse.v_dim_tax_period_malta_compat AS
+    SELECT 
+        p.*,
+        p.calendar_year AS basis_year,
+        CASE WHEN p.period_type = 'MONTHLY' 
+             THEN p.period_code 
+             ELSE NULL 
+        END AS fss_period_code
+    FROM warehouse.dim_tax_period p
+    WHERE p.country_code = 'MLT';
+
+# =============================================================================
+# Validation Criteria
+# =============================================================================
+# | Check                          | Expected                              |
+# |--------------------------------|---------------------------------------|
+# | country_key column added       | FK to dim_country                     |
+# | country_code in natural key    | Part of unique constraint             |
+# | fiscal_year derivation         | Based on country tax_year_type        |
+# | year_of_assessment derivation  | fiscal_year + country offset          |
+# | Malta YA offset                | 1 for income tax, 0 for VAT           |
+# | Sri Lanka fiscal year          | April-March                           |
+# | Moldova fiscal year            | Calendar year                         |
+# | Sample data                    | 3 countries with various period types |
+# | Query patterns                 | 6 patterns documented                 |
+# | Business rules                 | 7 rules defined                       |
+# | Migration notes                | Backward compatibility documented     |
+# =============================================================================

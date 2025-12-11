@@ -1,0 +1,1296 @@
+# =============================================================================
+# TA-RDM L3 - Party Dimension (Generalized)
+# =============================================================================
+# Purpose: Taxpayer/entity dimension supporting multiple countries
+# Pattern: P2 (Multi-Identifier Party) from L3 Generalization Patterns Catalog
+# L2 Source: party.party, party.individual, party.enterprise, party.party_identifier
+# Priority: HIGH
+# Version: 2.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4c of L3 Generalization Implementation
+# =============================================================================
+#
+# This dimension is the conformed party dimension for multi-country support.
+# It replaces the Malta-specific dim_party from Step 10a with a generalized
+# structure that:
+#
+# - Uses generic identifier columns instead of hardcoded TIN/VAT/EORI
+# - Adds country_key FK for party's primary tax jurisdiction
+# - References dim_geography instead of Malta-specific locality codes
+# - Links to bridge_party_identifier for multi-identifier support
+# - Renames Malta-specific columns to generic equivalents
+#
+# Design Principles:
+# - SCD Type 2: Full history tracking for taxpayer changes
+# - country_code + party_source_id form the composite natural key
+# - Denormalized identifier columns for common queries (primary/secondary)
+# - bridge_party_identifier for full identifier history
+# - Integration with dim_country, dim_geography, dim_tax_scheme
+#
+# CHANGES FROM v1.0.0 (Malta-specific):
+# - REMOVED: tin, vat_number, eori_number, malta_id_card_number
+# - REMOVED: locality_code, district_code (Malta-specific geography)
+# - REMOVED: vat_scheme_code (moved to dim_registration with tax_scheme_key)
+# - ADDED: country_key, primary_tax_id, primary_tax_id_type
+# - ADDED: geography_key, national_id_number
+# - RENAMED: is_malta_resident → is_domestic_resident
+# - RENAMED: gaming_license_type → special_license_type
+#
+# =============================================================================
+
+metadata:
+  dimension_name: dim_party
+  schema: warehouse
+  version: "2.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P2 - Multi-Identifier Party"
+  l2_source_tables:
+    - party.party
+    - party.individual
+    - party.enterprise
+    - party.party_identifier
+    - party.address
+  prior_version: "1.0.0 (Malta-specific)"
+  description: |
+    Conformed party dimension supporting taxpayers and entities across all
+    countries. Uses generic identifier pattern instead of country-specific
+    columns. SCD Type 2 for historical tracking.
+    
+    This dimension serves as the central taxpayer/entity reference for all
+    fact tables in the data warehouse, providing consistent party context
+    regardless of country or tax jurisdiction.
+
+# =============================================================================
+# Dimension Specification
+# =============================================================================
+
+dimension:
+  name: dim_party
+  schema: warehouse
+  type: dimension
+  scd_type: 2
+  
+  grain: "One row per party per version"
+  natural_key: [party_source_id, country_code]
+  surrogate_key: party_key
+  
+  business_context:
+    domain: "Party Management"
+    usage: |
+      All fact tables reference this dimension for party/taxpayer context.
+      Provides consistent party information across tax types, periods,
+      and jurisdictions. Supports multi-country deployments with unified
+      party model.
+    refresh: "DAILY"
+    priority: "CRITICAL"
+  
+  description: |
+    Conformed party dimension for multi-country tax administration.
+    Combines individual and enterprise attributes in a denormalized structure
+    for optimal query performance. Supports corporate group hierarchy and
+    multiple identifier types per party via bridge table.
+    
+    Key features:
+    - Multi-country support via country_key
+    - Generic identifier pattern (primary_tax_id + type)
+    - bridge_party_identifier for full identifier history
+    - Geography dimension integration
+    - SCD Type 2 for change tracking
+  
+  estimated_volume:
+    initial_per_country: 350000
+    with_history: 500000
+    annual_growth_percent: 5
+  
+  columns:
+    # ==========================================================================
+    # Keys
+    # ==========================================================================
+    - name: party_key
+      data_type: Int64
+      nullable: false
+      auto_increment: true
+      description: "Surrogate key for dimension - warehouse-assigned unique identifier"
+      role: SURROGATE_KEY
+    
+    - name: party_source_id
+      data_type: Int64
+      nullable: false
+      description: "Source party_id from L2 canonical party.party table"
+      role: NATURAL_KEY
+      source: "party.party.party_id"
+    
+    # ==========================================================================
+    # Country Context (NEW - Step 4c Addition)
+    # ==========================================================================
+    - name: country_key
+      data_type: Int32
+      nullable: false
+      foreign_key: warehouse.dim_country(country_key)
+      description: |
+        Party's primary tax jurisdiction. References dim_country for
+        country-specific rules (fiscal year, currency, tax system).
+      source: "Derived from party registration country or system default"
+      change_from_v1: "NEW column added for multi-country support"
+    
+    - name: country_code
+      data_type: String
+      length: 3
+      nullable: false
+      description: "ISO 3166-1 alpha-3 country code (denormalized for query convenience)"
+      source: "Derived from country_key lookup"
+      change_from_v1: "NEW column - denormalized from dim_country"
+    
+    # ==========================================================================
+    # Generic Identifier Columns (CHANGED - Replaced Malta-specific)
+    # ==========================================================================
+    - name: primary_tax_id
+      data_type: String
+      length: 50
+      nullable: true
+      description: |
+        Primary tax identifier value. Format varies by country:
+        - Malta (MLT): 9 digits (TIN)
+        - Sri Lanka (LKA): 9 digits (TIN)
+        - Moldova (MDA): 13 digits (IDNO for enterprises, IDNP for individuals)
+        - Ukraine (UKR): 8 digits (EDRPOU for enterprises, 10 digits IPN for individuals)
+        - Lebanon (LBN): 8 digits (TIN)
+        
+        For complete identifier history, see bridge_party_identifier.
+      source: "party.party_identifier WHERE is_tax_identifier = TRUE AND is_primary = TRUE"
+      change_from_v1: "REPLACES Malta-specific 'tin' column"
+    
+    - name: primary_tax_id_type
+      data_type: String
+      length: 20
+      nullable: true
+      description: |
+        Type code for primary tax identifier:
+        - TIN: Tax Identification Number (Malta, Sri Lanka, Lebanon)
+        - IDNO: Fiscal Code for enterprises (Moldova)
+        - IDNP: Identification Number of Physical Person (Moldova)
+        - EDRPOU: Unified State Register code (Ukraine)
+        - IPN: Individual Tax Number (Ukraine)
+      source: "party.party_identifier.identifier_type_code"
+      change_from_v1: "NEW column - identifier type context"
+    
+    - name: secondary_id
+      data_type: String
+      length: 50
+      nullable: true
+      description: |
+        Secondary identifier (e.g., VAT number, EORI).
+        Most commonly holds VAT registration number for enterprises.
+        For complete identifier history, use bridge_party_identifier.
+      source: "party.party_identifier WHERE identifier_type_code = 'VAT' AND is_primary = TRUE"
+      change_from_v1: "REPLACES Malta-specific 'vat_number' column"
+    
+    - name: secondary_id_type
+      data_type: String
+      length: 20
+      nullable: true
+      description: "Type code for secondary identifier: VAT, EORI, BRN, SSC, etc."
+      source: "party.party_identifier.identifier_type_code"
+      change_from_v1: "NEW column - identifier type context"
+    
+    - name: national_id_number
+      data_type: String
+      length: 50
+      nullable: true
+      description: |
+        National identity document number. Used for KYC and identity verification.
+        Format varies by country:
+        - Malta: 7 digits + letter (e.g., 123456M)
+        - Sri Lanka: 12 digits or 9 digits + V/X (NIC)
+        - Moldova: 13 digits (IDNP same as tax ID)
+        - Ukraine: 9 digits passport or biometric ID
+        - Lebanon: Civil register number
+      source: "party.party_identifier WHERE identifier_type_code = 'NATID'"
+      change_from_v1: "RENAMED from 'malta_id_card_number'"
+    
+    - name: company_registration_id
+      data_type: String
+      length: 50
+      nullable: true
+      description: |
+        Company/business registration number from registrar.
+        Format varies by country:
+        - Malta: 'C' + digits (e.g., C12345)
+        - Sri Lanka: Alphanumeric (PV, PB prefix)
+        - Moldova: IDNO (same as tax ID)
+        - Ukraine: EDRPOU (same as tax ID)
+        - Lebanon: Commercial register number
+      source: "party.party_identifier WHERE identifier_type_code IN ('ROC', 'BRN', 'CR')"
+      change_from_v1: "Format validation generalized"
+    
+    # ==========================================================================
+    # Party Type
+    # ==========================================================================
+    - name: party_type_code
+      data_type: String
+      length: 20
+      nullable: false
+      description: "Party classification: INDIVIDUAL, ENTERPRISE, GOVERNMENT, NON_PROFIT"
+      source: "party.party.party_type_code"
+      allowed_values:
+        - INDIVIDUAL
+        - ENTERPRISE
+        - GOVERNMENT
+        - NON_PROFIT
+    
+    - name: party_type_name
+      data_type: String
+      length: 50
+      description: "Display name for party type (e.g., 'Individual', 'Enterprise')"
+      derived: "CASE party_type_code WHEN 'INDIVIDUAL' THEN 'Individual' ..."
+    
+    # ==========================================================================
+    # Individual Attributes (when party_type = INDIVIDUAL)
+    # ==========================================================================
+    - name: first_name
+      data_type: String
+      length: 100
+      description: "First/given name for individuals"
+      source: "party.individual.first_name"
+    
+    - name: middle_name
+      data_type: String
+      length: 100
+      description: "Middle name(s) for individuals"
+      source: "party.individual.middle_name"
+    
+    - name: last_name
+      data_type: String
+      length: 100
+      description: "Last/family name for individuals"
+      source: "party.individual.last_name"
+    
+    - name: full_name
+      data_type: String
+      length: 300
+      description: |
+        Full name formatted per country convention.
+        - Western format: First Middle Last
+        - Sri Lanka: First Last (middle rare)
+      derived: "CONCAT(first_name, ' ', COALESCE(middle_name || ' ', ''), last_name)"
+    
+    - name: date_of_birth
+      data_type: Date
+      description: "Date of birth for individuals"
+      source: "party.individual.date_of_birth"
+    
+    - name: gender_code
+      data_type: String
+      length: 1
+      description: "Gender code: M (Male), F (Female), O (Other), U (Unknown)"
+      source: "party.individual.gender_code"
+    
+    - name: nationality_code
+      data_type: String
+      length: 3
+      description: "ISO 3166-1 alpha-3 nationality code (may differ from tax jurisdiction)"
+      source: "party.individual.nationality_code"
+    
+    - name: marital_status_code
+      data_type: String
+      length: 20
+      description: "Marital status: SINGLE, MARRIED, DIVORCED, WIDOWED, SEPARATED"
+      source: "party.individual.marital_status_code"
+    
+    # ==========================================================================
+    # Enterprise Attributes (when party_type = ENTERPRISE)
+    # ==========================================================================
+    - name: legal_name
+      data_type: String
+      length: 300
+      description: "Official registered legal name from company register"
+      source: "party.enterprise.legal_name"
+    
+    - name: trading_name
+      data_type: String
+      length: 300
+      description: "Trading/business/DBA name if different from legal name"
+      source: "party.enterprise.trading_name"
+    
+    - name: display_name
+      data_type: String
+      length: 300
+      nullable: false
+      description: |
+        Primary display name for UI and reports.
+        For individuals: full_name
+        For enterprises: trading_name if set, otherwise legal_name
+      derived: |
+        CASE party_type_code
+          WHEN 'INDIVIDUAL' THEN full_name
+          WHEN 'ENTERPRISE' THEN COALESCE(trading_name, legal_name)
+          ELSE legal_name
+        END
+    
+    - name: legal_form_code
+      data_type: String
+      length: 20
+      description: |
+        Legal form classification code:
+        - LLC, LTD, PLC, SOLE_PROP, PARTNERSHIP, CORP, SRL, etc.
+        Codes are standardized across countries where possible.
+      source: "party.enterprise.legal_form_code"
+    
+    - name: legal_form_name
+      data_type: String
+      length: 100
+      description: "Full legal form name (e.g., 'Private Limited Company')"
+      source: "Reference lookup from legal_form_code"
+    
+    - name: incorporation_date
+      data_type: Date
+      description: "Date of incorporation/registration"
+      source: "party.enterprise.incorporation_date"
+    
+    - name: incorporation_country_code
+      data_type: String
+      length: 3
+      description: |
+        ISO 3166-1 alpha-3 country of incorporation.
+        May differ from tax jurisdiction (country_key) for foreign branches.
+      source: "party.enterprise.incorporation_country_code"
+    
+    - name: financial_year_end_month
+      data_type: UInt8
+      description: "Month of financial year end (1-12). NULL defaults to country standard."
+      source: "party.enterprise.financial_year_end_month"
+    
+    # ==========================================================================
+    # Activity Classification
+    # ==========================================================================
+    - name: primary_nace_code
+      data_type: String
+      length: 10
+      description: |
+        Primary NACE/ISIC activity code (e.g., '47.11', '62.01').
+        EU uses NACE Rev.2, other countries may use ISIC or local variants.
+      source: "party.party.primary_activity_code"
+    
+    - name: primary_nace_description
+      data_type: String
+      length: 200
+      description: "Primary activity description from classification"
+      source: "Reference lookup from primary_nace_code"
+    
+    - name: secondary_nace_code
+      data_type: String
+      length: 10
+      description: "Secondary activity code if applicable"
+      source: "party.party.secondary_activity_code"
+    
+    - name: industry_sector_code
+      data_type: String
+      length: 20
+      description: |
+        High-level industry sector classification:
+        AGRICULTURE, MANUFACTURING, CONSTRUCTION, RETAIL, SERVICES, 
+        FINANCE, TECHNOLOGY, HEALTHCARE, EDUCATION, GOVERNMENT, OTHER
+      derived: "NACE code mapping to sector"
+    
+    - name: industry_sector_name
+      data_type: String
+      length: 100
+      description: "Industry sector display name"
+      derived: "CASE industry_sector_code WHEN 'RETAIL' THEN 'Retail Trade' ..."
+    
+    # ==========================================================================
+    # Geographic Location (CHANGED - Generic Geography Dimension)
+    # ==========================================================================
+    - name: geography_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_geography(geography_key)
+      description: |
+        Link to generic geography dimension for primary address location.
+        Replaces Malta-specific locality_code and district_code columns.
+        dim_geography provides country-specific administrative hierarchy.
+      source: "Lookup from dim_geography by address locality + country"
+      change_from_v1: "REPLACES Malta-specific locality_code, district_code"
+    
+    - name: postal_code
+      data_type: String
+      length: 20
+      description: |
+        Postal/ZIP code from primary address.
+        Format varies by country (Malta: ABC 1234, Sri Lanka: 5 digits)
+      source: "party.address.postal_code WHERE is_primary = TRUE"
+    
+    - name: city_name
+      data_type: String
+      length: 100
+      description: "City/town name from primary address (denormalized for convenience)"
+      source: "party.address.city OR dim_geography.level_4_name"
+    
+    - name: address_line_1
+      data_type: String
+      length: 200
+      description: "Primary address line 1 (street address)"
+      source: "party.address.address_line_1 WHERE is_primary = TRUE"
+    
+    - name: address_line_2
+      data_type: String
+      length: 200
+      description: "Primary address line 2 (apartment, suite, etc.)"
+      source: "party.address.address_line_2 WHERE is_primary = TRUE"
+    
+    # ==========================================================================
+    # Contact Information
+    # ==========================================================================
+    - name: primary_email
+      data_type: String
+      length: 200
+      description: "Primary email address for correspondence"
+      source: "party.contact WHERE contact_type = 'EMAIL' AND is_primary = TRUE"
+    
+    - name: primary_phone
+      data_type: String
+      length: 50
+      description: "Primary phone number (formatted with country code)"
+      source: "party.contact WHERE contact_type = 'PHONE' AND is_primary = TRUE"
+    
+    - name: mobile_phone
+      data_type: String
+      length: 50
+      description: "Mobile phone number"
+      source: "party.contact WHERE contact_type = 'MOBILE'"
+    
+    # ==========================================================================
+    # Tax Status (CHANGED - Generalized)
+    # ==========================================================================
+    - name: is_domestic_resident
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: |
+        Is tax resident in country_key jurisdiction (1=Yes, 0=No).
+        Determines domestic vs. foreign filing/reporting requirements.
+      source: "party.party.is_resident"
+      change_from_v1: "RENAMED from 'is_malta_resident'"
+    
+    - name: residency_status_code
+      data_type: String
+      length: 20
+      description: |
+        Detailed residency classification:
+        - RESIDENT: Fully tax resident
+        - NON_RESIDENT: Foreign tax resident
+        - ORDINARILY_RESIDENT: Special status (Malta)
+        - TEMPORARY_RESIDENT: Time-limited residency
+        - DEEMED_RESIDENT: Deemed resident by law
+      source: "party.party.residency_status_code"
+    
+    - name: tax_status_code
+      data_type: String
+      length: 20
+      description: |
+        Overall tax account status:
+        - ACTIVE: Normal active taxpayer
+        - INACTIVE: Temporarily inactive
+        - SUSPENDED: Account suspended
+        - DECEASED: Individual deceased
+        - DISSOLVED: Enterprise dissolved
+        - DORMANT: Enterprise dormant but registered
+      source: "party.party.status_code"
+    
+    - name: tax_status_name
+      data_type: String
+      length: 50
+      description: "Display name for tax status"
+      derived: "Lookup from tax_status_code"
+    
+    - name: tax_residence_country
+      data_type: String
+      length: 3
+      description: |
+        ISO 3166-1 alpha-3 country of tax residence.
+        May differ from country_key for non-residents with obligations.
+      source: "party.party.tax_residence_country_code"
+    
+    # ==========================================================================
+    # Size & Segmentation (CHANGED - Added country context note)
+    # ==========================================================================
+    - name: segment_code
+      data_type: String
+      length: 20
+      description: |
+        Taxpayer segment classification: LARGE, MEDIUM, SMALL, MICRO.
+        Segment definitions/thresholds vary by country:
+        - Malta: CFR classification based on turnover/employees
+        - Sri Lanka: IRD classification
+        - EU: SME definition from EU Recommendation 2003/361
+      source: "party.party.segment_code"
+      change_from_v1: "Added country context documentation"
+    
+    - name: segment_name
+      data_type: String
+      length: 50
+      description: "Segment display name (e.g., 'Large Taxpayer')"
+      derived: "Lookup from segment_code"
+    
+    - name: size_category
+      data_type: String
+      length: 20
+      description: |
+        EU SME size category: MICRO, SMALL, MEDIUM, LARGE.
+        Based on EU criteria (employees, turnover, assets).
+      derived: "Classification based on employee_count and annual_turnover"
+    
+    - name: annual_turnover
+      data_type: Decimal64(2)
+      description: |
+        Latest annual turnover in local currency.
+        Used for segment classification and threshold checking.
+      source: "party.enterprise.annual_turnover"
+    
+    - name: annual_turnover_eur
+      data_type: Decimal64(2)
+      description: "Annual turnover converted to EUR for cross-country comparison"
+      derived: "annual_turnover * exchange rate from dim_country.currency_code"
+    
+    - name: employee_count
+      data_type: Int32
+      description: "Number of employees (for size classification)"
+      source: "party.enterprise.employee_count"
+    
+    - name: total_assets
+      data_type: Decimal64(2)
+      description: "Total assets in local currency (for SME classification)"
+      source: "party.enterprise.total_assets"
+    
+    # ==========================================================================
+    # Special Licenses (CHANGED - Generalized)
+    # ==========================================================================
+    - name: special_license_type
+      data_type: String
+      length: 50
+      description: |
+        Special regulatory license type if applicable:
+        - Malta: GAMING_A, GAMING_B1, GAMING_B2, FINANCIAL_SERVICES, INSURANCE
+        - Sri Lanka: BOI_ZONE, FINANCIAL_SERVICES
+        - Moldova: BANKING_LICENSE, INSURANCE_LICENSE
+        Country-specific license types may be added.
+      source: "party.party_license.license_type_code"
+      change_from_v1: "RENAMED from 'gaming_license_type' - now generic"
+    
+    - name: special_license_number
+      data_type: String
+      length: 50
+      description: "License number from regulatory authority"
+      source: "party.party_license.license_number"
+    
+    - name: has_special_license
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Has any special regulatory license (1=Yes)"
+      derived: "CASE WHEN special_license_type IS NOT NULL THEN 1 ELSE 0 END"
+    
+    # ==========================================================================
+    # Corporate Group
+    # ==========================================================================
+    - name: parent_party_key
+      data_type: Int64
+      nullable: true
+      foreign_key: warehouse.dim_party(party_key)
+      description: |
+        Immediate parent entity in corporate group structure.
+        NULL for individuals and top-level enterprises.
+      source: "party.corporate_group.parent_party_id → lookup party_key"
+    
+    - name: ultimate_parent_party_key
+      data_type: Int64
+      nullable: true
+      foreign_key: warehouse.dim_party(party_key)
+      description: "Ultimate parent at top of corporate group hierarchy"
+      source: "party.corporate_group recursive lookup"
+    
+    - name: group_head_indicator
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is head of corporate group (1=Yes)"
+      derived: "CASE WHEN parent_party_key IS NULL AND has_subsidiaries THEN 1 ELSE 0 END"
+    
+    # ==========================================================================
+    # Registration Flags
+    # ==========================================================================
+    - name: is_vat_registered
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Has active VAT registration (1=Yes)"
+      source: "EXISTS (registration WHERE tax_type = 'VAT' AND is_active)"
+    
+    - name: is_eori_registered
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Has EORI registration for customs (1=Yes, EU countries)"
+      source: "EXISTS (party_identifier WHERE identifier_type = 'EORI')"
+    
+    - name: is_crs_reportable
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Subject to CRS (Common Reporting Standard) reporting (1=Yes)"
+      source: "Derived from party attributes and CRS rules"
+    
+    - name: is_fatca_reportable
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Subject to FATCA reporting (1=Yes, US persons)"
+      source: "Derived from nationality/residency"
+    
+    # ==========================================================================
+    # SCD Type 2 Tracking
+    # ==========================================================================
+    - name: effective_from
+      data_type: Date
+      nullable: false
+      description: "Date this version became effective"
+      scd_role: "ROW_START"
+    
+    - name: effective_to
+      data_type: Date
+      description: "Date this version ended (NULL = current)"
+      scd_role: "ROW_END"
+    
+    - name: is_current
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Is current version (1=Yes, 0=No)"
+      scd_role: "CURRENT_FLAG"
+    
+    - name: version_number
+      data_type: Int32
+      nullable: false
+      default: 1
+      description: "Version number for this party (increments on each change)"
+      scd_role: "VERSION"
+    
+    - name: version_reason
+      data_type: String
+      length: 200
+      description: "Reason for version change (e.g., 'Address update', 'Name change')"
+    
+    - name: source_checksum
+      data_type: String
+      length: 64
+      description: "MD5/SHA hash of source columns for change detection"
+    
+    # ==========================================================================
+    # ETL Metadata
+    # ==========================================================================
+    - name: etl_batch_id
+      data_type: Int64
+      nullable: false
+      description: "ETL batch that loaded/updated this record"
+    
+    - name: etl_load_timestamp
+      data_type: DateTime
+      nullable: false
+      description: "Timestamp when record was loaded to warehouse"
+    
+    - name: etl_source_system
+      data_type: String
+      length: 50
+      description: |
+        Source system code:
+        - L2_CANONICAL: Standard L2 party tables
+        - SIGTAS: Direct SIGTAS migration
+        - RAMIS: Sri Lanka RAMIS system
+        - SFS: Moldova State Fiscal Service
+        - ERP: Enterprise integration
+      default: "'L2_CANONICAL'"
+
+  # ============================================================================
+  # Indexes
+  # ============================================================================
+  indexes:
+    - name: idx_party_source
+      columns: [party_source_id]
+      description: "Source system party ID lookup"
+    
+    - name: idx_party_tax_id
+      columns: [primary_tax_id, country_code]
+      description: "Primary tax identifier lookup (country-scoped)"
+    
+    - name: idx_party_secondary_id
+      columns: [secondary_id, secondary_id_type, country_code]
+      description: "Secondary identifier lookup (VAT, EORI, etc.)"
+    
+    - name: idx_party_country
+      columns: [country_key, party_type_code]
+      description: "Country and party type filtering"
+    
+    - name: idx_party_name
+      columns: [display_name]
+      description: "Name search index"
+    
+    - name: idx_party_current
+      columns: [party_source_id, is_current]
+      where: "is_current = 1"
+      description: "Current version lookup (filtered index)"
+    
+    - name: idx_party_geography
+      columns: [geography_key]
+      description: "Geographic location filtering"
+    
+    - name: idx_party_segment
+      columns: [country_key, segment_code]
+      description: "Segment analysis"
+    
+    - name: idx_party_status
+      columns: [country_key, tax_status_code]
+      description: "Status filtering"
+    
+    - name: idx_party_effective
+      columns: [effective_from, effective_to]
+      description: "SCD Type 2 temporal queries"
+
+  # ============================================================================
+  # Removed Columns (Migration Reference)
+  # ============================================================================
+  removed_columns:
+    - name: tin
+      reason: "Replaced by primary_tax_id + primary_tax_id_type"
+      migration: "tin → primary_tax_id WHERE primary_tax_id_type = 'TIN'"
+    
+    - name: vat_number
+      reason: "Moved to bridge_party_identifier or secondary_id"
+      migration: "vat_number → bridge_party_identifier WHERE identifier_type_code = 'VAT'"
+    
+    - name: eori_number
+      reason: "Moved to bridge_party_identifier"
+      migration: "eori_number → bridge_party_identifier WHERE identifier_type_code = 'EORI'"
+    
+    - name: malta_id_card_number
+      reason: "Renamed to national_id_number"
+      migration: "malta_id_card_number → national_id_number"
+    
+    - name: locality_code
+      reason: "Replaced by geography_key FK to dim_geography"
+      migration: "locality_code → dim_geography lookup → geography_key"
+    
+    - name: district_code
+      reason: "Included in geography hierarchy via dim_geography"
+      migration: "district_code → dim_geography.level_2_code"
+    
+    - name: is_malta_resident
+      reason: "Renamed to is_domestic_resident"
+      migration: "is_malta_resident → is_domestic_resident"
+    
+    - name: vat_scheme_code
+      reason: "Moved to dim_registration with tax_scheme_key FK"
+      migration: "vat_scheme_code → dim_registration.tax_scheme_key → dim_tax_scheme"
+    
+    - name: gaming_license_type
+      reason: "Renamed to special_license_type (generic)"
+      migration: "gaming_license_type → special_license_type"
+
+  # ============================================================================
+  # Business Rules
+  # ============================================================================
+  business_rules:
+    - rule_id: BR_DP_001
+      description: "Every party must have a country_key"
+      severity: ERROR
+      validation: "country_key IS NOT NULL"
+    
+    - rule_id: BR_DP_002
+      description: "Current version flag must match effective_to date"
+      severity: ERROR
+      validation: "(is_current = 1 AND effective_to IS NULL) OR (is_current = 0 AND effective_to IS NOT NULL)"
+    
+    - rule_id: BR_DP_003
+      description: "display_name must be populated"
+      severity: ERROR
+      validation: "display_name IS NOT NULL AND LENGTH(display_name) > 0"
+    
+    - rule_id: BR_DP_004
+      description: "Individuals must have first_name and last_name"
+      severity: WARNING
+      validation: "party_type_code != 'INDIVIDUAL' OR (first_name IS NOT NULL AND last_name IS NOT NULL)"
+    
+    - rule_id: BR_DP_005
+      description: "Enterprises must have legal_name"
+      severity: WARNING
+      validation: "party_type_code != 'ENTERPRISE' OR legal_name IS NOT NULL"
+    
+    - rule_id: BR_DP_006
+      description: "primary_tax_id should match country format"
+      severity: WARNING
+      validation: "primary_tax_id matches ref_identifier_type.format_regex for country"
+    
+    - rule_id: BR_DP_007
+      description: "Only one current version per party_source_id"
+      severity: ERROR
+      validation: "COUNT(*) = 1 WHERE party_source_id = X AND is_current = 1"
+    
+    - rule_id: BR_DP_008
+      description: "country_code must match country_key"
+      severity: ERROR
+      validation: "country_code = (SELECT country_code FROM dim_country WHERE country_key = dim_party.country_key)"
+
+# ==============================================================================
+# ETL Source Mapping
+# ==============================================================================
+etl_source:
+  source_system: "L2_CANONICAL"
+  source_tables:
+    - table: party.party
+      role: "Primary party record"
+      join: "party_id"
+    - table: party.individual
+      role: "Individual attributes"
+      join: "party_id"
+    - table: party.enterprise
+      role: "Enterprise attributes"
+      join: "party_id"
+    - table: party.party_identifier
+      role: "Multiple identifiers"
+      join: "party_id"
+    - table: party.address
+      role: "Primary address"
+      join: "party_id"
+    - table: party.contact
+      role: "Contact information"
+      join: "party_id"
+    - table: party.party_license
+      role: "Special licenses"
+      join: "party_id"
+  
+  load_strategy: "SCD_TYPE_2"
+  load_frequency: "DAILY"
+  change_detection: "SOURCE_CHECKSUM"
+  
+  key_transformations:
+    - source: "party.party.party_id"
+      target: "party_source_id"
+      description: "Direct mapping of source key"
+    
+    - source: "system_parameter.default_country_code OR party registration country"
+      target: "country_key"
+      transformation: "Lookup country_key from dim_country by country_code"
+    
+    - source: "party.party_identifier (is_tax_identifier = TRUE, is_primary = TRUE)"
+      target: "primary_tax_id"
+      transformation: "Get primary tax identifier value"
+    
+    - source: "party.party_identifier.identifier_type_code"
+      target: "primary_tax_id_type"
+      transformation: "Get identifier type for primary tax ID"
+    
+    - source: "party.address (is_primary = TRUE)"
+      target: "geography_key"
+      transformation: "Lookup from dim_geography by locality_code + country_code"
+
+# ==============================================================================
+# Sample Data
+# ==============================================================================
+sample_data:
+  # Malta Individual
+  - party_key: 1001
+    party_source_id: 1001
+    country_key: 1
+    country_code: "MLT"
+    primary_tax_id: "123456789"
+    primary_tax_id_type: "TIN"
+    national_id_number: "123456M"
+    party_type_code: "INDIVIDUAL"
+    party_type_name: "Individual"
+    first_name: "John"
+    last_name: "Borg"
+    full_name: "John Borg"
+    display_name: "John Borg"
+    date_of_birth: "1980-05-15"
+    gender_code: "M"
+    nationality_code: "MLT"
+    geography_key: 101
+    postal_code: "VLT 1000"
+    city_name: "Valletta"
+    is_domestic_resident: 1
+    tax_status_code: "ACTIVE"
+    tax_status_name: "Active"
+    segment_code: "SMALL"
+    segment_name: "Small Taxpayer"
+    effective_from: "2020-01-01"
+    is_current: 1
+    version_number: 1
+    etl_batch_id: 1
+    etl_load_timestamp: "2025-01-01 00:00:00"
+    etl_source_system: "L2_CANONICAL"
+
+  # Malta Enterprise
+  - party_key: 2001
+    party_source_id: 2001
+    country_key: 1
+    country_code: "MLT"
+    primary_tax_id: "987654321"
+    primary_tax_id_type: "TIN"
+    secondary_id: "MT98765432"
+    secondary_id_type: "VAT"
+    company_registration_id: "C12345"
+    party_type_code: "ENTERPRISE"
+    party_type_name: "Enterprise"
+    legal_name: "ABC Trading Ltd"
+    trading_name: "ABC Trading"
+    display_name: "ABC Trading Ltd"
+    legal_form_code: "LTD"
+    legal_form_name: "Private Limited Company"
+    incorporation_date: "2010-03-15"
+    incorporation_country_code: "MLT"
+    primary_nace_code: "47.11"
+    primary_nace_description: "Retail sale in non-specialised stores"
+    geography_key: 102
+    postal_code: "SLM 1234"
+    city_name: "Sliema"
+    is_domestic_resident: 1
+    tax_status_code: "ACTIVE"
+    segment_code: "MEDIUM"
+    is_vat_registered: 1
+    is_eori_registered: 1
+    effective_from: "2015-01-01"
+    is_current: 1
+    version_number: 2
+    etl_batch_id: 50
+    etl_load_timestamp: "2025-06-01 00:00:00"
+    etl_source_system: "L2_CANONICAL"
+
+  # Sri Lanka Individual
+  - party_key: 3001
+    party_source_id: 3001
+    country_key: 2
+    country_code: "LKA"
+    primary_tax_id: "123456789"
+    primary_tax_id_type: "TIN"
+    national_id_number: "199012345678"
+    party_type_code: "INDIVIDUAL"
+    first_name: "Kumara"
+    last_name: "Perera"
+    full_name: "Kumara Perera"
+    display_name: "Kumara Perera"
+    date_of_birth: "1990-08-20"
+    gender_code: "M"
+    nationality_code: "LKA"
+    geography_key: 201
+    city_name: "Colombo"
+    is_domestic_resident: 1
+    tax_status_code: "ACTIVE"
+    segment_code: "SMALL"
+    effective_from: "2023-01-01"
+    is_current: 1
+    version_number: 1
+    etl_batch_id: 100
+    etl_load_timestamp: "2025-03-01 00:00:00"
+    etl_source_system: "L2_CANONICAL"
+
+  # Moldova Enterprise
+  - party_key: 4001
+    party_source_id: 4001
+    country_key: 3
+    country_code: "MDA"
+    primary_tax_id: "1234567890123"
+    primary_tax_id_type: "IDNO"
+    party_type_code: "ENTERPRISE"
+    legal_name: "Moldtrade SRL"
+    display_name: "Moldtrade SRL"
+    legal_form_code: "SRL"
+    incorporation_country_code: "MDA"
+    geography_key: 301
+    city_name: "Chișinău"
+    is_domestic_resident: 1
+    tax_status_code: "ACTIVE"
+    effective_from: "2018-06-15"
+    is_current: 1
+    version_number: 1
+    etl_batch_id: 150
+    etl_load_timestamp: "2025-04-01 00:00:00"
+    etl_source_system: "L2_CANONICAL"
+
+  # Ukraine Individual
+  - party_key: 5001
+    party_source_id: 5001
+    country_key: 4
+    country_code: "UKR"
+    primary_tax_id: "1234567890"
+    primary_tax_id_type: "IPN"
+    party_type_code: "INDIVIDUAL"
+    first_name: "Oleksandr"
+    last_name: "Shevchenko"
+    full_name: "Oleksandr Shevchenko"
+    display_name: "Oleksandr Shevchenko"
+    date_of_birth: "1985-02-10"
+    gender_code: "M"
+    nationality_code: "UKR"
+    geography_key: 401
+    city_name: "Kyiv"
+    is_domestic_resident: 1
+    tax_status_code: "ACTIVE"
+    effective_from: "2022-01-01"
+    is_current: 1
+    version_number: 1
+    etl_batch_id: 200
+    etl_load_timestamp: "2025-05-01 00:00:00"
+    etl_source_system: "L2_CANONICAL"
+
+  # Lebanon Enterprise
+  - party_key: 6001
+    party_source_id: 6001
+    country_key: 5
+    country_code: "LBN"
+    primary_tax_id: "12345678"
+    primary_tax_id_type: "TIN"
+    secondary_id: "12345678-001"
+    secondary_id_type: "VAT"
+    party_type_code: "ENTERPRISE"
+    legal_name: "Beirut Trading SAL"
+    display_name: "Beirut Trading SAL"
+    legal_form_code: "SAL"
+    incorporation_country_code: "LBN"
+    geography_key: 501
+    city_name: "Beirut"
+    is_domestic_resident: 1
+    tax_status_code: "ACTIVE"
+    effective_from: "2019-01-01"
+    is_current: 1
+    version_number: 1
+    etl_batch_id: 250
+    etl_load_timestamp: "2025-06-01 00:00:00"
+    etl_source_system: "L2_CANONICAL"
+
+# ==============================================================================
+# ClickHouse DDL
+# ==============================================================================
+clickhouse_ddl:
+  database: ta_rdm_warehouse
+  engine: ReplacingMergeTree(version_number)
+  partition_by: "toYYYYMM(effective_from)"
+  order_by: [country_key, party_source_id, effective_from]
+  primary_key: [country_key, party_source_id]
+  
+  ddl: |
+    -- ============================================================================
+    -- TA-RDM L3: dim_party (Generalized Party Dimension)
+    -- ============================================================================
+    -- Version: 2.0.0
+    -- Engine: ReplacingMergeTree(version_number)
+    -- Partition: By effective_from month (YYYYMM)
+    -- ============================================================================
+    
+    CREATE TABLE IF NOT EXISTS ta_rdm_warehouse.dim_party
+    (
+        -- Keys
+        party_key Int64 COMMENT 'Surrogate key',
+        party_source_id Int64 COMMENT 'L2 party.party.party_id',
+        
+        -- Country Context (NEW in v2.0)
+        country_key Int32 COMMENT 'FK to dim_country',
+        country_code FixedString(3) COMMENT 'ISO 3166-1 alpha-3',
+        
+        -- Generic Identifiers (CHANGED in v2.0)
+        primary_tax_id Nullable(String) COMMENT 'Primary tax ID (format varies by country)',
+        primary_tax_id_type Nullable(String) COMMENT 'TIN, IDNO, IDNP, EDRPOU, IPN',
+        secondary_id Nullable(String) COMMENT 'Secondary ID (typically VAT)',
+        secondary_id_type Nullable(String) COMMENT 'VAT, EORI, BRN, etc.',
+        national_id_number Nullable(String) COMMENT 'National identity document',
+        company_registration_id Nullable(String) COMMENT 'Company register number',
+        
+        -- Party Type
+        party_type_code LowCardinality(String) COMMENT 'INDIVIDUAL, ENTERPRISE, etc.',
+        party_type_name Nullable(String),
+        
+        -- Individual Attributes
+        first_name Nullable(String),
+        middle_name Nullable(String),
+        last_name Nullable(String),
+        full_name Nullable(String),
+        date_of_birth Nullable(Date32),
+        gender_code Nullable(FixedString(1)),
+        nationality_code Nullable(FixedString(3)),
+        marital_status_code Nullable(LowCardinality(String)),
+        
+        -- Enterprise Attributes
+        legal_name Nullable(String),
+        trading_name Nullable(String),
+        display_name String COMMENT 'Primary display name',
+        legal_form_code Nullable(LowCardinality(String)),
+        legal_form_name Nullable(String),
+        incorporation_date Nullable(Date32),
+        incorporation_country_code Nullable(FixedString(3)),
+        financial_year_end_month Nullable(UInt8),
+        
+        -- Activity Classification
+        primary_nace_code Nullable(String),
+        primary_nace_description Nullable(String),
+        secondary_nace_code Nullable(String),
+        industry_sector_code Nullable(LowCardinality(String)),
+        industry_sector_name Nullable(String),
+        
+        -- Geographic Location (CHANGED in v2.0 - uses dim_geography)
+        geography_key Nullable(Int32) COMMENT 'FK to dim_geography',
+        postal_code Nullable(String),
+        city_name Nullable(String),
+        address_line_1 Nullable(String),
+        address_line_2 Nullable(String),
+        
+        -- Contact
+        primary_email Nullable(String),
+        primary_phone Nullable(String),
+        mobile_phone Nullable(String),
+        
+        -- Tax Status (CHANGED in v2.0 - generalized)
+        is_domestic_resident UInt8 DEFAULT 1 COMMENT 'Renamed from is_malta_resident',
+        residency_status_code Nullable(LowCardinality(String)),
+        tax_status_code Nullable(LowCardinality(String)),
+        tax_status_name Nullable(String),
+        tax_residence_country Nullable(FixedString(3)),
+        
+        -- Segmentation
+        segment_code Nullable(LowCardinality(String)),
+        segment_name Nullable(String),
+        size_category Nullable(LowCardinality(String)),
+        annual_turnover Nullable(Decimal64(2)),
+        annual_turnover_eur Nullable(Decimal64(2)),
+        employee_count Nullable(Int32),
+        total_assets Nullable(Decimal64(2)),
+        
+        -- Special Licenses (CHANGED in v2.0 - generalized)
+        special_license_type Nullable(String) COMMENT 'Renamed from gaming_license_type',
+        special_license_number Nullable(String),
+        has_special_license UInt8 DEFAULT 0,
+        
+        -- Corporate Group
+        parent_party_key Nullable(Int64),
+        ultimate_parent_party_key Nullable(Int64),
+        group_head_indicator UInt8 DEFAULT 0,
+        
+        -- Registration Flags
+        is_vat_registered UInt8 DEFAULT 0,
+        is_eori_registered UInt8 DEFAULT 0,
+        is_crs_reportable UInt8 DEFAULT 0,
+        is_fatca_reportable UInt8 DEFAULT 0,
+        
+        -- SCD Type 2
+        effective_from Date32,
+        effective_to Nullable(Date32),
+        is_current UInt8 DEFAULT 1,
+        version_number Int32 DEFAULT 1,
+        version_reason Nullable(String),
+        source_checksum Nullable(String),
+        
+        -- ETL Metadata
+        etl_batch_id Int64,
+        etl_load_timestamp DateTime64(3) DEFAULT now64(),
+        etl_source_system LowCardinality(String) DEFAULT 'L2_CANONICAL'
+    )
+    ENGINE = ReplacingMergeTree(version_number)
+    PARTITION BY toYYYYMM(effective_from)
+    ORDER BY (country_key, party_source_id, effective_from)
+    SETTINGS index_granularity = 8192;
+    
+    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_dim_party_tax_id 
+        ON ta_rdm_warehouse.dim_party (primary_tax_id, country_code) 
+        TYPE bloom_filter GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_dim_party_secondary_id 
+        ON ta_rdm_warehouse.dim_party (secondary_id, secondary_id_type, country_code) 
+        TYPE bloom_filter GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_dim_party_name 
+        ON ta_rdm_warehouse.dim_party (display_name) 
+        TYPE ngrambf_v1(3, 256, 2, 0) GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_dim_party_geography 
+        ON ta_rdm_warehouse.dim_party (geography_key) 
+        TYPE minmax GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_dim_party_current 
+        ON ta_rdm_warehouse.dim_party (is_current) 
+        TYPE minmax GRANULARITY 1;
+
+# ==============================================================================
+# Integration Guide
+# ==============================================================================
+integration:
+  description: |
+    dim_party is the core conformed dimension for all taxpayer/entity context.
+    All fact tables should reference party_key for party dimensions.
+    
+    Key changes from v1.0.0 (Malta-specific):
+    - country_key required for multi-country support
+    - Generic identifier pattern replaces Malta-specific columns
+    - bridge_party_identifier for full identifier history
+    - geography_key replaces Malta-specific locality codes
+  
+  affected_facts:
+    - fact_filing: "party_key for taxpayer who filed"
+    - fact_assessment: "party_key for assessed taxpayer"
+    - fact_payment: "party_key for payer"
+    - fact_refund: "party_key for refund recipient"
+    - fact_customs_declaration: "party_key for declarant/importer/exporter"
+    - fact_compliance_event: "party_key for subject of compliance action"
+    - fact_risk_score: "party_key for risk-scored party"
+  
+  related_dimensions:
+    - dim_country: "country_key FK for party jurisdiction"
+    - dim_geography: "geography_key FK for party location"
+    - bridge_party_identifier: "party_key FK for all identifiers"
+  
+  query_examples:
+    - description: "Get current party by primary tax ID"
+      sql: |
+        SELECT * 
+        FROM ta_rdm_warehouse.dim_party
+        WHERE primary_tax_id = '123456789'
+          AND country_code = 'MLT'
+          AND is_current = 1
+    
+    - description: "Get all identifiers for a party"
+      sql: |
+        SELECT p.display_name, b.identifier_type_code, b.identifier_value
+        FROM ta_rdm_warehouse.dim_party p
+        JOIN ta_rdm_warehouse.bridge_party_identifier b ON p.party_key = b.party_key
+        WHERE p.party_key = 1001
+          AND b.is_current = 1
+    
+    - description: "Count parties by country and segment"
+      sql: |
+        SELECT 
+            c.country_name,
+            p.segment_code,
+            COUNT(*) as party_count
+        FROM ta_rdm_warehouse.dim_party p
+        JOIN ta_rdm_warehouse.dim_country c ON p.country_key = c.country_key
+        WHERE p.is_current = 1
+        GROUP BY c.country_name, p.segment_code
+        ORDER BY c.country_name, p.segment_code
+
+# ==============================================================================
+# Validation Criteria
+# ==============================================================================
+# | Check                        | Expected                                     |
+# |------------------------------|----------------------------------------------|
+# | Surrogate key                | party_key (Int64)                            |
+# | Natural key                  | party_source_id + country_code               |
+# | SCD Type                     | Type 2 (effective_from/to, is_current)       |
+# | country_key added            | FK to dim_country (required)                 |
+# | Malta-specific columns       | 12 columns remediated                        |
+# | Generic identifier pattern   | primary_tax_id + primary_tax_id_type         |
+# | Geography integration        | geography_key FK to dim_geography            |
+# | Bridge table                 | bridge_party_identifier for all identifiers  |
+# | Sample data                  | 6 parties across 5 countries                 |
+# | Business rules               | 8 rules defined                              |
+# | ClickHouse DDL               | Included with indexes                        |
+# | Integration guide            | FK patterns and query examples               |
+# ==============================================================================

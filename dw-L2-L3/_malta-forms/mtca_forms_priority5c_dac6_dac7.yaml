@@ -1,0 +1,1456 @@
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_entity_sellers"
+                column: "residence_country"
+              ors_mapping:
+                table: "mtca_ors.dac7_entity_sellers"
+                column: "residence_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "entity_address_street"
+              field_code: "Street"
+              field_name_en: "Street Address"
+              field_name_mt: "Indirizz tat-Triq"
+              field_description: "Street name and number"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Identity/dpi:EntitySeller/dpi:Standard/dpi:Address/dpi:Street"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "StringMax200_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_entity_sellers"
+                column: "address_street"
+              ors_mapping:
+                table: "mtca_ors.dac7_entity_sellers"
+                column: "address_street"
+                data_type: "String"
+
+            - field_id: "entity_address_country"
+              field_code: "CountryCode"
+              field_name_en: "Country"
+              field_name_mt: "PajjiÅ¼"
+              field_description: "ISO country code of address"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Identity/dpi:EntitySeller/dpi:Standard/dpi:Address/dpi:CountryCode"
+              validation_rules:
+                - rule_id: "DAC7_SE_004"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO country code"
+                  rule_expression: "IN(iso_3166_1_alpha2)"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_3166_1_alpha2"
+              oecd_element_ref: "CountryCode_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_entity_sellers"
+                column: "address_country"
+              ors_mapping:
+                table: "mtca_ors.dac7_entity_sellers"
+                column: "address_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "entity_financial_account_id"
+              field_code: "FinancialAccountId"
+              field_name_en: "Financial Account Identifier"
+              field_name_mt: "Identifikatur tal-Kont Finanzjarju"
+              field_description: "IBAN or other account identifier"
+              data_type: "STRING"
+              format: null
+              max_length: 34
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Identity/dpi:EntitySeller/dpi:FinancialIdentifier/dpi:Identifier"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "FinancialIdentifier_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_entity_sellers"
+                column: "financial_account_id"
+              ors_mapping:
+                table: "mtca_ors.dac7_entity_sellers"
+                column: "financial_account_id"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section: Relevant Activities
+        # ----------------------------------------------------------------------
+        - section_id: "RELEVANT_ACTIVITIES"
+          section_name: "Relevant Activities"
+          section_description: "Information about seller activities and consideration"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "dpi:DPI_OECD/dpi:DPIBody/dpi:ReportableSeller/dpi:RelevantActivities"
+          fields:
+            - field_id: "activity_type"
+              field_code: "ActivityType"
+              field_name_en: "Type of Relevant Activity"
+              field_name_mt: "Tip ta' AttivitÃ  Rilevanti"
+              field_description: "Category of relevant activity performed"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:RelevantActivities"
+              validation_rules:
+                - rule_id: "DAC7_ACT_001"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid activity type"
+                  rule_expression: "IN(dac7_activity_types)"
+                  error_message_en: "Invalid activity type"
+                  error_message_mt: "Tip ta' attivitÃ  mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "DPI901"
+                  description_en: "Rental of immovable property"
+                - code: "DPI902"
+                  description_en: "Personal services"
+                - code: "DPI903"
+                  description_en: "Sale of goods"
+                - code: "DPI904"
+                  description_en: "Rental of any mode of transport"
+              reference_table: "dac7_activity_types"
+              oecd_element_ref: "RelevantActivities_EnumType"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "activity_type"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "activity_type"
+                data_type: "Enum8('DPI901'=1,'DPI902'=2,'DPI903'=3,'DPI904'=4)"
+
+            - field_id: "consideration_q1"
+              field_code: "ConsiderationQ1"
+              field_name_en: "Consideration - Q1"
+              field_name_mt: "Konsiderazzjoni - Q1"
+              field_description: "Total consideration paid/credited in Q1"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Consideration/dpi:ConsQ1"
+              validation_rules:
+                - rule_id: "DAC7_ACT_002"
+                  rule_type: "range"
+                  rule_description: "Amount must be non-negative"
+                  rule_expression: "consideration_q1 >= 0"
+                  error_message_en: "Consideration cannot be negative"
+                  error_message_mt: "Il-konsiderazzjoni ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MonAmnt_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "consideration_q1"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "consideration_q1"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "consideration_q2"
+              field_code: "ConsiderationQ2"
+              field_name_en: "Consideration - Q2"
+              field_name_mt: "Konsiderazzjoni - Q2"
+              field_description: "Total consideration paid/credited in Q2"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Consideration/dpi:ConsQ2"
+              validation_rules:
+                - rule_id: "DAC7_ACT_003"
+                  rule_type: "range"
+                  rule_description: "Amount must be non-negative"
+                  rule_expression: "consideration_q2 >= 0"
+                  error_message_en: "Consideration cannot be negative"
+                  error_message_mt: "Il-konsiderazzjoni ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MonAmnt_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "consideration_q2"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "consideration_q2"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "consideration_q3"
+              field_code: "ConsiderationQ3"
+              field_name_en: "Consideration - Q3"
+              field_name_mt: "Konsiderazzjoni - Q3"
+              field_description: "Total consideration paid/credited in Q3"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Consideration/dpi:ConsQ3"
+              validation_rules:
+                - rule_id: "DAC7_ACT_004"
+                  rule_type: "range"
+                  rule_description: "Amount must be non-negative"
+                  rule_expression: "consideration_q3 >= 0"
+                  error_message_en: "Consideration cannot be negative"
+                  error_message_mt: "Il-konsiderazzjoni ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MonAmnt_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "consideration_q3"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "consideration_q3"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "consideration_q4"
+              field_code: "ConsiderationQ4"
+              field_name_en: "Consideration - Q4"
+              field_name_mt: "Konsiderazzjoni - Q4"
+              field_description: "Total consideration paid/credited in Q4"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Consideration/dpi:ConsQ4"
+              validation_rules:
+                - rule_id: "DAC7_ACT_005"
+                  rule_type: "range"
+                  rule_description: "Amount must be non-negative"
+                  rule_expression: "consideration_q4 >= 0"
+                  error_message_en: "Consideration cannot be negative"
+                  error_message_mt: "Il-konsiderazzjoni ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MonAmnt_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "consideration_q4"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "consideration_q4"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "consideration_currency"
+              field_code: "ConsiderationCurrency"
+              field_name_en: "Currency"
+              field_name_mt: "Munita"
+              field_description: "Currency code for consideration amounts"
+              data_type: "CODE"
+              format: "AAA"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "EUR"
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Consideration/@currCode"
+              validation_rules:
+                - rule_id: "DAC7_ACT_006"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO 4217 currency code"
+                  rule_expression: "IN(iso_4217)"
+                  error_message_en: "Invalid currency code"
+                  error_message_mt: "KodiÄ‹i tal-munita mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_4217"
+              oecd_element_ref: "currCode_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "consideration_currency"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "consideration_currency"
+                data_type: "FixedString(3)"
+
+            - field_id: "fees_q1"
+              field_code: "FeesQ1"
+              field_name_en: "Fees/Commissions/Taxes Withheld - Q1"
+              field_name_mt: "Tariffi/Kummissjonijiet/Taxxi MiÅ¼muma - Q1"
+              field_description: "Total fees, commissions, and taxes withheld in Q1"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Fees/dpi:FeesQ1"
+              validation_rules:
+                - rule_id: "DAC7_ACT_007"
+                  rule_type: "range"
+                  rule_description: "Amount must be non-negative"
+                  rule_expression: "fees_q1 >= 0"
+                  error_message_en: "Fees cannot be negative"
+                  error_message_mt: "It-tariffi ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MonAmnt_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "fees_q1"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "fees_q1"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "fees_q2"
+              field_code: "FeesQ2"
+              field_name_en: "Fees/Commissions/Taxes Withheld - Q2"
+              field_name_mt: "Tariffi/Kummissjonijiet/Taxxi MiÅ¼muma - Q2"
+              field_description: "Total fees, commissions, and taxes withheld in Q2"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Fees/dpi:FeesQ2"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MonAmnt_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "fees_q2"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "fees_q2"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "fees_q3"
+              field_code: "FeesQ3"
+              field_name_en: "Fees/Commissions/Taxes Withheld - Q3"
+              field_name_mt: "Tariffi/Kummissjonijiet/Taxxi MiÅ¼muma - Q3"
+              field_description: "Total fees, commissions, and taxes withheld in Q3"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Fees/dpi:FeesQ3"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MonAmnt_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "fees_q3"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "fees_q3"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "fees_q4"
+              field_code: "FeesQ4"
+              field_name_en: "Fees/Commissions/Taxes Withheld - Q4"
+              field_name_mt: "Tariffi/Kummissjonijiet/Taxxi MiÅ¼muma - Q4"
+              field_description: "Total fees, commissions, and taxes withheld in Q4"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: false
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:Fees/dpi:FeesQ4"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MonAmnt_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "fees_q4"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "fees_q4"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "number_of_activities"
+              field_code: "NumberOfActivities"
+              field_name_en: "Number of Relevant Activities"
+              field_name_mt: "Numru ta' Attivitajiet Rilevanti"
+              field_description: "Total count of relevant activities in the period"
+              data_type: "INTEGER"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:NumberOfActivities"
+              validation_rules:
+                - rule_id: "DAC7_ACT_008"
+                  rule_type: "range"
+                  rule_description: "Count must be positive"
+                  rule_expression: "number_of_activities > 0"
+                  error_message_en: "Number of activities must be positive"
+                  error_message_mt: "In-numru ta' attivitajiet irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "integer"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_activities"
+                column: "number_of_activities"
+              ors_mapping:
+                table: "mtca_ors.dac7_activities"
+                column: "number_of_activities"
+                data_type: "UInt32"
+
+        # ----------------------------------------------------------------------
+        # Section: Immovable Property (for property rental activities)
+        # ----------------------------------------------------------------------
+        - section_id: "IMMOVABLE_PROPERTY"
+          section_name: "Immovable Property"
+          section_description: "Details of immovable property for rental activities"
+          repeatable: true
+          conditional: true
+          condition_logic: "activity_type = 'DPI901'"
+          xml_element: "dpi:DPI_OECD/dpi:DPIBody/dpi:ReportableSeller/dpi:ImmovableProperty"
+          fields:
+            - field_id: "property_address_street"
+              field_code: "PropertyStreet"
+              field_name_en: "Property Street Address"
+              field_name_mt: "Indirizz tat-Triq tal-ProprjetÃ "
+              field_description: "Street address of the property"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:PropertyListing/dpi:Address/dpi:Street"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "StringMax200_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_properties"
+                column: "address_street"
+              ors_mapping:
+                table: "mtca_ors.dac7_properties"
+                column: "address_street"
+                data_type: "String"
+
+            - field_id: "property_address_city"
+              field_code: "PropertyCity"
+              field_name_en: "Property City"
+              field_name_mt: "Belt tal-ProprjetÃ "
+              field_description: "City where property is located"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:PropertyListing/dpi:Address/dpi:City"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "StringMax200_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_properties"
+                column: "address_city"
+              ors_mapping:
+                table: "mtca_ors.dac7_properties"
+                column: "address_city"
+                data_type: "String"
+
+            - field_id: "property_address_postcode"
+              field_code: "PropertyPostCode"
+              field_name_en: "Property Postal Code"
+              field_name_mt: "KodiÄ‹i Postali tal-ProprjetÃ "
+              field_description: "Postal code of property location"
+              data_type: "STRING"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:PropertyListing/dpi:Address/dpi:PostCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "StringMax200_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_properties"
+                column: "address_postcode"
+              ors_mapping:
+                table: "mtca_ors.dac7_properties"
+                column: "address_postcode"
+                data_type: "Nullable(String)"
+
+            - field_id: "property_address_country"
+              field_code: "PropertyCountryCode"
+              field_name_en: "Property Country"
+              field_name_mt: "PajjiÅ¼ tal-ProprjetÃ "
+              field_description: "Country where property is located"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:PropertyListing/dpi:Address/dpi:CountryCode"
+              validation_rules:
+                - rule_id: "DAC7_PROP_001"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid EU Member State code"
+                  rule_expression: "IN(eu_member_states)"
+                  error_message_en: "Property must be located in an EU Member State"
+                  error_message_mt: "Il-proprjetÃ  trid tkun f'Istat Membru tal-UE"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_3166_1_alpha2_eu"
+              oecd_element_ref: "CountryCode_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_properties"
+                column: "address_country"
+              ors_mapping:
+                table: "mtca_ors.dac7_properties"
+                column: "address_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "land_registration_number"
+              field_code: "LandRegistrationNumber"
+              field_name_en: "Land Registration Number"
+              field_name_mt: "Numru tar-ReÄ¡istrazzjoni tal-Art"
+              field_description: "Land registration number if available"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:PropertyListing/dpi:LandRegistrationNumber"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "StringMax200_Type"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_properties"
+                column: "land_reg_number"
+              ors_mapping:
+                table: "mtca_ors.dac7_properties"
+                column: "land_reg_number"
+                data_type: "Nullable(String)"
+
+            - field_id: "rental_days"
+              field_code: "NumberOfDaysRented"
+              field_name_en: "Number of Days Rented"
+              field_name_mt: "Numru ta' Ä ranet Mikrijin"
+              field_description: "Total number of days property was rented during period"
+              data_type: "INTEGER"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "dpi:PropertyListing/dpi:NumberOfDaysRented"
+              validation_rules:
+                - rule_id: "DAC7_PROP_002"
+                  rule_type: "range"
+                  rule_description: "Days must be between 0 and 366"
+                  rule_expression: "rental_days >= 0 AND rental_days <= 366"
+                  error_message_en: "Number of days must be between 0 and 366"
+                  error_message_mt: "In-numru ta' Ä¡ranet irid ikun bejn 0 u 366"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "integer"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_properties"
+                column: "rental_days"
+              ors_mapping:
+                table: "mtca_ors.dac7_properties"
+                column: "rental_days"
+                data_type: "UInt16"
+
+      xml_schema:
+        namespace: "urn:eu:taxud:dac7:v1"
+        root_element: "DPI_OECD"
+        schema_version: "1.0"
+        schema_url: "https://taxation-customs.ec.europa.eu/system/files/2022-12/dac7_v1.0.xsd"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "DAC7_REGISTRATION"
+          relationship_type: "prerequisite"
+          relationship_description: "Platform operator must be registered before submitting DAC7 reports"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Annual (by February 28)"
+        partner_authorities: "EU Member States (via CCN/CSI)"
+        encryption_required: true
+        transmission_protocol: "CCN Mail"
+
+      submission_workflow:
+        authentication_required: "CFR e-ID credentials"
+        signature_required: true
+        validation_type: "XSD schema validation and business rules"
+        acknowledgment_type: "Receipt confirmation"
+
+  # ==========================================================================
+  # DAC7_REGISTRATION: Platform Operator Registration
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "DAC7_REGISTRATION"
+        form_name_en: "Digital Platform Operator Registration"
+        form_name_mt: "ReÄ¡istrazzjoni ta' Operatur ta' Pjattaforma DiÄ¡itali"
+        version: "1.0"
+        effective_from: "2023-01-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive 2021/514/EU (DAC7)"
+        subsidiary_legislation:
+          - "S.L.123.127 - Cooperation with Other Jurisdictions on Tax Matters Regulations"
+          - "LN 8/2023 - Reporting Obligations of Digital Platform Operators Rules"
+        administering_authority: "CFR"
+        tax_type: "Exchange of Information"
+        taxpayer_category: "Platform Operator"
+        filing_frequency: "Once (initial registration)"
+        filing_deadline: "Before January 1, 2023 or commencement of platform activities"
+        submission_method: "Electronic Portal"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: null
+        exchange_partner: null
+        source_url: "https://cfr.gov.mt/en/eServices/Pages/DAC7.aspx"
+        notes: |
+          Platform operators qualifying under DAC7 must register with CFR before
+          submitting annual reports. Registration is required for platform operators
+          resident in Malta, or non-EU operators choosing Malta as their single
+          registration Member State. Registration provides portal access for XML
+          submission and assigns unique identifiers.
+
+      sections:
+        - section_id: "OPERATOR_INFO"
+          section_name: "Platform Operator Information"
+          section_description: "Information about the platform operator"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "operator_tin"
+              field_code: "TIN"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Malta TIN of the platform operator"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "DAC7_REG_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Malta TIN"
+                  rule_expression: "^[0-9]{8,9}$"
+                  error_message_en: "Invalid Malta TIN format"
+                  error_message_mt: "Format tat-TIN ta' Malta mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_registrations"
+                column: "tin"
+              ors_mapping:
+                table: "mtca_ors.dac7_registrations"
+                column: "tin"
+                data_type: "String"
+
+            - field_id: "operator_name"
+              field_code: "LegalName"
+              field_name_en: "Legal Name"
+              field_name_mt: "Isem Legali"
+              field_description: "Full legal name of the platform operator"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_registrations"
+                column: "legal_name"
+              ors_mapping:
+                table: "mtca_ors.dac7_registrations"
+                column: "legal_name"
+                data_type: "String"
+
+            - field_id: "platform_names"
+              field_code: "PlatformNames"
+              field_name_en: "Platform Trading Name(s)"
+              field_name_mt: "Isem/Ismijiet KummerÄ‹jali tal-Pjattaforma"
+              field_description: "Trading names of the platform(s) operated"
+              data_type: "TEXT"
+              format: null
+              max_length: 1000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_registrations"
+                column: "platform_names"
+              ors_mapping:
+                table: "mtca_ors.dac7_registrations"
+                column: "platform_names"
+                data_type: "String"
+
+            - field_id: "platform_urls"
+              field_code: "PlatformURLs"
+              field_name_en: "Platform Website URL(s)"
+              field_name_mt: "URL(s) tas-Sit web tal-Pjattaforma"
+              field_description: "Website addresses of the platform(s)"
+              data_type: "TEXT"
+              format: null
+              max_length: 1000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_registrations"
+                column: "platform_urls"
+              ors_mapping:
+                table: "mtca_ors.dac7_registrations"
+                column: "platform_urls"
+                data_type: "String"
+
+            - field_id: "relevant_activities"
+              field_code: "RelevantActivities"
+              field_name_en: "Types of Relevant Activities"
+              field_name_mt: "Tipi ta' Attivitajiet Rilevanti"
+              field_description: "Categories of relevant activities facilitated by the platform"
+              data_type: "ARRAY"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "DAC7_REG_002"
+                  rule_type: "codelist"
+                  rule_description: "Must select at least one activity type"
+                  rule_expression: "ARRAY_LENGTH >= 1"
+                  error_message_en: "At least one activity type must be selected"
+                  error_message_mt: "Mill-inqas tip wieÄ§ed ta' attivitÃ  gÄ§andu jintgÄ§aÅ¼el"
+                  severity: "error"
+              allowed_values:
+                - code: "DPI901"
+                  description_en: "Rental of immovable property"
+                - code: "DPI902"
+                  description_en: "Personal services"
+                - code: "DPI903"
+                  description_en: "Sale of goods"
+                - code: "DPI904"
+                  description_en: "Rental of any mode of transport"
+              reference_table: "dac7_activity_types"
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_reg_activities"
+                column: "activity_type"
+              ors_mapping:
+                table: "mtca_ors.dac7_registrations"
+                column: "relevant_activities"
+                data_type: "Array(String)"
+
+            - field_id: "registration_type"
+              field_code: "RegistrationType"
+              field_name_en: "Registration Type"
+              field_name_mt: "Tip ta' ReÄ¡istrazzjoni"
+              field_description: "Basis for Malta registration"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "DAC7_REG_003"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid registration type"
+                  rule_expression: "IN('RESIDENT','NON_EU_SINGLE')"
+                  error_message_en: "Invalid registration type"
+                  error_message_mt: "Tip ta' reÄ¡istrazzjoni mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "RESIDENT"
+                  description_en: "Resident in Malta"
+                - code: "NON_EU_SINGLE"
+                  description_en: "Non-EU operator - Malta as single registration MS"
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_registrations"
+                column: "registration_type"
+              ors_mapping:
+                table: "mtca_ors.dac7_registrations"
+                column: "registration_type"
+                data_type: "Enum8('RESIDENT'=1,'NON_EU_SINGLE'=2)"
+
+            - field_id: "contact_name"
+              field_code: "ContactName"
+              field_name_en: "Contact Person Name"
+              field_name_mt: "Isem tal-Persuna ta' Kuntatt"
+              field_description: "Name of the contact person for DAC7 matters"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_registrations"
+                column: "contact_name"
+              ors_mapping:
+                table: "mtca_ors.dac7_registrations"
+                column: "contact_name"
+                data_type: "String"
+
+            - field_id: "contact_email"
+              field_code: "ContactEmail"
+              field_name_en: "Contact Email"
+              field_name_mt: "Email ta' Kuntatt"
+              field_description: "Email address for DAC7 correspondence"
+              data_type: "EMAIL"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "DAC7_REG_004"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid email format"
+                  rule_expression: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                  error_message_en: "Invalid email format"
+                  error_message_mt: "Format tal-email mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "dac7_registrations"
+                column: "contact_email"
+              ors_mapping:
+                table: "mtca_ors.dac7_registrations"
+                column: "contact_email"
+                data_type: "String"
+
+      xml_schema: null
+
+      attachments: []
+
+      related_forms:
+        - form_code: "DAC7_REPORT"
+          relationship_type: "enables"
+          relationship_description: "Registration enables submission of DAC7 reports"
+
+      exchange_mechanism: null
+
+      submission_workflow:
+        authentication_required: "CFR e-ID credentials"
+        signature_required: false
+        validation_type: "Business rules"
+        acknowledgment_type: "Registration confirmation and portal access"
+
+# ============================================================================
+# Reference Tables
+# ============================================================================
+reference_tables:
+  dac6_hallmark_categories:
+    - code: "A"
+      description_en: "Generic hallmarks linked to Main Benefit Test"
+      description_mt: "Hallmarks Ä¡eneriÄ‹i marbuta mat-Test tal-BenefiÄ‹Ä‹ju PrinÄ‹ipali"
+    - code: "B"
+      description_en: "Specific hallmarks linked to Main Benefit Test"
+      description_mt: "Hallmarks speÄ‹ifiÄ‹i marbuta mat-Test tal-BenefiÄ‹Ä‹ju PrinÄ‹ipali"
+    - code: "C"
+      description_en: "Specific hallmarks for cross-border transactions"
+      description_mt: "Hallmarks speÄ‹ifiÄ‹i gÄ§al tranÅ¼azzjonijiet transkonfinali"
+    - code: "D"
+      description_en: "Automatic exchange undermining hallmarks"
+      description_mt: "Hallmarks li jdgÄ§ajfu l-iskambju awtomatiku"
+    - code: "E"
+      description_en: "Transfer pricing hallmarks"
+      description_mt: "Hallmarks tal-prezzijiet tat-trasferiment"
+
+  dac6_hallmarks:
+    # Category A
+    - code: "DAC6A1"
+      category: "A"
+      description_en: "Confidentiality condition"
+      mbt_required: true
+    - code: "DAC6A2a"
+      category: "A"
+      description_en: "Fee linked to tax advantage - amount"
+      mbt_required: true
+    - code: "DAC6A2b"
+      category: "A"
+      description_en: "Fee linked to tax advantage - contingent/refundable"
+      mbt_required: true
+    - code: "DAC6A3"
+      category: "A"
+      description_en: "Standardised documentation/structure"
+      mbt_required: true
+    # Category B
+    - code: "DAC6B1"
+      category: "B"
+      description_en: "Acquiring loss-making company"
+      mbt_required: true
+    - code: "DAC6B2"
+      category: "B"
+      description_en: "Converting income to lower-taxed categories"
+      mbt_required: true
+    - code: "DAC6B3"
+      category: "B"
+      description_en: "Circular transactions with no commercial function"
+      mbt_required: true
+    # Category C
+    - code: "DAC6C1a"
+      category: "C"
+      description_en: "Deductible payments - no tax residence"
+      mbt_required: false
+    - code: "DAC6C1bi"
+      category: "C"
+      description_en: "Deductible payments - non-cooperative jurisdiction"
+      mbt_required: false
+    - code: "DAC6C1bii"
+      category: "C"
+      description_en: "Deductible payments - zero/almost zero tax"
+      mbt_required: false
+    - code: "DAC6C1c"
+      category: "C"
+      description_en: "Deductible payments - full exemption"
+      mbt_required: false
+    - code: "DAC6C1d"
+      category: "C"
+      description_en: "Deductible payments - preferential regime"
+      mbt_required: false
+    - code: "DAC6C2"
+      category: "C"
+      description_en: "Multiple depreciation deductions"
+      mbt_required: false
+    - code: "DAC6C3"
+      category: "C"
+      description_en: "Relief from double taxation circumvention"
+      mbt_required: false
+    - code: "DAC6C4"
+      category: "C"
+      description_en: "Transfer of assets with material valuation difference"
+      mbt_required: false
+    # Category D
+    - code: "DAC6D1a"
+      category: "D"
+      description_en: "Account not being a financial account"
+      mbt_required: false
+    - code: "DAC6D1b"
+      category: "D"
+      description_en: "Recharacterising income/capital"
+      mbt_required: false
+    - code: "DAC6D1c"
+      category: "D"
+      description_en: "Transfer to non-reporting institutions"
+      mbt_required: false
+    - code: "DAC6D1d"
+      category: "D"
+      description_en: "Transfer to non-participating jurisdictions"
+      mbt_required: false
+    - code: "DAC6D1e"
+      category: "D"
+      description_en: "Misclassifying legal arrangements"
+      mbt_required: false
+    - code: "DAC6D1f"
+      category: "D"
+      description_en: "Use of entities without substance"
+      mbt_required: false
+    - code: "DAC6D1Other"
+      category: "D"
+      description_en: "Other arrangement undermining CRS"
+      mbt_required: false
+    - code: "DAC6D2"
+      category: "D"
+      description_en: "Opaque offshore structures"
+      mbt_required: false
+    # Category E
+    - code: "DAC6E1"
+      category: "E"
+      description_en: "Use of unilateral safe harbour rules"
+      mbt_required: false
+    - code: "DAC6E2"
+      category: "E"
+      description_en: "Hard-to-value intangibles transfers"
+      mbt_required: false
+    - code: "DAC6E3"
+      category: "E"
+      description_en: "Cross-border transfer with >50% EBIT impact"
+      mbt_required: false
+
+  dac7_activity_types:
+    - code: "DPI901"
+      description_en: "Rental of immovable property"
+      description_mt: "Kiri ta' proprjetÃ  immobbli"
+    - code: "DPI902"
+      description_en: "Personal services"
+      description_mt: "Servizzi personali"
+    - code: "DPI903"
+      description_en: "Sale of goods"
+      description_mt: "BejgÄ§ ta' oÄ¡Ä¡etti"
+    - code: "DPI904"
+      description_en: "Rental of any mode of transport"
+      description_mt: "Kiri ta' kwalunkwe mod ta' trasport"
+
+  eu_member_states:
+    - code: "AT"
+      name: "Austria"
+    - code: "BE"
+      name: "Belgium"
+    - code: "BG"
+      name: "Bulgaria"
+    - code: "HR"
+      name: "Croatia"
+    - code: "CY"
+      name: "Cyprus"
+    - code: "CZ"
+      name: "Czech Republic"
+    - code: "DK"
+      name: "Denmark"
+    - code: "EE"
+      name: "Estonia"
+    - code: "FI"
+      name: "Finland"
+    - code: "FR"
+      name: "France"
+    - code: "DE"
+      name: "Germany"
+    - code: "GR"
+      name: "Greece"
+    - code: "HU"
+      name: "Hungary"
+    - code: "IE"
+      name: "Ireland"
+    - code: "IT"
+      name: "Italy"
+    - code: "LV"
+      name: "Latvia"
+    - code: "LT"
+      name: "Lithuania"
+    - code: "LU"
+      name: "Luxembourg"
+    - code: "MT"
+      name: "Malta"
+    - code: "NL"
+      name: "Netherlands"
+    - code: "PL"
+      name: "Poland"
+    - code: "PT"
+      name: "Portugal"
+    - code: "RO"
+      name: "Romania"
+    - code: "SK"
+      name: "Slovakia"
+    - code: "SI"
+      name: "Slovenia"
+    - code: "ES"
+      name: "Spain"
+    - code: "SE"
+      name: "Sweden"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  exchange_db:
+    tables:
+      # DAC6 Tables
+      - legacy_table: "dac6_messages"
+        ors_table: "mtca_ors.dac6_messages"
+        description: "DAC6 message header records"
+        key_columns:
+          - legacy: "message_id"
+            ors: "message_id"
+        column_mappings:
+          - legacy: "sender_tin"
+            ors: "sending_entity_in"
+          - legacy: "msg_ref"
+            ors: "message_ref_id"
+          - legacy: "msg_type"
+            ors: "message_type"
+          - legacy: "created_date"
+            ors: "created_timestamp"
+
+      - legacy_table: "dac6_disclosures"
+        ors_table: "mtca_ors.dac6_disclosures"
+        description: "DAC6 arrangement disclosure records"
+        key_columns:
+          - legacy: "disclosure_id"
+            ors: "disclosure_id"
+
+      - legacy_table: "dac6_disclosers"
+        ors_table: "mtca_ors.dac6_disclosers"
+        description: "DAC6 disclosing person records"
+        key_columns:
+          - legacy: "discloser_id"
+            ors: "discloser_id"
+
+      - legacy_table: "dac6_taxpayers"
+        ors_table: "mtca_ors.dac6_taxpayers"
+        description: "DAC6 relevant taxpayer records"
+        key_columns:
+          - legacy: "taxpayer_id"
+            ors: "taxpayer_id"
+
+      - legacy_table: "dac6_intermediaries"
+        ors_table: "mtca_ors.dac6_intermediaries"
+        description: "DAC6 intermediary records"
+        key_columns:
+          - legacy: "intermediary_id"
+            ors: "intermediary_id"
+
+      - legacy_table: "dac6_hallmarks"
+        ors_table: "mtca_ors.dac6_hallmarks"
+        description: "DAC6 hallmark records"
+        key_columns:
+          - legacy: "hallmark_id"
+            ors: "hallmark_id"
+
+      - legacy_table: "dac6_registrations"
+        ors_table: "mtca_ors.dac6_registrations"
+        description: "DAC6 intermediary/taxpayer registrations"
+        key_columns:
+          - legacy: "registration_id"
+            ors: "registration_id"
+
+      # DAC7 Tables
+      - legacy_table: "dac7_messages"
+        ors_table: "mtca_ors.dac7_messages"
+        description: "DAC7 message header records"
+        key_columns:
+          - legacy: "message_id"
+            ors: "message_id"
+
+      - legacy_table: "dac7_platform_operators"
+        ors_table: "mtca_ors.dac7_platform_operators"
+        description: "DAC7 platform operator records"
+        key_columns:
+          - legacy: "operator_id"
+            ors: "operator_id"
+
+      - legacy_table: "dac7_sellers"
+        ors_table: "mtca_ors.dac7_sellers"
+        description: "DAC7 individual seller records"
+        key_columns:
+          - legacy: "seller_id"
+            ors: "seller_id"
+
+      - legacy_table: "dac7_entity_sellers"
+        ors_table: "mtca_ors.dac7_entity_sellers"
+        description: "DAC7 entity seller records"
+        key_columns:
+          - legacy: "entity_seller_id"
+            ors: "entity_seller_id"
+
+      - legacy_table: "dac7_activities"
+        ors_table: "mtca_ors.dac7_activities"
+        description: "DAC7 relevant activity records"
+        key_columns:
+          - legacy: "activity_id"
+            ors: "activity_id"
+
+      - legacy_table: "dac7_properties"
+        ors_table: "mtca_ors.dac7_properties"
+        description: "DAC7 immovable property records"
+        key_columns:
+          - legacy: "property_id"
+            ors: "property_id"
+
+      - legacy_table: "dac7_registrations"
+        ors_table: "mtca_ors.dac7_registrations"
+        description: "DAC7 platform operator registrations"
+        key_columns:
+          - legacy: "registration_id"
+            ors: "registration_id"
+
+# ============================================================================
+# Form Relationships
+# ============================================================================
+form_relationships:
+  dac6_workflow:
+    - step: 1
+      form: "DAC6_REGISTRATION"
+      description: "Register as intermediary or taxpayer"
+    - step: 2
+      form: "DAC6_REPORT"
+      description: "Submit cross-border arrangement disclosure"
+
+  dac7_workflow:
+    - step: 1
+      form: "DAC7_REGISTRATION"
+      description: "Register as platform operator"
+    - step: 2
+      form: "DAC7_REPORT"
+      description: "Submit annual seller report"
+
+  cross_directive_relationships:
+    - source: "DAC6_REPORT"
+      target: "CRS_REPORT"
+      relationship: "Category D hallmarks relate to CRS avoidance"
+    - source: "DAC7_REPORT"
+      target: "VAT_RETURN"
+      relationship: "Platform seller income may be VAT-able"
+    - source: "DAC6_REPORT"
+      target: "e-CO"
+      relationship: "Arrangements may affect corporate tax positions"

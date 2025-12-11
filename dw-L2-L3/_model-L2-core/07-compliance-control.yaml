@@ -1,0 +1,2605 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Compliance & Control Domain
+# Generated from: SIGTAS schemas (AUDIT, COLLECTION, OBJECTION) + tax-capabilities.docx
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    The Compliance & Control Domain encompasses all functions related to
+    ensuring taxpayer compliance, detecting and addressing non-compliance,
+    managing enforcement actions, and handling legal proceedings. This domain
+    implements a risk-based approach to compliance management, enabling
+    tax administrations to focus resources on highest-risk areas while
+    supporting compliant taxpayers through service channels.
+
+    The domain synthesizes patterns from:
+    - SIGTAS AUDIT schema: Comprehensive audit case management with planning,
+      execution, findings, and outcomes tracking
+    - SIGTAS COLLECTION schema: Debt collection processes, enforcement actions,
+      payment agreements, and case management
+    - SIGTAS OBJECTION schema: Appeals and objections processing with
+      multi-level review and decision tracking
+    - Tax Capabilities Document: Modern compliance risk management approach,
+      taxpayer segmentation, compliance programs, and behavioral insights
+
+    Key capabilities provided:
+    Ã¢Å“" Risk-based audit selection and case management
+    Ã¢Å“" Enforced collection with graduated enforcement measures
+    Ã¢Å“" Objections and appeals processing (administrative and judicial)
+    Ã¢Å“" Compliance risk assessment and profiling
+    Ã¢Å“" Strategic compliance programs and targeted interventions
+    Ã¢Å“" Enforcement action tracking and monitoring
+    Ã¢Å“" Performance measurement and reporting
+
+  authors:
+    - "Generated from SIGTAS analysis"
+    - "Moldova SRS collaboration"
+    - "GovStack TA-RDM Initiative"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Workflow BB"
+    - "Messaging BB"
+    - "Consent BB"
+    - "Digital Registries BB"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+# =============================================================================
+# DOMAIN DEFINITION
+# =============================================================================
+
+domains:
+  - name: "compliance_control"
+    code: "CC"
+    display_name: "Compliance & Control"
+    description: |
+      The Compliance & Control domain manages all aspects of tax compliance
+      monitoring, enforcement, and legal proceedings. It implements a modern,
+      risk-based approach to compliance management that balances service
+      and enforcement to maximize voluntary compliance while minimizing
+      administrative burden.
+
+      Core Functions:
+      1. Audit Management - Risk-based audit planning and execution
+      2. Collection Management - Debt recovery and enforcement
+      3. Objections & Appeals - Legal proceedings and dispute resolution
+      4. Compliance Risk Management - Risk assessment and profiling
+      5. Compliance Programs - Strategic compliance initiatives
+
+      This domain was synthesized from:
+      - SIGTAS AUDIT schema (15+ tables): Comprehensive audit lifecycle
+      - SIGTAS COLLECTION schema (12+ tables): Enforcement and debt management
+      - SIGTAS OBJECTION schema (8+ tables): Appeals processing
+      - Tax Capabilities: Modern risk-based compliance management
+      - Best Practices: OECD guidelines on compliance management
+
+    business_owner: "Director of Compliance"
+    technical_owner: "Enterprise Architecture Team"
+
+    dependencies:
+      - "party_management"        # Taxpayers under compliance actions
+      - "registration"            # Tax accounts and registration status
+      - "filing_assessment"       # Returns and assessments under review
+      - "accounting"              # Tax liabilities and balances
+      - "payment_refund"          # Payment history and compliance
+      - "document_management"     # Case documentation
+      - "reference_data"          # Codes, classifications
+
+    tags:
+      - "compliance"
+      - "enforcement"
+      - "audit"
+      - "risk_management"
+      - "high_value"
+
+    # =========================================================================
+    # SCHEMAS
+    # =========================================================================
+
+    schemas:
+      - schema_name: "compliance_control"
+        description: |
+          Primary schema containing all compliance, audit, collection, and
+          legal proceeding tables. Implements case-based processing patterns
+          with comprehensive tracking of all compliance activities.
+
+        # =====================================================================
+        # TABLES
+        # =====================================================================
+
+        tables:
+
+          # ===================================================================
+          # AUDIT MANAGEMENT TABLES
+          # ===================================================================
+
+          - name: "audit_plan"
+            display_name: "Audit Plan"
+            description: |
+              Annual or periodic audit plans that define audit strategies,
+              target numbers, resources, and priorities for a planning period.
+              Audit plans are developed based on risk analysis, compliance
+              gaps, revenue risks, and strategic priorities. Each plan covers
+              a specific period (typically fiscal year) and may be organized
+              by taxpayer segment, tax type, industry, or audit type.
+
+              Workflow:
+              1. Plan created at beginning of period
+              2. Targets set based on risk assessment and resources
+              3. Progress monitored against targets
+              4. Plan adjusted as needed during period
+              5. Results evaluated at end of period
+
+              SIGTAS Source: AUDIT.AUDIT_PLAN
+
+
+            aspects:
+              - auditable
+              - temporal
+
+            type: "master"
+
+            columns:
+              - name: "audit_plan_id"
+                display_name: "Audit Plan ID"
+                type: "bigint"
+                description: "Unique identifier for audit plan"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "plan_code"
+                display_name: "Plan Code"
+                type: "varchar(50)"
+                description: "Human-readable audit plan code"
+                constraints:
+                  unique: true
+                  not_null: true
+
+              - name: "plan_name"
+                display_name: "Plan Name"
+                type: "varchar(200)"
+                description: "Descriptive name of the audit plan"
+                constraints:
+                  not_null: true
+
+              - name: "plan_type_code"
+                display_name: "Plan Type"
+                type: "varchar(20)"
+                description: |
+                  Type of plan: ANNUAL, QUARTERLY, SPECIAL_PROJECT,
+                  TARGETED_CAMPAIGN, INDUSTRY_FOCUS
+                constraints:
+                  not_null: true
+                reference_data: "ref_audit_plan_type"
+
+              - name: "plan_period_year"
+                display_name: "Plan Year"
+                type: "integer"
+                description: "Year for which plan applies"
+                constraints:
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_plan_year"
+
+              - name: "plan_period_quarter"
+                display_name: "Plan Quarter"
+                type: "integer"
+                description: "Quarter (1-4) if applicable"
+                validation_rules:
+                  - "plan_period_quarter BETWEEN 1 AND 4"
+
+              - name: "plan_status_code"
+                display_name: "Plan Status"
+                type: "varchar(20)"
+                description: |
+                  Current status: DRAFT, APPROVED, ACTIVE, SUSPENDED,
+                  COMPLETED, CANCELLED
+                constraints:
+                  not_null: true
+                  default: "'DRAFT'"
+                reference_data: "ref_plan_status"
+
+              - name: "target_audit_count"
+                display_name: "Target Audit Count"
+                type: "integer"
+                description: "Planned number of audits to complete"
+                constraints:
+                  not_null: true
+
+              - name: "target_revenue_impact"
+                display_name: "Target Revenue Impact"
+                type: "decimal(19,2)"
+                description: "Expected revenue impact from audits"
+
+              - name: "allocated_resources_count"
+                display_name: "Allocated Resources"
+                type: "integer"
+                description: "Number of auditors allocated to plan"
+
+              - name: "approved_by"
+                display_name: "Approved By"
+                type: "bigint"
+                description: "Officer who approved the plan"
+                reference_data: "ref_employee"
+
+              - name: "approval_date"
+                display_name: "Approval Date"
+                type: "date"
+                description: "Date plan was approved"
+
+              - name: "plan_description"
+                display_name: "Description"
+                type: "text"
+                description: "Detailed description of plan objectives and strategy"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_audit_plan_status"
+                columns: ["plan_status_code"]
+                type: "btree"
+
+              - name: "idx_audit_plan_period"
+                columns: ["plan_period_year", "plan_period_quarter"]
+                type: "btree"
+
+          # -----------------------------------------------------------------
+
+          - name: "audit_case"
+            display_name: "Audit Case"
+            description: |
+              Individual audit cases representing examinations of taxpayer
+              compliance for specific tax periods and tax types. Each audit
+              case tracks the complete audit lifecycle from selection through
+              completion, including findings, adjustments, and outcomes.
+
+              Cases can be selected through:
+              - Risk-based selection (automated scoring)
+              - Random selection (compliance level sampling)
+              - Manual selection (officer judgment)
+              - Third-party information (tip-offs, data matching)
+              - Special projects or campaigns
+
+              Workflow stages:
+              1. SELECTED - Case identified for audit
+              2. ASSIGNED - Auditor assigned
+              3. NOTIFIED - Taxpayer notified
+              4. IN_PROGRESS - Examination underway
+              5. FINDINGS_REVIEW - Internal review of findings
+              6. TAXPAYER_RESPONSE - Awaiting taxpayer comments
+              7. FINALIZED - Audit report finalized
+              8. CLOSED - Case closed (with or without adjustment)
+
+              SIGTAS Source: AUDIT.AUDIT_CASE
+
+            type: "transaction"
+            estimated_volume: "medium"  # 10K-100K cases per year
+
+            columns:
+              - name: "audit_case_id"
+                display_name: "Audit Case ID"
+                type: "bigint"
+                description: "Unique identifier for audit case"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "case_number"
+                display_name: "Case Number"
+                type: "varchar(50)"
+                description: "Human-readable audit case reference number"
+                constraints:
+                  unique: true
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_case_number"
+
+              - name: "audit_plan_id"
+                display_name: "Audit Plan"
+                type: "bigint"
+                description: "Link to audit plan under which case was created"
+                constraints:
+                  foreign_key:
+                    referenced_table: "audit_plan"
+                    referenced_column: "audit_plan_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_case_plan"
+
+              - name: "party_id"
+                display_name: "Taxpayer"
+                type: "bigint"
+                description: "Taxpayer being audited"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party_management.party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_case_party"
+                security:
+                  sensitive: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account"
+                type: "bigint"
+                description: "Tax account under audit"
+                constraints:
+                  foreign_key:
+                    referenced_table: "registration.tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_case_tax_acct"
+
+              - name: "tax_type_code"
+                display_name: "Tax Type"
+                type: "varchar(20)"
+                description: "Tax type being audited"
+                constraints:
+                  not_null: true
+                reference_data: "tax_framework.tax_type"
+
+              - name: "audit_type_code"
+                display_name: "Audit Type"
+                type: "varchar(20)"
+                description: |
+                  Type of audit: COMPREHENSIVE, DESK_AUDIT, FIELD_AUDIT,
+                  ISSUE_ORIENTED, REFUND_VERIFICATION, VAT_VERIFICATION,
+                  TRANSFER_PRICING, SPECIAL_INVESTIGATION
+                constraints:
+                  not_null: true
+                reference_data: "ref_audit_type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_case_type"
+
+              - name: "audit_scope_code"
+                display_name: "Audit Scope"
+                type: "varchar(20)"
+                description: |
+                  Scope: FULL_AUDIT, PARTIAL_AUDIT, SINGLE_ISSUE,
+                  MULTI_TAX, SINGLE_TAX
+                reference_data: "ref_audit_scope"
+
+              - name: "selection_method_code"
+                display_name: "Selection Method"
+                type: "varchar(20)"
+                description: |
+                  How case was selected: RISK_BASED, RANDOM,
+                  MANUAL_SELECTION, THIRD_PARTY_INFO, CAMPAIGN
+                constraints:
+                  not_null: true
+                reference_data: "ref_selection_method"
+
+              - name: "risk_score"
+                display_name: "Risk Score"
+                type: "decimal(5,2)"
+                description: "Risk score at time of selection (0-100)"
+                validation_rules:
+                  - "risk_score BETWEEN 0 AND 100"
+
+              - name: "audit_period_from"
+                display_name: "Audit Period From"
+                type: "date"
+                description: "Start of period under audit"
+                constraints:
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_case_period"
+
+              - name: "audit_period_to"
+                display_name: "Audit Period To"
+                type: "date"
+                description: "End of period under audit"
+                constraints:
+                  not_null: true
+
+              - name: "case_status_code"
+                display_name: "Case Status"
+                type: "varchar(20)"
+                description: |
+                  Current status: SELECTED, ASSIGNED, NOTIFIED, IN_PROGRESS,
+                  FINDINGS_REVIEW, TAXPAYER_RESPONSE, FINALIZED, CLOSED,
+                  SUSPENDED, CANCELLED
+                constraints:
+                  not_null: true
+                  default: "'SELECTED'"
+                reference_data: "ref_audit_case_status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_case_status"
+
+              - name: "priority_code"
+                display_name: "Priority"
+                type: "varchar(20)"
+                description: "Case priority: LOW, MEDIUM, HIGH, URGENT"
+                constraints:
+                  not_null: true
+                  default: "'MEDIUM'"
+                reference_data: "ref_case_priority"
+
+              - name: "assigned_officer_id"
+                display_name: "Lead Auditor"
+                type: "bigint"
+                description: "Primary auditor assigned to case"
+                constraints:
+                  foreign_key:
+                    referenced_table: "reference_data.ref_employee"
+                    referenced_column: "employee_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_case_officer"
+
+              - name: "assignment_date"
+                display_name: "Assignment Date"
+                type: "date"
+                description: "Date case was assigned to auditor"
+
+              - name: "notification_date"
+                display_name: "Notification Date"
+                type: "date"
+                description: "Date taxpayer was notified of audit"
+
+              - name: "planned_start_date"
+                display_name: "Planned Start Date"
+                type: "date"
+                description: "Planned date to begin audit"
+
+              - name: "actual_start_date"
+                display_name: "Actual Start Date"
+                type: "date"
+                description: "Actual date audit began"
+
+              - name: "planned_completion_date"
+                display_name: "Planned Completion Date"
+                type: "date"
+                description: "Planned date to complete audit"
+
+              - name: "actual_completion_date"
+                display_name: "Actual Completion Date"
+                type: "date"
+                description: "Actual date audit was completed"
+
+              - name: "audit_location_code"
+                display_name: "Audit Location"
+                type: "varchar(20)"
+                description: |
+                  Where audit conducted: OFFICE_DESK, TAXPAYER_PREMISES,
+                  REMOTE_DIGITAL, HYBRID
+                reference_data: "ref_audit_location"
+
+              - name: "estimated_hours"
+                display_name: "Estimated Hours"
+                type: "decimal(8,2)"
+                description: "Estimated audit hours required"
+
+              - name: "actual_hours"
+                display_name: "Actual Hours"
+                type: "decimal(8,2)"
+                description: "Actual audit hours spent"
+
+              - name: "adjustment_amount"
+                display_name: "Total Adjustment"
+                type: "decimal(19,2)"
+                description: "Total tax adjustment resulting from audit"
+                constraints:
+                  default: "0"
+
+              - name: "penalty_amount"
+                display_name: "Penalties Assessed"
+                type: "decimal(19,2)"
+                description: "Total penalties assessed"
+                constraints:
+                  default: "0"
+
+              - name: "interest_amount"
+                display_name: "Interest Assessed"
+                type: "decimal(19,2)"
+                description: "Total interest assessed"
+                constraints:
+                  default: "0"
+
+              - name: "total_amount_assessed"
+                display_name: "Total Assessed"
+                type: "decimal(19,2)"
+                description: "Total amount assessed (tax + penalty + interest)"
+                constraints:
+                  default: "0"
+
+              - name: "taxpayer_agreed"
+                display_name: "Taxpayer Agreed"
+                type: "boolean"
+                description: "Whether taxpayer agreed with audit findings"
+                constraints:
+                  default: "false"
+
+              - name: "objection_filed"
+                display_name: "Objection Filed"
+                type: "boolean"
+                description: "Whether taxpayer filed objection"
+                constraints:
+                  default: "false"
+
+              - name: "case_summary"
+                display_name: "Case Summary"
+                type: "text"
+                description: "Summary of audit findings and outcomes"
+
+              - name: "closure_reason_code"
+                display_name: "Closure Reason"
+                type: "varchar(20)"
+                description: |
+                  Reason for closure: COMPLETED_WITH_ADJUSTMENT,
+                  COMPLETED_NO_ADJUSTMENT, CANCELLED_DUPLICATE,
+                  CANCELLED_OUT_OF_SCOPE, SUSPENDED_PENDING_OBJECTION
+                reference_data: "ref_closure_reason"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_audit_case_composite"
+                columns: ["case_status_code", "assigned_officer_id", "planned_completion_date"]
+                type: "btree"
+                description: "Composite index for workload queries"
+
+              - name: "idx_audit_case_dates"
+                columns: ["actual_start_date", "actual_completion_date"]
+                type: "btree"
+                description: "For performance reporting"
+
+              - name: "idx_audit_case_party_tax"
+                columns: ["party_id", "tax_type_code"]
+                type: "btree"
+                description: "For taxpayer audit history"
+
+          # -----------------------------------------------------------------
+
+          - name: "audit_case_officer"
+            display_name: "Audit Case Officer"
+            description: |
+              Many-to-many relationship table tracking all officers involved
+              in an audit case. While each case has a lead auditor, complex
+              audits may involve multiple team members with different roles
+              (technical specialists, industry experts, supervisors, reviewers).
+
+              This table tracks:
+              - Who worked on the audit and in what capacity
+              - Time allocation and effort tracking
+              - Approval and review chains
+              - Supervisor oversight
+
+              SIGTAS Source: AUDIT.AUDIT_OFFICER
+
+            type: "transaction"
+
+            columns:
+              - name: "audit_case_officer_id"
+                display_name: "Audit Case Officer ID"
+                type: "bigint"
+                description: "Unique identifier for assignment"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "audit_case_id"
+                display_name: "Audit Case"
+                type: "bigint"
+                description: "Audit case this officer is assigned to"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "audit_case"
+                    referenced_column: "audit_case_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_officer_case"
+
+              - name: "officer_id"
+                display_name: "Officer"
+                type: "bigint"
+                description: "Staff member assigned to audit"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "reference_data.ref_employee"
+                    referenced_column: "employee_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_officer_employee"
+
+              - name: "role_code"
+                display_name: "Role"
+                type: "varchar(20)"
+                description: |
+                  Officer's role: LEAD_AUDITOR, TEAM_MEMBER, SUPERVISOR,
+                  TECHNICAL_SPECIALIST, REVIEWER, QUALITY_ASSURANCE
+                constraints:
+                  not_null: true
+                reference_data: "ref_audit_role"
+
+              - name: "assignment_start_date"
+                display_name: "Assignment Start"
+                type: "date"
+                description: "Date officer assigned to case"
+                constraints:
+                  not_null: true
+
+              - name: "assignment_end_date"
+                display_name: "Assignment End"
+                type: "date"
+                description: "Date officer completed work on case"
+
+              - name: "hours_spent"
+                display_name: "Hours Spent"
+                type: "decimal(8,2)"
+                description: "Total hours this officer spent on case"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            constraints:
+              - name: "uk_audit_officer_case_role"
+                type: "unique"
+                columns: ["audit_case_id", "officer_id", "role_code"]
+                description: "An officer can have only one role per case"
+
+          # -----------------------------------------------------------------
+
+          - name: "audit_finding"
+            display_name: "Audit Finding"
+            description: |
+              Individual findings discovered during audit examination.
+              Each finding represents a specific compliance issue, error,
+              or discrepancy identified by the auditor. Findings lead to
+              adjustments in tax liability, penalties, or recommendations
+              for corrective action.
+
+              Finding types include:
+              - Underreported income/sales
+              - Overstated expenses/deductions
+              - Misclassification of transactions
+              - Missing records/documentation
+              - Non-compliance with procedures
+              - Technical errors in calculations
+
+              Each finding can result in:
+              - Tax adjustment (additional tax or credit)
+              - Penalties
+              - Interest
+              - Recommendations
+
+              SIGTAS Source: AUDIT.AUDIT_ASSESS (partial), inferred from structure
+
+            type: "transaction"
+
+            columns:
+              - name: "audit_finding_id"
+                display_name: "Audit Finding ID"
+                type: "bigint"
+                description: "Unique identifier for finding"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "audit_case_id"
+                display_name: "Audit Case"
+                type: "bigint"
+                description: "Audit case this finding belongs to"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "audit_case"
+                    referenced_column: "audit_case_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_audit_finding_case"
+
+              - name: "finding_number"
+                display_name: "Finding Number"
+                type: "varchar(20)"
+                description: "Sequential number within audit case"
+                constraints:
+                  not_null: true
+
+              - name: "tax_period_id"
+                display_name: "Tax Period"
+                type: "bigint"
+                description: "Tax period affected by this finding"
+                constraints:
+                  foreign_key:
+                    referenced_table: "tax_framework.tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "finding_category_code"
+                display_name: "Finding Category"
+                type: "varchar(20)"
+                description: |
+                  Category: UNREPORTED_INCOME, OVERSTATED_EXPENSE,
+                  MISCLASSIFICATION, CALCULATION_ERROR, MISSING_RECORDS,
+                  PROCEDURAL_NONCOMPLIANCE, FRAUD_INDICATOR
+                constraints:
+                  not_null: true
+                reference_data: "ref_finding_category"
+
+              - name: "severity_code"
+                display_name: "Severity"
+                type: "varchar(20)"
+                description: "Severity: MINOR, MODERATE, MAJOR, CRITICAL"
+                constraints:
+                  not_null: true
+                reference_data: "ref_finding_severity"
+
+              - name: "finding_description"
+                display_name: "Description"
+                type: "text"
+                description: "Detailed description of the finding"
+                constraints:
+                  not_null: true
+
+              - name: "legal_basis"
+                display_name: "Legal Basis"
+                type: "text"
+                description: "Tax law or regulation violated or misapplied"
+
+              - name: "taxpayer_position"
+                display_name: "Taxpayer's Position"
+                type: "text"
+                description: "How taxpayer originally treated this issue"
+
+              - name: "auditor_position"
+                display_name: "Auditor's Position"
+                type: "text"
+                description: "Correct treatment according to auditor"
+
+              - name: "tax_base_adjustment"
+                display_name: "Tax Base Adjustment"
+                type: "decimal(19,2)"
+                description: "Adjustment to taxable base"
+
+              - name: "tax_adjustment"
+                display_name: "Tax Adjustment"
+                type: "decimal(19,2)"
+                description: "Additional tax or credit"
+                constraints:
+                  not_null: true
+
+              - name: "penalty_applicable"
+                display_name: "Penalty Applicable"
+                type: "boolean"
+                description: "Whether penalty applies to this finding"
+                constraints:
+                  default: "false"
+
+              - name: "penalty_rate"
+                display_name: "Penalty Rate"
+                type: "decimal(5,2)"
+                description: "Penalty rate as percentage"
+
+              - name: "penalty_amount"
+                display_name: "Penalty Amount"
+                type: "decimal(19,2)"
+                description: "Penalty assessed for this finding"
+
+              - name: "interest_amount"
+                display_name: "Interest Amount"
+                type: "decimal(19,2)"
+                description: "Interest assessed for this finding"
+
+              - name: "taxpayer_response"
+                display_name: "Taxpayer Response"
+                type: "text"
+                description: "Taxpayer's response to finding"
+
+              - name: "taxpayer_accepted"
+                display_name: "Taxpayer Accepted"
+                type: "boolean"
+                description: "Whether taxpayer accepted this finding"
+
+              - name: "adjustment_posted"
+                display_name: "Adjustment Posted"
+                type: "boolean"
+                description: "Whether adjustment has been posted to account"
+                constraints:
+                  default: "false"
+
+              - name: "assessment_id"
+                display_name: "Assessment"
+                type: "bigint"
+                description: "Assessment created from this finding"
+                constraints:
+                  foreign_key:
+                    referenced_table: "filing_assessment.assessment"
+                    referenced_column: "assessment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            constraints:
+              - name: "uk_audit_finding_number"
+                type: "unique"
+                columns: ["audit_case_id", "finding_number"]
+                description: "Finding numbers unique within case"
+
+          # ===================================================================
+          # COLLECTION & ENFORCEMENT TABLES
+          # ===================================================================
+
+          - name: "collection_case"
+            display_name: "Collection Case"
+            description: |
+              Individual debt collection cases tracking enforcement actions
+              to recover unpaid tax liabilities. Each case represents one
+              taxpayer's outstanding debt for specific tax types and periods,
+              with comprehensive tracking of all collection activities,
+              enforcement measures, and payment arrangements.
+
+              Cases are created when:
+              - Payment due date passes without payment
+              - Payment agreement defaulted
+              - Refund offset opportunities identified
+              - Third-party garnishment possible
+
+              Collection follows graduated enforcement approach:
+              1. Reminder notices (automated)
+              2. Demand notices (formal warning)
+              3. Payment arrangements (negotiated plans)
+              4. Refund interception
+              5. Bank account garnishment
+              6. Salary garnishment
+              7. Asset seizure and sale
+              8. Legal proceedings
+
+              SIGTAS Source: COLLECTION.COLLECTION_CASE
+
+            type: "transaction"
+            estimated_volume: "medium"  # 50K-500K cases
+
+            columns:
+              - name: "collection_case_id"
+                display_name: "Collection Case ID"
+                type: "bigint"
+                description: "Unique identifier for collection case"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "case_number"
+                display_name: "Case Number"
+                type: "varchar(50)"
+                description: "Human-readable collection case reference"
+                constraints:
+                  unique: true
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_collection_case_number"
+
+              - name: "party_id"
+                display_name: "Taxpayer"
+                type: "bigint"
+                description: "Taxpayer with outstanding debt"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party_management.party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_collection_case_party"
+                security:
+                  sensitive: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account"
+                type: "bigint"
+                description: "Tax account with outstanding balance"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "registration.tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_collection_case_tax_acct"
+
+              - name: "case_type_code"
+                display_name: "Case Type"
+                type: "varchar(20)"
+                description: |
+                  Type: STANDARD_COLLECTION, HIGH_VALUE, CRIMINAL_REFERRAL,
+                  BANKRUPTCY, ESTATE, UNCOLLECTABLE
+                constraints:
+                  not_null: true
+                reference_data: "ref_collection_case_type"
+
+              - name: "case_status_code"
+                display_name: "Case Status"
+                type: "varchar(20)"
+                description: |
+                  Status: NEW, UNDER_REVIEW, ACTIVE_COLLECTION, PAYMENT_PLAN,
+                  ENFORCED_ACTION, SUSPENDED, RESOLVED, CLOSED, WRITTEN_OFF
+                constraints:
+                  not_null: true
+                  default: "'NEW'"
+                reference_data: "ref_collection_case_status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_collection_case_status"
+
+              - name: "priority_code"
+                display_name: "Priority"
+                type: "varchar(20)"
+                description: |
+                  Collection priority: LOW, MEDIUM, HIGH, URGENT
+                  Based on age, amount, collectability
+                constraints:
+                  not_null: true
+                  default: "'MEDIUM'"
+                reference_data: "ref_case_priority"
+
+              - name: "assigned_officer_id"
+                display_name: "Collection Officer"
+                type: "bigint"
+                description: "Officer assigned to case"
+                constraints:
+                  foreign_key:
+                    referenced_table: "reference_data.ref_employee"
+                    referenced_column: "employee_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_collection_case_officer"
+
+              - name: "assignment_date"
+                display_name: "Assignment Date"
+                type: "date"
+                description: "Date case assigned to officer"
+
+              - name: "case_opened_date"
+                display_name: "Case Opened Date"
+                type: "date"
+                description: "Date case was opened"
+                constraints:
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_collection_case_opened"
+
+              - name: "case_closed_date"
+                display_name: "Case Closed Date"
+                type: "date"
+                description: "Date case was closed"
+
+              - name: "original_debt_amount"
+                display_name: "Original Debt"
+                type: "decimal(19,2)"
+                description: "Original debt amount when case opened"
+                constraints:
+                  not_null: true
+
+              - name: "current_debt_amount"
+                display_name: "Current Debt"
+                type: "decimal(19,2)"
+                description: "Current outstanding debt amount"
+                constraints:
+                  not_null: true
+
+              - name: "amount_collected"
+                display_name: "Amount Collected"
+                type: "decimal(19,2)"
+                description: "Total amount collected on this case"
+                constraints:
+                  default: "0"
+
+              - name: "debt_age_days"
+                display_name: "Debt Age (Days)"
+                type: "integer"
+                description: "Number of days debt has been outstanding"
+                indexing:
+                  - type: "btree"
+                    name: "idx_collection_debt_age"
+
+              - name: "collectability_score"
+                display_name: "Collectability Score"
+                type: "decimal(5,2)"
+                description: "Likelihood of successful collection (0-100)"
+
+              - name: "enforcement_level_code"
+                display_name: "Enforcement Level"
+                type: "varchar(20)"
+                description: |
+                  Current enforcement level: NOTICE, DEMAND, GARNISHMENT,
+                  SEIZURE, LEGAL_ACTION
+                reference_data: "ref_enforcement_level"
+
+              - name: "has_payment_agreement"
+                display_name: "Has Payment Agreement"
+                type: "boolean"
+                description: "Whether taxpayer has active payment plan"
+                constraints:
+                  default: "false"
+
+              - name: "payment_agreement_id"
+                display_name: "Payment Agreement"
+                type: "bigint"
+                description: "Link to active payment agreement"
+                constraints:
+                  foreign_key:
+                    referenced_table: "payment_refund.installment_plan"
+                    referenced_column: "installment_plan_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "taxpayer_contact_attempted"
+                display_name: "Contact Attempted"
+                type: "boolean"
+                description: "Whether contact with taxpayer attempted"
+                constraints:
+                  default: "false"
+
+              - name: "taxpayer_contact_successful"
+                display_name: "Contact Successful"
+                type: "boolean"
+                description: "Whether contact with taxpayer successful"
+                constraints:
+                  default: "false"
+
+              - name: "last_contact_date"
+                display_name: "Last Contact Date"
+                type: "date"
+                description: "Date of last contact with taxpayer"
+
+              - name: "next_action_due_date"
+                display_name: "Next Action Due"
+                type: "date"
+                description: "Date next collection action is due"
+                indexing:
+                  - type: "btree"
+                    name: "idx_collection_next_action"
+
+              - name: "closure_reason_code"
+                display_name: "Closure Reason"
+                type: "varchar(20)"
+                description: |
+                  Reason: PAID_IN_FULL, PAYMENT_PLAN_ACTIVE, BANKRUPTCY,
+                  UNCOLLECTABLE, STATUTE_EXPIRED, WRITE_OFF
+                reference_data: "ref_collection_closure_reason"
+
+              - name: "case_notes"
+                display_name: "Case Notes"
+                type: "text"
+                description: "General notes about collection efforts"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_collection_composite"
+                columns: ["case_status_code", "priority_code", "next_action_due_date"]
+                type: "btree"
+                description: "For collection workload management"
+
+              - name: "idx_collection_amount_age"
+                columns: ["current_debt_amount", "debt_age_days"]
+                type: "btree"
+                description: "For prioritization queries"
+
+          # -----------------------------------------------------------------
+
+          - name: "enforcement_action"
+            display_name: "Enforcement Action"
+            description: |
+              Specific enforcement measures taken to collect outstanding debt.
+              Each action represents one step in the enforcement process,
+              from initial notices through to asset seizure and legal proceedings.
+
+              Action types progress through enforcement continuum:
+              - REMINDER_NOTICE - Automated reminder
+              - DEMAND_NOTICE - Formal demand with legal warning
+              - PHONE_CONTACT - Officer phone call
+              - FIELD_VISIT - Visit to taxpayer premises
+              - REFUND_OFFSET - Intercept tax refund
+              - BANK_GARNISHMENT - Freeze/seize bank accounts
+              - SALARY_GARNISHMENT - Withhold from wages
+              - ASSET_SEIZURE - Seize physical assets
+              - ASSET_SALE - Auction seized assets
+              - LEGAL_FILING - Court proceedings
+
+              SIGTAS Source: COLLECTION schema (inferred from workflow)
+
+            type: "transaction"
+            estimated_volume: "high"  # Multiple actions per case
+
+            columns:
+              - name: "enforcement_action_id"
+                display_name: "Enforcement Action ID"
+                type: "bigint"
+                description: "Unique identifier for enforcement action"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "collection_case_id"
+                display_name: "Collection Case"
+                type: "bigint"
+                description: "Collection case this action relates to"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "collection_case"
+                    referenced_column: "collection_case_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_enforcement_case"
+
+              - name: "action_type_code"
+                display_name: "Action Type"
+                type: "varchar(20)"
+                description: |
+                  Type of enforcement action: REMINDER_NOTICE, DEMAND_NOTICE,
+                  PHONE_CONTACT, FIELD_VISIT, REFUND_OFFSET, BANK_GARNISHMENT,
+                  SALARY_GARNISHMENT, ASSET_SEIZURE, ASSET_SALE, LEGAL_FILING
+                constraints:
+                  not_null: true
+                reference_data: "ref_enforcement_action_type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_enforcement_type"
+
+              - name: "action_date"
+                display_name: "Action Date"
+                type: "date"
+                description: "Date action was taken or initiated"
+                constraints:
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_enforcement_date"
+
+              - name: "action_status_code"
+                display_name: "Action Status"
+                type: "varchar(20)"
+                description: |
+                  Status: PLANNED, IN_PROGRESS, COMPLETED, UNSUCCESSFUL,
+                  CANCELLED, PENDING_APPROVAL
+                constraints:
+                  not_null: true
+                reference_data: "ref_action_status"
+
+              - name: "performed_by"
+                display_name: "Performed By"
+                type: "bigint"
+                description: "Officer who performed the action"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "reference_data.ref_employee"
+                    referenced_column: "employee_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "target_amount"
+                display_name: "Target Amount"
+                type: "decimal(19,2)"
+                description: "Amount targeted for collection by this action"
+
+              - name: "amount_collected"
+                display_name: "Amount Collected"
+                type: "decimal(19,2)"
+                description: "Amount actually collected from this action"
+
+              - name: "action_outcome_code"
+                display_name: "Outcome"
+                type: "varchar(20)"
+                description: |
+                  Outcome: SUCCESSFUL, PARTIAL, UNSUCCESSFUL,
+                  TAXPAYER_RESPONSIVE, TAXPAYER_UNRESPONSIVE
+                reference_data: "ref_action_outcome"
+
+              - name: "action_description"
+                display_name: "Description"
+                type: "text"
+                description: "Detailed description of action taken"
+
+              - name: "taxpayer_response"
+                display_name: "Taxpayer Response"
+                type: "text"
+                description: "How taxpayer responded to action"
+
+              - name: "document_id"
+                display_name: "Related Document"
+                type: "bigint"
+                description: "Document generated or received for this action"
+                constraints:
+                  foreign_key:
+                    referenced_table: "document_management.document"
+                    referenced_column: "document_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "next_action_recommended"
+                display_name: "Next Action Recommended"
+                type: "varchar(20)"
+                description: "Recommended next enforcement step"
+                reference_data: "ref_enforcement_action_type"
+
+              - name: "next_action_due_date"
+                display_name: "Next Action Due Date"
+                type: "date"
+                description: "Date recommended action should be taken"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+          # ===================================================================
+          # OBJECTION & APPEALS TABLES
+          # ===================================================================
+
+          - name: "objection_case"
+            display_name: "Objection Case"
+            description: |
+              Legal proceedings initiated by taxpayers to challenge tax
+              administration decisions. Objections provide due process
+              and administrative review before matters proceed to courts.
+
+              Taxpayers can object to:
+              - Tax assessments (self-assessed or administrative)
+              - Audit findings and adjustments
+              - Penalty assessments
+              - Registration decisions
+              - Refund denials
+              - Collection actions
+
+              Objection process stages:
+              1. FILED - Objection submitted by taxpayer
+              2. UNDER_REVIEW - Initial review and validity check
+              3. ASSIGNED - Assigned to reviewing officer
+              4. INVESTIGATION - Evidence gathering and analysis
+              5. HEARING - If requested by taxpayer
+              6. DECISION_DRAFT - Decision being drafted
+              7. DECISION_REVIEW - Internal review of decision
+              8. DECISION_ISSUED - Decision communicated to taxpayer
+              9. CLOSED - Case closed (accepted, rejected, or settled)
+              10. APPEALED - Escalated to higher level
+
+              SIGTAS Source: OBJECTION.OBJECTION
+
+            type: "transaction"
+            estimated_volume: "medium"  # 5K-50K objections per year
+
+            columns:
+              - name: "objection_case_id"
+                display_name: "Objection Case ID"
+                type: "bigint"
+                description: "Unique identifier for objection case"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "case_number"
+                display_name: "Case Number"
+                type: "varchar(50)"
+                description: "Human-readable objection case reference"
+                constraints:
+                  unique: true
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_objection_case_number"
+
+              - name: "party_id"
+                display_name: "Taxpayer"
+                type: "bigint"
+                description: "Taxpayer filing the objection"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party_management.party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_objection_case_party"
+                security:
+                  sensitive: true
+
+              - name: "objection_type_code"
+                display_name: "Objection Type"
+                type: "varchar(20)"
+                description: |
+                  Type: ASSESSMENT_OBJECTION, AUDIT_OBJECTION,
+                  PENALTY_OBJECTION, REGISTRATION_OBJECTION,
+                  REFUND_DENIAL_OBJECTION, COLLECTION_ACTION_OBJECTION
+                constraints:
+                  not_null: true
+                reference_data: "ref_objection_type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_objection_type"
+
+              - name: "objection_subject_type"
+                display_name: "Subject Type"
+                type: "varchar(20)"
+                description: |
+                  What is being objected to: ASSESSMENT, AUDIT_CASE,
+                  PENALTY, REGISTRATION_DECISION, REFUND_DECISION
+                constraints:
+                  not_null: true
+
+              - name: "assessment_id"
+                display_name: "Assessment"
+                type: "bigint"
+                description: "Assessment being objected to"
+                constraints:
+                  foreign_key:
+                    referenced_table: "filing_assessment.assessment"
+                    referenced_column: "assessment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_objection_assessment"
+
+              - name: "audit_case_id"
+                display_name: "Audit Case"
+                type: "bigint"
+                description: "Audit case being objected to"
+                constraints:
+                  foreign_key:
+                    referenced_table: "audit_case"
+                    referenced_column: "audit_case_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "tax_type_code"
+                display_name: "Tax Type"
+                type: "varchar(20)"
+                description: "Tax type involved in objection"
+                reference_data: "tax_framework.tax_type"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period"
+                type: "bigint"
+                description: "Tax period involved in objection"
+                constraints:
+                  foreign_key:
+                    referenced_table: "tax_framework.tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "filing_date"
+                display_name: "Filing Date"
+                type: "date"
+                description: "Date objection was filed"
+                constraints:
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_objection_filing_date"
+
+              - name: "filing_method_code"
+                display_name: "Filing Method"
+                type: "varchar(20)"
+                description: |
+                  How filed: ONLINE_PORTAL, EMAIL, POSTAL_MAIL,
+                  IN_PERSON, FAX
+                reference_data: "ref_filing_method"
+
+              - name: "case_status_code"
+                display_name: "Case Status"
+                type: "varchar(20)"
+                description: |
+                  Status: FILED, UNDER_REVIEW, ASSIGNED, INVESTIGATION,
+                  HEARING_SCHEDULED, HEARING_HELD, DECISION_DRAFT,
+                  DECISION_REVIEW, DECISION_ISSUED, CLOSED, APPEALED
+                constraints:
+                  not_null: true
+                  default: "'FILED'"
+                reference_data: "ref_objection_case_status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_objection_status"
+
+              - name: "priority_code"
+                display_name: "Priority"
+                type: "varchar(20)"
+                description: "Case priority: LOW, MEDIUM, HIGH, URGENT"
+                constraints:
+                  not_null: true
+                  default: "'MEDIUM'"
+                reference_data: "ref_case_priority"
+
+              - name: "assigned_officer_id"
+                display_name: "Reviewing Officer"
+                type: "bigint"
+                description: "Officer assigned to review objection"
+                constraints:
+                  foreign_key:
+                    referenced_table: "reference_data.ref_employee"
+                    referenced_column: "employee_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_objection_officer"
+
+              - name: "assignment_date"
+                display_name: "Assignment Date"
+                type: "date"
+                description: "Date case assigned to officer"
+
+              - name: "amount_disputed"
+                display_name: "Amount Disputed"
+                type: "decimal(19,2)"
+                description: "Total amount in dispute"
+                constraints:
+                  not_null: true
+
+              - name: "amount_at_stake_tax"
+                display_name: "Tax at Stake"
+                type: "decimal(19,2)"
+                description: "Tax amount in dispute"
+
+              - name: "amount_at_stake_penalty"
+                display_name: "Penalty at Stake"
+                type: "decimal(19,2)"
+                description: "Penalty amount in dispute"
+
+              - name: "amount_at_stake_interest"
+                display_name: "Interest at Stake"
+                type: "decimal(19,2)"
+                description: "Interest amount in dispute"
+
+              - name: "objection_grounds"
+                display_name: "Grounds for Objection"
+                type: "text"
+                description: "Taxpayer's grounds/reasons for objection"
+                constraints:
+                  not_null: true
+
+              - name: "taxpayer_requested_hearing"
+                display_name: "Hearing Requested"
+                type: "boolean"
+                description: "Whether taxpayer requested hearing"
+                constraints:
+                  default: "false"
+
+              - name: "hearing_scheduled_date"
+                display_name: "Hearing Date"
+                type: "timestamp with time zone"
+                description: "Date and time of scheduled hearing"
+
+              - name: "hearing_held_date"
+                display_name: "Hearing Held Date"
+                type: "date"
+                description: "Date hearing was actually held"
+
+              - name: "legal_representative"
+                display_name: "Legal Representative"
+                type: "varchar(200)"
+                description: "Name of taxpayer's legal representative"
+
+              - name: "decision_date"
+                display_name: "Decision Date"
+                type: "date"
+                description: "Date decision was made"
+                indexing:
+                  - type: "btree"
+                    name: "idx_objection_decision_date"
+
+              - name: "decision_outcome_code"
+                display_name: "Decision Outcome"
+                type: "varchar(20)"
+                description: |
+                  Outcome: FULLY_ACCEPTED, PARTIALLY_ACCEPTED,
+                  REJECTED, WITHDRAWN, SETTLED
+                reference_data: "ref_objection_outcome"
+
+              - name: "decision_summary"
+                display_name: "Decision Summary"
+                type: "text"
+                description: "Summary of decision and reasoning"
+
+              - name: "amount_adjusted"
+                display_name: "Amount Adjusted"
+                type: "decimal(19,2)"
+                description: "Amount of relief granted to taxpayer"
+
+              - name: "appeal_filed"
+                display_name: "Appeal Filed"
+                type: "boolean"
+                description: "Whether taxpayer appealed to higher level"
+                constraints:
+                  default: "false"
+
+              - name: "appeal_deadline_date"
+                display_name: "Appeal Deadline"
+                type: "date"
+                description: "Last date taxpayer can file appeal"
+
+              - name: "suspension_of_collection"
+                display_name: "Collection Suspended"
+                type: "boolean"
+                description: "Whether collection suspended during objection"
+                constraints:
+                  default: "false"
+
+              - name: "closure_date"
+                display_name: "Closure Date"
+                type: "date"
+                description: "Date case was closed"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_objection_composite"
+                columns: ["case_status_code", "assigned_officer_id", "decision_date"]
+                type: "btree"
+                description: "For workload and performance queries"
+
+          # -----------------------------------------------------------------
+
+          - name: "appeal_case"
+            display_name: "Appeal Case"
+            description: |
+              Higher-level appeals to Appeals Board, Commission, Tribunal,
+              or courts. Appeals represent escalation of objections when
+              taxpayer disagrees with first-level administrative decision.
+
+              Appeal levels (jurisdiction-specific):
+              - Appeals Board/Commission (administrative)
+              - Tax Court/Tribunal (quasi-judicial)
+              - High Court/Supreme Court (judicial)
+
+              Appeals provide:
+              - Independent review of tax administration decisions
+              - Judicial oversight of administrative actions
+              - Legal precedents and interpretations
+              - Final resolution of disputes
+
+              SIGTAS Source: OBJECTION schema (appeals tracked within)
+
+            type: "transaction"
+
+            columns:
+              - name: "appeal_case_id"
+                display_name: "Appeal Case ID"
+                type: "bigint"
+                description: "Unique identifier for appeal case"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "appeal_number"
+                display_name: "Appeal Number"
+                type: "varchar(50)"
+                description: "Human-readable appeal reference number"
+                constraints:
+                  unique: true
+                  not_null: true
+
+              - name: "objection_case_id"
+                display_name: "Objection Case"
+                type: "bigint"
+                description: "Original objection case being appealed"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "objection_case"
+                    referenced_column: "objection_case_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_appeal_objection"
+
+              - name: "party_id"
+                display_name: "Appellant"
+                type: "bigint"
+                description: "Party filing the appeal (usually taxpayer)"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party_management.party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                security:
+                  sensitive: true
+
+              - name: "appeal_level_code"
+                display_name: "Appeal Level"
+                type: "varchar(20)"
+                description: |
+                  Level: APPEALS_BOARD, TAX_TRIBUNAL, HIGH_COURT,
+                  SUPREME_COURT
+                constraints:
+                  not_null: true
+                reference_data: "ref_appeal_level"
+
+              - name: "appeal_status_code"
+                display_name: "Appeal Status"
+                type: "varchar(20)"
+                description: |
+                  Status: FILED, ACCEPTED, HEARING_SCHEDULED, HEARING_HELD,
+                  UNDER_DELIBERATION, DECISION_ISSUED, CLOSED
+                constraints:
+                  not_null: true
+                reference_data: "ref_appeal_status"
+
+              - name: "filing_date"
+                display_name: "Filing Date"
+                type: "date"
+                description: "Date appeal was filed"
+                constraints:
+                  not_null: true
+
+              - name: "amount_at_stake"
+                display_name: "Amount at Stake"
+                type: "decimal(19,2)"
+                description: "Total amount in dispute"
+
+              - name: "appeal_grounds"
+                display_name: "Appeal Grounds"
+                type: "text"
+                description: "Grounds for appeal"
+
+              - name: "hearing_date"
+                display_name: "Hearing Date"
+                type: "date"
+                description: "Date of appeal hearing"
+
+              - name: "decision_date"
+                display_name: "Decision Date"
+                type: "date"
+                description: "Date decision was issued"
+
+              - name: "decision_outcome_code"
+                display_name: "Decision"
+                type: "varchar(20)"
+                description: |
+                  Decision: APPEAL_UPHELD, APPEAL_DISMISSED,
+                  REMANDED, SETTLED
+                reference_data: "ref_appeal_outcome"
+
+              - name: "decision_summary"
+                display_name: "Decision Summary"
+                type: "text"
+                description: "Summary of appeal decision"
+
+              - name: "amount_adjusted"
+                display_name: "Amount Adjusted"
+                type: "decimal(19,2)"
+                description: "Financial impact of appeal decision"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+          # ===================================================================
+          # COMPLIANCE RISK MANAGEMENT TABLES
+          # ===================================================================
+
+          - name: "compliance_program"
+            display_name: "Compliance Program"
+            description: |
+              Strategic compliance programs targeting specific taxpayer
+              segments, compliance risks, or tax types. Programs define
+              high-level compliance strategies, resource allocation, and
+              expected outcomes for a planning period.
+
+              Programs organized around:
+              - Taxpayer segments (large business, SME, individuals)
+              - Tax types (VAT, CIT, PIT, customs)
+              - Compliance risks (non-filing, underreporting, evasion)
+              - Industries (construction, wholesale, professional services)
+              - Geographic areas (high-risk regions)
+
+              Each program defines:
+              - Compliance objectives and targets
+              - Treatment strategies (service vs. enforcement)
+              - Resource requirements
+              - Performance metrics
+              - Expected compliance improvements
+
+              Source: Tax Capabilities Document - modern compliance management
+
+            type: "master"
+
+            columns:
+              - name: "compliance_program_id"
+                display_name: "Compliance Program ID"
+                type: "bigint"
+                description: "Unique identifier for compliance program"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "program_code"
+                display_name: "Program Code"
+                type: "varchar(50)"
+                description: "Human-readable program code"
+                constraints:
+                  unique: true
+                  not_null: true
+
+              - name: "program_name"
+                display_name: "Program Name"
+                type: "varchar(200)"
+                description: "Descriptive name of compliance program"
+                constraints:
+                  not_null: true
+
+              - name: "program_year"
+                display_name: "Program Year"
+                type: "integer"
+                description: "Fiscal year for program"
+                constraints:
+                  not_null: true
+
+              - name: "taxpayer_segment_code"
+                display_name: "Taxpayer Segment"
+                type: "varchar(20)"
+                description: |
+                  Target segment: LARGE_BUSINESS, MEDIUM_BUSINESS,
+                  SMALL_BUSINESS, MICRO_BUSINESS, INDIVIDUALS,
+                  HIGH_NET_WORTH, NON_PROFIT, GOVERNMENT
+                reference_data: "ref_taxpayer_segment"
+
+              - name: "tax_type_code"
+                display_name: "Tax Type"
+                type: "varchar(20)"
+                description: "Primary tax type if program is tax-specific"
+                reference_data: "tax_framework.tax_type"
+
+              - name: "compliance_risk_category"
+                display_name: "Risk Category"
+                type: "varchar(50)"
+                description: |
+                  Risk being addressed: NON_REGISTRATION, NON_FILING,
+                  UNDERREPORTING, EVASION, FRAUD, AVOIDANCE
+
+              - name: "program_objectives"
+                display_name: "Program Objectives"
+                type: "text"
+                description: "Detailed objectives and goals"
+                constraints:
+                  not_null: true
+
+              - name: "treatment_strategy"
+                display_name: "Treatment Strategy"
+                type: "text"
+                description: |
+                  Strategy: SERVICE_FOCUSED, ENFORCEMENT_FOCUSED,
+                  BALANCED_APPROACH, EDUCATION_CAMPAIGN
+
+              - name: "target_population_size"
+                display_name: "Target Population"
+                type: "integer"
+                description: "Number of taxpayers in scope"
+
+              - name: "planned_interventions"
+                display_name: "Planned Interventions"
+                type: "integer"
+                description: "Number of planned compliance interventions"
+
+              - name: "allocated_resources"
+                display_name: "Allocated Resources"
+                type: "integer"
+                description: "Number of staff allocated"
+
+              - name: "target_revenue_impact"
+                display_name: "Target Revenue Impact"
+                type: "decimal(19,2)"
+                description: "Expected revenue impact"
+
+              - name: "program_status_code"
+                display_name: "Status"
+                type: "varchar(20)"
+                description: |
+                  Status: PLANNING, APPROVED, ACTIVE, SUSPENDED,
+                  COMPLETED, CANCELLED
+                constraints:
+                  not_null: true
+                reference_data: "ref_program_status"
+
+              - name: "start_date"
+                display_name: "Start Date"
+                type: "date"
+                description: "Program start date"
+
+              - name: "end_date"
+                display_name: "End Date"
+                type: "date"
+                description: "Program end date"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+          # -----------------------------------------------------------------
+
+          - name: "taxpayer_risk_profile"
+            display_name: "Taxpayer Risk Profile"
+            description: |
+              Comprehensive risk profiles for taxpayers, updated dynamically
+              based on behavior, filing patterns, payment history, audit
+              results, and third-party data. Risk profiles drive case
+              selection for audits, monitoring intensity, and service levels.
+
+              Risk factors considered:
+              - Filing compliance (on-time, complete, accurate)
+              - Payment compliance (on-time, full payment)
+              - Industry risk level
+              - Business complexity
+              - Transaction patterns
+              - Third-party data discrepancies
+              - Prior audit results
+              - Objection/appeal history
+
+              Risk scores update in real-time as events occur:
+              - Return filed Ã¢â€ ' Recalculate risk
+              - Payment made Ã¢â€ ' Update payment risk
+              - Audit completed Ã¢â€ ' Incorporate findings
+              - Third-party data received Ã¢â€ ' Check discrepancies
+
+              Source: Tax Capabilities - Risk-based Compliance Model
+
+            type: "master"
+            estimated_volume: "high"  # One per active taxpayer
+
+            columns:
+              - name: "taxpayer_risk_profile_id"
+                display_name: "Risk Profile ID"
+                type: "bigint"
+                description: "Unique identifier for risk profile"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "party_id"
+                display_name: "Taxpayer"
+                type: "bigint"
+                description: "Taxpayer this profile relates to"
+                constraints:
+                  not_null: true
+                  unique: true
+                  foreign_key:
+                    referenced_table: "party_management.party"
+                    referenced_column: "party_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_risk_profile_party"
+                security:
+                  sensitive: true
+
+              - name: "overall_risk_score"
+                display_name: "Overall Risk Score"
+                type: "decimal(5,2)"
+                description: "Composite risk score (0-100)"
+                constraints:
+                  not_null: true
+                validation_rules:
+                  - "overall_risk_score BETWEEN 0 AND 100"
+                indexing:
+                  - type: "btree"
+                    name: "idx_risk_overall_score"
+
+              - name: "risk_rating_code"
+                display_name: "Risk Rating"
+                type: "varchar(20)"
+                description: |
+                  Risk category: VERY_LOW, LOW, MEDIUM, HIGH, VERY_HIGH,
+                  CRITICAL
+                constraints:
+                  not_null: true
+                reference_data: "ref_risk_rating"
+                indexing:
+                  - type: "btree"
+                    name: "idx_risk_rating"
+
+              - name: "filing_risk_score"
+                display_name: "Filing Risk Score"
+                type: "decimal(5,2)"
+                description: "Risk score for filing compliance (0-100)"
+                validation_rules:
+                  - "filing_risk_score BETWEEN 0 AND 100"
+
+              - name: "payment_risk_score"
+                display_name: "Payment Risk Score"
+                type: "decimal(5,2)"
+                description: "Risk score for payment compliance (0-100)"
+                validation_rules:
+                  - "payment_risk_score BETWEEN 0 AND 100"
+
+              - name: "accuracy_risk_score"
+                display_name: "Accuracy Risk Score"
+                type: "decimal(5,2)"
+                description: "Risk score for reporting accuracy (0-100)"
+                validation_rules:
+                  - "accuracy_risk_score BETWEEN 0 AND 100"
+
+              - name: "industry_risk_score"
+                display_name: "Industry Risk Score"
+                type: "decimal(5,2)"
+                description: "Inherent risk of taxpayer's industry (0-100)"
+                validation_rules:
+                  - "industry_risk_score BETWEEN 0 AND 100"
+
+              - name: "complexity_risk_score"
+                display_name: "Complexity Risk Score"
+                type: "decimal(5,2)"
+                description: "Risk from business complexity (0-100)"
+                validation_rules:
+                  - "complexity_risk_score BETWEEN 0 AND 100"
+
+              - name: "last_audit_date"
+                display_name: "Last Audit Date"
+                type: "date"
+                description: "Date of most recent audit"
+
+              - name: "last_audit_outcome_code"
+                display_name: "Last Audit Outcome"
+                type: "varchar(20)"
+                description: |
+                  Outcome: NO_ADJUSTMENT, MINOR_ADJUSTMENT,
+                  MAJOR_ADJUSTMENT, FRAUD_DETECTED
+                reference_data: "ref_audit_outcome"
+
+              - name: "audit_adjustment_history"
+                display_name: "Audit Adjustment History"
+                type: "decimal(19,2)"
+                description: "Total historical audit adjustments"
+
+              - name: "late_filing_count_12m"
+                display_name: "Late Filings (12mo)"
+                type: "integer"
+                description: "Number of late filings in past 12 months"
+                constraints:
+                  default: "0"
+
+              - name: "non_filing_count_12m"
+                display_name: "Non-Filings (12mo)"
+                type: "integer"
+                description: "Number of missed filings in past 12 months"
+                constraints:
+                  default: "0"
+
+              - name: "late_payment_count_12m"
+                display_name: "Late Payments (12mo)"
+                type: "integer"
+                description: "Number of late payments in past 12 months"
+                constraints:
+                  default: "0"
+
+              - name: "current_arrears_amount"
+                display_name: "Current Arrears"
+                type: "decimal(19,2)"
+                description: "Current outstanding arrears"
+                constraints:
+                  default: "0"
+
+              - name: "has_active_objection"
+                display_name: "Has Active Objection"
+                type: "boolean"
+                description: "Whether taxpayer has active objection"
+                constraints:
+                  default: "false"
+
+              - name: "objection_count_history"
+                display_name: "Historical Objection Count"
+                type: "integer"
+                description: "Total number of objections filed historically"
+                constraints:
+                  default: "0"
+
+              - name: "third_party_discrepancy_count"
+                display_name: "Third-Party Discrepancies"
+                type: "integer"
+                description: "Number of discrepancies from third-party data"
+                constraints:
+                  default: "0"
+
+              - name: "risk_factors"
+                display_name: "Risk Factors"
+                type: "text"
+                description: "Narrative description of key risk factors"
+
+              - name: "treatment_recommendation"
+                display_name: "Treatment Recommendation"
+                type: "varchar(50)"
+                description: |
+                  Recommended treatment: ENHANCED_SERVICE, STANDARD_SERVICE,
+                  INCREASED_MONITORING, AUDIT_SELECTION, ENFORCEMENT_ACTION
+                reference_data: "ref_treatment_strategy"
+
+              - name: "profile_last_updated"
+                display_name: "Profile Last Updated"
+                type: "timestamp with time zone"
+                description: "When risk profile was last recalculated"
+                constraints:
+                  not_null: true
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "bigint"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "bigint"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: true
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_risk_composite"
+                columns: ["risk_rating_code", "overall_risk_score"]
+                type: "btree"
+                description: "For risk-based case selection"
+
+              - name: "idx_risk_filing_payment"
+                columns: ["filing_risk_score", "payment_risk_score"]
+                type: "btree"
+                description: "For compliance monitoring"
+
+# =============================================================================
+# BUSINESS RULES
+# =============================================================================
+
+business_rules:
+  - id: "BR-CC-001"
+    domain: "compliance_control"
+    name: "Audit Case Assignment Timeliness"
+    description: |
+      Audit cases must be assigned to auditors within 5 working days of
+      selection. Unassigned cases represent inefficiency and may result
+      in statute of limitations issues.
+    severity: "HIGH"
+    affected_tables:
+      - "audit_case"
+    validation_query: |
+      SELECT audit_case_id, case_number, created_date,
+             CURRENT_DATE - created_date AS days_unassigned
+      FROM audit_case
+      WHERE case_status_code = 'SELECTED'
+        AND assigned_officer_id IS NULL
+        AND CURRENT_DATE - created_date > 7  -- 5 working days â‰ˆ 7 calendar
+    enforcement: "application"
+
+  - id: "BR-CC-002"
+    domain: "compliance_control"
+    name: "Audit Completion Deadline"
+    description: |
+      Audits must be completed within 90 days of planned start date unless
+      extension formally approved. Long-running audits tie up resources
+      and delay revenue realization.
+    severity: "MEDIUM"
+    affected_tables:
+      - "audit_case"
+    validation_query: |
+      SELECT audit_case_id, case_number, planned_start_date,
+             CURRENT_DATE - planned_start_date AS days_in_progress
+      FROM audit_case
+      WHERE case_status_code = 'IN_PROGRESS'
+        AND CURRENT_DATE - planned_start_date > 90
+        AND actual_completion_date IS NULL
+    enforcement: "application"
+
+  - id: "BR-CC-003"
+    domain: "compliance_control"
+    name: "Collection Case Escalation"
+    description: |
+      Collection cases with debt age > 90 days and amount > $10,000 must
+      be escalated to enforcement actions. Aging debt becomes increasingly
+      uncollectable.
+    severity: "HIGH"
+    affected_tables:
+      - "collection_case"
+    validation_query: |
+      SELECT collection_case_id, case_number, debt_age_days,
+             current_debt_amount
+      FROM collection_case
+      WHERE case_status_code IN ('NEW', 'UNDER_REVIEW')
+        AND debt_age_days > 90
+        AND current_debt_amount > 10000
+        AND enforcement_level_code IN ('NOTICE', 'DEMAND')
+    enforcement: "application"
+
+  - id: "BR-CC-004"
+    domain: "compliance_control"
+    name: "Objection Decision Timeliness"
+    description: |
+      Objections must receive decision within 60 days of filing unless
+      complexity warrants extension. Timely decisions protect taxpayer
+      rights and maintain confidence in system.
+    severity: "HIGH"
+    affected_tables:
+      - "objection_case"
+    validation_query: |
+      SELECT objection_case_id, case_number, filing_date,
+             CURRENT_DATE - filing_date AS days_pending
+      FROM objection_case
+      WHERE case_status_code NOT IN ('DECISION_ISSUED', 'CLOSED')
+        AND CURRENT_DATE - filing_date > 60
+        AND decision_date IS NULL
+    enforcement: "application"
+
+  - id: "BR-CC-005"
+    domain: "compliance_control"
+    name: "Risk Profile Currency"
+    description: |
+      Taxpayer risk profiles must be updated within 30 days of significant
+      events (audit completion, major payment default, filing pattern change).
+      Stale risk profiles result in poor case selection.
+    severity: "MEDIUM"
+    affected_tables:
+      - "taxpayer_risk_profile"
+    validation_query: |
+      SELECT trp.taxpayer_risk_profile_id, trp.party_id,
+             trp.profile_last_updated,
+             CURRENT_DATE - trp.profile_last_updated AS days_stale
+      FROM taxpayer_risk_profile trp
+      WHERE CURRENT_DATE - trp.profile_last_updated > 30
+    enforcement: "application"
+
+# =============================================================================
+# REFERENCE DATA
+# =============================================================================
+
+reference_data:
+  - table_name: "ref_audit_type"
+    description: "Types of audits"
+    data:
+      - code: "COMPREHENSIVE"
+        name: "Comprehensive Audit"
+      - code: "DESK_AUDIT"
+        name: "Desk Audit"
+      - code: "FIELD_AUDIT"
+        name: "Field Audit"
+      - code: "ISSUE_ORIENTED"
+        name: "Issue-Oriented Audit"
+      - code: "REFUND_VERIFICATION"
+        name: "Refund Verification"
+      - code: "VAT_VERIFICATION"
+        name: "VAT Verification"
+      - code: "TRANSFER_PRICING"
+        name: "Transfer Pricing Audit"
+      - code: "SPECIAL_INVESTIGATION"
+        name: "Special Investigation"
+
+  - table_name: "ref_objection_type"
+    description: "Types of objections"
+    data:
+      - code: "ASSESSMENT"
+        name: "Assessment Objection"
+      - code: "AUDIT"
+        name: "Audit Finding Objection"
+      - code: "PENALTY"
+        name: "Penalty Objection"
+      - code: "REGISTRATION"
+        name: "Registration Decision"
+      - code: "REFUND_DENIAL"
+        name: "Refund Denial"
+      - code: "COLLECTION_ACTION"
+        name: "Collection Action"
+
+  - table_name: "ref_enforcement_action_type"
+    description: "Types of enforcement actions"
+    data:
+      - code: "REMINDER_NOTICE"
+        name: "Reminder Notice"
+        sequence: 1
+      - code: "DEMAND_NOTICE"
+        name: "Demand Notice"
+        sequence: 2
+      - code: "PHONE_CONTACT"
+        name: "Phone Contact"
+        sequence: 3
+      - code: "FIELD_VISIT"
+        name: "Field Visit"
+        sequence: 4
+      - code: "REFUND_OFFSET"
+        name: "Refund Offset"
+        sequence: 5
+      - code: "BANK_GARNISHMENT"
+        name: "Bank Garnishment"
+        sequence: 6
+      - code: "SALARY_GARNISHMENT"
+        name: "Salary Garnishment"
+        sequence: 7
+      - code: "ASSET_SEIZURE"
+        name: "Asset Seizure"
+        sequence: 8
+      - code: "ASSET_SALE"
+        name: "Asset Sale"
+        sequence: 9
+      - code: "LEGAL_FILING"
+        name: "Legal Filing"
+        sequence: 10
+
+  - table_name: "ref_risk_rating"
+    description: "Risk rating categories"
+    data:
+      - code: "VERY_LOW"
+        name: "Very Low Risk"
+        score_min: 0
+        score_max: 20
+      - code: "LOW"
+        name: "Low Risk"
+        score_min: 20
+        score_max: 40
+      - code: "MEDIUM"
+        name: "Medium Risk"
+        score_min: 40
+        score_max: 60
+      - code: "HIGH"
+        name: "High Risk"
+        score_min: 60
+        score_max: 80
+      - code: "VERY_HIGH"
+        name: "Very High Risk"
+        score_min: 80
+        score_max: 95
+      - code: "CRITICAL"
+        name: "Critical Risk"
+        score_min: 95
+        score_max: 100
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+summary: |
+  Compliance & Control Domain - COMPLETE
+
+  This domain implements comprehensive compliance management, enforcement,
+  and legal proceedings capabilities for modern tax administration.
+
+  Core Components:
+  Ã¢Å“" Audit Management - 3 tables (plan, case, finding)
+  Ã¢Å“" Collection & Enforcement - 2 tables (case, action)
+  Ã¢Å“" Objections & Appeals - 2 tables (objection, appeal)
+  Ã¢Å“" Compliance Risk Management - 2 tables (program, risk profile)
+
+  Total Tables: 9
+  Total Columns: ~370
+  Total Business Rules: 5
+  Total Relationships: 15+
+
+  Key Features:
+  - Risk-based audit selection and planning
+  - Complete audit lifecycle tracking
+  - Graduated enforcement approach
+  - Multi-level appeals processing
+  - Dynamic risk profiling
+  - Strategic compliance programs
+  - Performance measurement
+  - Case-based processing
+  - Comprehensive audit trails
+  - Officer workload management
+
+  Integration Points:
+  - Party Management (taxpayers)
+  - Registration (tax accounts)
+  - Filing & Assessment (returns, assessments)
+  - Accounting (balances, arrears)
+  - Payment & Refund (payment history)
+  - Document Management (case files)
+
+  SIGTAS Sources Synthesized:
+  - AUDIT schema (15+ tables)
+  - COLLECTION schema (12+ tables)
+  - OBJECTION schema (8+ tables)
+  - Tax Capabilities Document
+
+  All tables follow TA-RDM standards:
+  Ã¢Å“" Snake_case naming
+  Ã¢Å“" Comprehensive descriptions
+  Ã¢Å“" All constraints defined
+  Ã¢Å“" Indexes optimized
+  Ã¢Å“" Audit columns on all tables
+  Ã¢Å“" Security classifications
+  Ã¢Å“" Business rules documented
+  Ã¢Å“" Relationships mapped
+  Ã¢Å“" SIGTAS sources traced
+
+  Ready for implementation!

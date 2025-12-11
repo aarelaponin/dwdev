@@ -1,0 +1,805 @@
+# =============================================================================
+# Malta L3 Warehouse: fact_account_balance Fact Table
+# =============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Phase: C - L3 Warehouse Model Development
+# Step: 11b - Financial & Customs Facts
+# =============================================================================
+
+fact_table:
+  name: "fact_account_balance"
+  schema: "warehouse"
+  description: |
+    Periodic snapshot fact table capturing tax account balances at regular
+    intervals (monthly). Each row represents the state of a single tax
+    account at a specific point in time (month end).
+    
+    KEY DIFFERENCE FROM TRANSACTIONAL FACTS:
+    - Transactional facts: One row per event, measures are ADDITIVE
+    - Periodic snapshot: One row per entity per period, balance measures are SEMI-ADDITIVE
+    
+    Semi-additive measures (balances) can be summed across all dimensions
+    EXCEPT time. Summing balances across months would double-count.
+    
+    Use Cases:
+    - Arrears analysis and aging buckets
+    - Balance trends over time
+    - Collection effectiveness measurement
+    - Credit balance identification
+    - Write-off analysis
+    
+    Snapshot Timing:
+    - Generated monthly on last day of month
+    - Captures end-of-day balances
+    - Historical snapshots are immutable (never updated)
+    
+  fact_type: "PERIODIC_SNAPSHOT"
+  grain: "One row per tax account per snapshot month"
+  snapshot_frequency: "MONTHLY"
+  snapshot_timing: "End of month (23:59:59)"
+  
+  business_context:
+    domain: "Accounting"
+    primary_use: "Arrears management, aging analysis, collection effectiveness"
+    usage_pattern: "High read volume for debt dashboards; monthly append-only ETL"
+    refresh: "Monthly snapshot on first business day after month end"
+    
+  estimated_volume:
+    initial_rows: 50000000
+    annual_growth_rows: 6000000
+    note: |
+      ~500K tax accounts × 12 months × 5 years historical
+      Very large table - partitioning recommended
+    partitioning:
+      strategy: "RANGE"
+      column: "snapshot_date_key"
+      interval: "YEARLY"
+      retention: "7 years"
+
+  # ===========================================================================
+  # DIMENSION FOREIGN KEYS
+  # ===========================================================================
+  dimension_keys:
+    - name: "party_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_party"
+      description: "Taxpayer owning the account"
+      
+    - name: "tax_type_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_tax_type"
+      description: "Type of tax for this account"
+      
+    - name: "registration_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_registration"
+      description: "Registration status at snapshot date"
+      note: "Use registration effective at snapshot month end"
+      
+    - name: "compliance_status_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_compliance_status"
+      description: "Account compliance status at snapshot"
+      
+    - name: "risk_category_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_risk_category"
+      description: "Risk classification at snapshot date"
+      default_value: -1
+      
+    - name: "geography_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_geography"
+      description: "Taxpayer's location at snapshot"
+      default_value: -1
+
+  # ===========================================================================
+  # SNAPSHOT DATE KEY
+  # ===========================================================================
+  date_keys:
+    - name: "snapshot_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Snapshot Date"
+      description: "Last day of snapshot month"
+      format: "YYYYMMDD smart key"
+      source: "Last day of accounting period"
+      note: |
+        For periodic snapshots, there is only ONE date key (the snapshot date).
+        Unlike transactional facts which have multiple role-playing dates.
+        The snapshot date is always the last day of the month.
+        Example: For January 2024 snapshot, date_key = 20240131
+
+  # ===========================================================================
+  # DEGENERATE DIMENSIONS
+  # ===========================================================================
+  degenerate_dimensions:
+    - name: "account_source_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "L2 tax_account_id - reference to source account"
+      source: "registration.tax_account.tax_account_id"
+      note: "Part of composite primary key with snapshot_date_key"
+      
+    - name: "account_number"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "Business key for the tax account"
+      source: "tax_account.account_number"
+      
+    - name: "snapshot_period"
+      data_type: "VARCHAR(7)"
+      nullable: false
+      description: "Snapshot period in YYYY-MM format"
+      source: "Derived from snapshot_date_key"
+      example: "2024-01"
+      
+    - name: "account_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Account status at snapshot"
+      source: "tax_account.account_status_code"
+      allowed_values: ["ACTIVE", "SUSPENDED", "CLOSED", "DORMANT"]
+
+  # ===========================================================================
+  # SEMI-ADDITIVE MEASURES - BALANCE AMOUNTS
+  # ===========================================================================
+  # CRITICAL: These measures are SEMI-ADDITIVE
+  # They can be summed across party, tax_type, geography, etc.
+  # They CANNOT be summed across time (snapshot_date)
+  # ===========================================================================
+  measures_semi_additive:
+    # Core Balance Measures
+    - name: "opening_balance"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: |
+        Balance at start of snapshot period.
+        This is the closing_balance from the previous month.
+      source: "Previous month's closing_balance OR account_balance.opening_balance"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      semi_additive_note: "Use MIN/MAX/AVG across time, SUM across other dims"
+      
+    - name: "closing_balance"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: |
+        Balance at end of snapshot period.
+        Calculated: opening_balance + debits - credits
+      source: "account_balance.closing_balance"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      semi_additive_note: "Primary balance for point-in-time analysis"
+      
+    - name: "debit_balance"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: |
+        Amount owed by taxpayer (positive balance).
+        Represents liability to the state.
+      source: "GREATEST(closing_balance, 0)"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "credit_balance"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: |
+        Amount owed to taxpayer (overpayment).
+        Represents potential refund or future offset.
+      source: "ABS(LEAST(closing_balance, 0))"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      note: "Stored as positive number for analysis"
+      
+    # Aging Bucket Measures
+    - name: "current_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: |
+        Amount not yet due (current).
+        Due date is in the future as of snapshot date.
+      source: "SUM of transactions where due_date > snapshot_date"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "overdue_1_30_days"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Amount overdue 1-30 days"
+      source: "SUM of transactions where days_overdue BETWEEN 1 AND 30"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "overdue_31_60_days"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Amount overdue 31-60 days"
+      source: "SUM of transactions where days_overdue BETWEEN 31 AND 60"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "overdue_61_90_days"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Amount overdue 61-90 days"
+      source: "SUM of transactions where days_overdue BETWEEN 61 AND 90"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "overdue_91_180_days"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Amount overdue 91-180 days"
+      source: "SUM of transactions where days_overdue BETWEEN 91 AND 180"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "overdue_181_365_days"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Amount overdue 181-365 days (6-12 months)"
+      source: "SUM of transactions where days_overdue BETWEEN 181 AND 365"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "overdue_over_365_days"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Amount overdue more than 1 year"
+      source: "SUM of transactions where days_overdue > 365"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      note: "Includes potentially uncollectible debt"
+      
+    # Component Balance Breakdown
+    - name: "principal_balance"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: |
+        Tax principal outstanding.
+        Core tax liability excluding penalties and interest.
+      source: "account_balance WHERE charge_type = 'PRINCIPAL'"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "penalty_balance"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Penalties outstanding"
+      source: "account_balance WHERE charge_type = 'PENALTY'"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "interest_balance"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Interest outstanding"
+      source: "account_balance WHERE charge_type = 'INTEREST'"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    - name: "surcharge_balance"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Other surcharges outstanding"
+      source: "account_balance WHERE charge_type = 'SURCHARGE'"
+      unit: "EUR"
+      aggregation: "SUM (except across time)"
+      
+    # Other Semi-Additive
+    - name: "days_oldest_debt"
+      data_type: "INT"
+      nullable: true
+      description: "Age in days of oldest outstanding item"
+      source: "MAX(days_overdue) from outstanding transactions"
+      aggregation: "MAX (not SUM)"
+      note: "Used for arrears aging; MAX is appropriate aggregation"
+
+  # ===========================================================================
+  # ADDITIVE MEASURES - PERIOD ACTIVITY
+  # ===========================================================================
+  # These measures represent ACTIVITY during the snapshot period
+  # They ARE fully additive and can be summed across all dimensions including time
+  # ===========================================================================
+  measures_additive:
+    - name: "period_assessments"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Total assessments raised during the snapshot period"
+      source: "SUM(tax_transaction WHERE type = 'ASSESSMENT' AND date IN snapshot_period)"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "period_payments"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Total payments received during the snapshot period"
+      source: "SUM(tax_transaction WHERE type = 'PAYMENT' AND date IN snapshot_period)"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "period_refunds"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Total refunds paid during the snapshot period"
+      source: "SUM(tax_transaction WHERE type = 'REFUND' AND date IN snapshot_period)"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "period_adjustments"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Net adjustments during the snapshot period"
+      source: "SUM(tax_transaction WHERE type = 'ADJUSTMENT' AND date IN snapshot_period)"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Can be positive or negative"
+      
+    - name: "period_write_offs"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Write-offs processed during the snapshot period"
+      source: "SUM(tax_transaction WHERE type = 'WRITE_OFF' AND date IN snapshot_period)"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "period_interest_accrued"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Interest accrued during the snapshot period"
+      source: "SUM(interest accruals in period)"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "period_penalties_imposed"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      default_value: 0.00
+      description: "Penalties imposed during the snapshot period"
+      source: "SUM(penalty transactions in period)"
+      unit: "EUR"
+      aggregation: "SUM"
+
+  # ===========================================================================
+  # NON-ADDITIVE MEASURES - CALCULATED RATIOS
+  # ===========================================================================
+  measures_non_additive:
+    - name: "collection_rate"
+      data_type: "DECIMAL(5,4)"
+      nullable: true
+      description: |
+        Collection effectiveness ratio for the period.
+        Payments received / Opening balance
+      source: "period_payments / NULLIF(opening_balance, 0)"
+      aggregation: "Must recalculate from summed components"
+      note: "Values typically 0-1; can exceed 1 if payments > opening balance"
+      
+    - name: "arrears_ratio"
+      data_type: "DECIMAL(5,4)"
+      nullable: true
+      description: |
+        Proportion of balance that is overdue.
+        Total overdue / closing_balance
+      source: "(SUM of overdue buckets) / NULLIF(debit_balance, 0)"
+      aggregation: "Must recalculate from summed components"
+      
+    - name: "bad_debt_ratio"
+      data_type: "DECIMAL(5,4)"
+      nullable: true
+      description: |
+        Proportion of debt likely uncollectible (>365 days).
+        overdue_over_365_days / debit_balance
+      source: "overdue_over_365_days / NULLIF(debit_balance, 0)"
+      aggregation: "Must recalculate from summed components"
+
+  # ===========================================================================
+  # FLAGS
+  # ===========================================================================
+  flags:
+    - name: "has_debit_balance"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Account has positive (debit) balance - owes money"
+      source: "closing_balance > 0"
+      
+    - name: "has_credit_balance"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Account has negative (credit) balance - overpaid"
+      source: "closing_balance < 0"
+      
+    - name: "has_overdue_debt"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Account has any overdue amount"
+      source: "(overdue_1_30_days + ... + overdue_over_365_days) > 0"
+      
+    - name: "is_in_arrears"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Account has significant arrears (>30 days overdue)"
+      source: "(overdue_31_60_days + ... + overdue_over_365_days) > 0"
+      
+    - name: "is_in_collection"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Account is under active collection action"
+      source: "Derived from compliance_event linkage"
+      
+    - name: "is_payment_plan_active"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Account has active installment payment plan"
+      source: "Derived from payment_plan linkage"
+      
+    - name: "is_zero_balance"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Account has zero balance"
+      source: "ABS(closing_balance) < 0.01"
+      
+    - name: "is_dormant"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "No activity in 12+ months"
+      source: "account_status_code = 'DORMANT'"
+
+  # ===========================================================================
+  # ETL METADATA
+  # ===========================================================================
+  metadata:
+    - name: "etl_batch_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch that created this snapshot"
+      
+    - name: "etl_load_timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when snapshot was generated"
+      
+    - name: "source_system"
+      data_type: "VARCHAR(50)"
+      nullable: false
+      description: "Source system identifier"
+      default_value: "L2_ACCOUNTING"
+      
+    - name: "snapshot_generated_date"
+      data_type: "DATE"
+      nullable: false
+      description: "Date when this snapshot was actually generated"
+      note: "May be different from snapshot_date_key if generated retroactively"
+
+  # ===========================================================================
+  # INDEXES
+  # ===========================================================================
+  indexes:
+    - name: "pk_fact_account_balance"
+      columns: ["account_source_id", "snapshot_date_key"]
+      type: "PRIMARY KEY"
+      note: "Composite primary key - account + snapshot date"
+      
+    - name: "idx_fact_balance_party"
+      columns: ["party_key", "snapshot_date_key"]
+      type: "BTREE"
+      description: "Party balance history queries"
+      
+    - name: "idx_fact_balance_tax"
+      columns: ["tax_type_key", "snapshot_date_key"]
+      type: "BTREE"
+      description: "Tax type balance analysis"
+      
+    - name: "idx_fact_balance_snapshot"
+      columns: ["snapshot_date_key"]
+      type: "BTREE"
+      description: "Point-in-time queries"
+      
+    - name: "idx_fact_balance_arrears"
+      columns: ["is_in_arrears", "snapshot_date_key"]
+      type: "BTREE"
+      description: "Arrears dashboard queries"
+      
+    - name: "idx_fact_balance_debit"
+      columns: ["has_debit_balance", "snapshot_date_key", "debit_balance"]
+      type: "BTREE"
+      description: "Outstanding balance queries"
+      
+    - name: "idx_fact_balance_period"
+      columns: ["snapshot_period"]
+      type: "BTREE"
+      description: "Period-based analysis"
+
+  # ===========================================================================
+  # SOURCE MAPPING
+  # ===========================================================================
+  source_mapping:
+    primary_source:
+      schema: "accounting"
+      table: "account_balance"
+      key: "account_balance_id"
+      filter: "Balance records at period end"
+      
+    snapshot_generation: |
+      For each month end:
+      1. Identify all active tax accounts
+      2. Calculate closing balance from account_balance
+      3. Aggregate transactions in period for activity measures
+      4. Calculate aging buckets from outstanding items
+      5. Apply dimension keys based on state at snapshot date
+      
+    joins:
+      - table: "registration.tax_account"
+        alias: "ta"
+        type: "INNER"
+        condition: "ab.tax_account_id = ta.tax_account_id"
+        
+      - table: "warehouse.dim_party"
+        alias: "dp"
+        type: "INNER"
+        condition: "ta.party_id = dp.party_source_id AND dp.is_current_flag = TRUE"
+        note: "For snapshot, use party state at snapshot date if available"
+        
+      - table: "warehouse.dim_tax_type"
+        alias: "dtt"
+        type: "INNER"
+        condition: "ta.tax_type_code = dtt.tax_type_code"
+        
+      - table: "accounting.tax_transaction"
+        alias: "tt"
+        type: "LEFT"
+        condition: "ta.tax_account_id = tt.tax_account_id AND tt.transaction_date IN snapshot_period"
+        aggregation: |
+          SUM(CASE WHEN tt.transaction_type = 'ASSESSMENT' THEN tt.amount ELSE 0 END) AS period_assessments,
+          SUM(CASE WHEN tt.transaction_type = 'PAYMENT' THEN tt.amount ELSE 0 END) AS period_payments,
+          ...
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+  business_rules:
+    - rule_id: "FAB_001"
+      description: "Balance equation: closing = opening + debits - credits"
+      validation_sql: |
+        SELECT account_source_id, snapshot_date_key
+        FROM warehouse.fact_account_balance
+        WHERE ABS(closing_balance - (opening_balance 
+              + period_assessments + period_interest_accrued + period_penalties_imposed
+              - period_payments - period_refunds + period_adjustments - period_write_offs)) > 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      note: "May need adjustment for data quality issues"
+      
+    - rule_id: "FAB_002"
+      description: "Component balances must sum to closing balance"
+      validation_sql: |
+        SELECT account_source_id, snapshot_date_key
+        FROM warehouse.fact_account_balance
+        WHERE ABS(debit_balance - credit_balance - closing_balance) > 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FAB_003"
+      description: "Charge type balances must sum to debit balance"
+      validation_sql: |
+        SELECT account_source_id, snapshot_date_key
+        FROM warehouse.fact_account_balance
+        WHERE has_debit_balance = TRUE
+          AND ABS(debit_balance - (principal_balance + penalty_balance + interest_balance + surcharge_balance)) > 0.01
+      expected_result: "0 rows"
+      severity: "WARNING"
+      
+    - rule_id: "FAB_004"
+      description: "Aging buckets must sum to debit balance"
+      validation_sql: |
+        SELECT account_source_id, snapshot_date_key
+        FROM warehouse.fact_account_balance
+        WHERE has_debit_balance = TRUE
+          AND ABS(debit_balance - (current_amount + overdue_1_30_days + overdue_31_60_days 
+              + overdue_61_90_days + overdue_91_180_days + overdue_181_365_days 
+              + overdue_over_365_days)) > 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FAB_005"
+      description: "Current month opening = previous month closing"
+      validation_sql: |
+        SELECT 
+            curr.account_source_id,
+            curr.snapshot_date_key AS current_period,
+            prev.snapshot_date_key AS previous_period,
+            curr.opening_balance,
+            prev.closing_balance
+        FROM warehouse.fact_account_balance curr
+        JOIN warehouse.fact_account_balance prev
+            ON curr.account_source_id = prev.account_source_id
+            AND prev.snapshot_date_key = (
+                SELECT MAX(p2.snapshot_date_key) 
+                FROM warehouse.fact_account_balance p2 
+                WHERE p2.account_source_id = curr.account_source_id
+                  AND p2.snapshot_date_key < curr.snapshot_date_key
+            )
+        WHERE ABS(curr.opening_balance - prev.closing_balance) > 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      note: "Ensures balance forward integrity"
+      
+    - rule_id: "FAB_006"
+      description: "Flags consistency with balances"
+      validation_sql: |
+        SELECT account_source_id, snapshot_date_key
+        FROM warehouse.fact_account_balance
+        WHERE (has_debit_balance = TRUE AND debit_balance <= 0)
+           OR (has_credit_balance = TRUE AND credit_balance <= 0)
+           OR (is_zero_balance = TRUE AND ABS(closing_balance) >= 0.01)
+      expected_result: "0 rows"
+      severity: "ERROR"
+
+  # ===========================================================================
+  # SAMPLE QUERIES
+  # ===========================================================================
+  sample_queries:
+    - name: "Total Arrears by Tax Type"
+      description: "Point-in-time arrears analysis"
+      sql: |
+        -- IMPORTANT: For periodic snapshots, always filter to a SINGLE snapshot date
+        -- Never SUM balances across multiple snapshot dates
+        SELECT 
+            dtt.tax_type_name,
+            COUNT(*) AS account_count,
+            SUM(fab.debit_balance) AS total_arrears,
+            SUM(fab.overdue_1_30_days) AS arr_1_30,
+            SUM(fab.overdue_31_60_days) AS arr_31_60,
+            SUM(fab.overdue_61_90_days) AS arr_61_90,
+            SUM(fab.overdue_91_180_days) AS arr_91_180,
+            SUM(fab.overdue_181_365_days) AS arr_181_365,
+            SUM(fab.overdue_over_365_days) AS arr_over_365
+        FROM warehouse.fact_account_balance fab
+        JOIN warehouse.dim_tax_type dtt ON fab.tax_type_key = dtt.tax_type_key
+        WHERE fab.snapshot_date_key = 20241231  -- Single point in time
+          AND fab.has_debit_balance = TRUE
+        GROUP BY dtt.tax_type_name
+        ORDER BY total_arrears DESC;
+        
+    - name: "Balance Trend Analysis"
+      description: "Track balance changes over time (one account)"
+      sql: |
+        -- For trend analysis, select snapshots but analyze with AVG/LAST, not SUM
+        SELECT 
+            fab.snapshot_period,
+            fab.opening_balance,
+            fab.period_assessments,
+            fab.period_payments,
+            fab.closing_balance,
+            fab.closing_balance - LAG(fab.closing_balance) OVER (ORDER BY fab.snapshot_date_key) AS balance_change
+        FROM warehouse.fact_account_balance fab
+        WHERE fab.account_source_id = 12345
+          AND fab.snapshot_date_key >= 20240101
+        ORDER BY fab.snapshot_date_key;
+        
+    - name: "Collection Effectiveness by Period"
+      description: "Track collection rates over time"
+      sql: |
+        -- Period activity measures ARE additive across time
+        SELECT 
+            dtt.tax_type_name,
+            fab.snapshot_period,
+            SUM(fab.period_payments) AS total_collected,
+            SUM(fab.opening_balance) AS total_opening_balance,
+            ROUND(100.0 * SUM(fab.period_payments) / NULLIF(SUM(fab.opening_balance), 0), 2) AS collection_rate
+        FROM warehouse.fact_account_balance fab
+        JOIN warehouse.dim_tax_type dtt ON fab.tax_type_key = dtt.tax_type_key
+        WHERE fab.snapshot_date_key >= 20240101
+        GROUP BY dtt.tax_type_name, fab.snapshot_period
+        ORDER BY fab.snapshot_period, collection_rate DESC;
+        
+    - name: "Aging Bucket Movement"
+      description: "How debt ages over consecutive months"
+      sql: |
+        SELECT 
+            curr.snapshot_period AS current_month,
+            SUM(curr.current_amount) AS current_bucket,
+            SUM(curr.overdue_1_30_days) AS bucket_1_30,
+            SUM(curr.overdue_over_365_days) AS bucket_over_365,
+            SUM(prev.current_amount) AS prev_current_bucket,
+            -- Track how much moved from current to 1-30
+            SUM(curr.overdue_1_30_days) - SUM(prev.overdue_1_30_days) AS movement_to_1_30
+        FROM warehouse.fact_account_balance curr
+        JOIN warehouse.fact_account_balance prev 
+            ON curr.account_source_id = prev.account_source_id
+            AND prev.snapshot_period = DATE_FORMAT(DATE_SUB(STR_TO_DATE(CONCAT(curr.snapshot_period, '-01'), '%Y-%m-%d'), INTERVAL 1 MONTH), '%Y-%m')
+        WHERE curr.snapshot_period = '2024-12'
+        GROUP BY curr.snapshot_period;
+        
+    - name: "Credit Balance Analysis"
+      description: "Identify accounts with overpayments"
+      sql: |
+        SELECT 
+            dp.tin,
+            dp.party_name,
+            dtt.tax_type_name,
+            fab.closing_balance,
+            fab.credit_balance,
+            fab.snapshot_period
+        FROM warehouse.fact_account_balance fab
+        JOIN warehouse.dim_party dp ON fab.party_key = dp.party_key
+        JOIN warehouse.dim_tax_type dtt ON fab.tax_type_key = dtt.tax_type_key
+        WHERE fab.snapshot_date_key = 20241231
+          AND fab.has_credit_balance = TRUE
+          AND fab.credit_balance > 1000
+          AND dp.is_current_flag = TRUE
+        ORDER BY fab.credit_balance DESC;
+        
+    - name: "Write-Off Candidates"
+      description: "Identify accounts for potential write-off"
+      sql: |
+        SELECT 
+            fab.account_number,
+            dp.tin,
+            dtt.tax_type_name,
+            fab.debit_balance,
+            fab.overdue_over_365_days,
+            fab.days_oldest_debt,
+            ROUND(100.0 * fab.overdue_over_365_days / NULLIF(fab.debit_balance, 0), 2) AS pct_over_365
+        FROM warehouse.fact_account_balance fab
+        JOIN warehouse.dim_party dp ON fab.party_key = dp.party_key
+        JOIN warehouse.dim_tax_type dtt ON fab.tax_type_key = dtt.tax_type_key
+        WHERE fab.snapshot_date_key = 20241231
+          AND fab.overdue_over_365_days > 0
+          AND fab.days_oldest_debt > 730  -- Over 2 years
+        ORDER BY fab.overdue_over_365_days DESC;
+
+  # ===========================================================================
+  # IMPORTANT NOTES FOR BI DEVELOPERS
+  # ===========================================================================
+  bi_developer_notes:
+    critical_warning: |
+      SEMI-ADDITIVE MEASURES WARNING:
+      
+      Balance columns (opening_balance, closing_balance, debit_balance, credit_balance,
+      and all aging buckets) are SEMI-ADDITIVE.
+      
+      ✓ CORRECT: SUM(closing_balance) WHERE snapshot_date_key = 20241231
+      ✗ WRONG:   SUM(closing_balance) WHERE snapshot_date_key BETWEEN 20240101 AND 20241231
+      
+      The second query would count the same money multiple times!
+      
+      For trend analysis across time, use:
+      - Individual rows per snapshot date
+      - AVG/MIN/MAX/LAST across time
+      - Only the period ACTIVITY measures (period_payments, etc.) can be summed across time
+      
+    recommended_aggregations:
+      closing_balance: "Use MAX or filter to single date"
+      opening_balance: "Use MIN or filter to single date"
+      period_payments: "SUM is safe across all dimensions including time"
+      collection_rate: "Recalculate from SUM(payments)/SUM(opening_balance)"

@@ -1,0 +1,1940 @@
+# ============================================================================
+# MTCA Forms - Priority 4D: Trader Registration & Origin Certificates
+# Forms: EORI, AEO, BTI, BOI, EUR.1, EUR-MED, Form A, REX, INF Documents
+# Version: 1.0
+# Date: 2025-12-06
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# EU Systems: EU CDS, EBTI, REX System
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # EORI Application: Economic Operator Registration and Identification
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "EORI_APPLICATION"
+        form_name_en: "EORI Registration Application"
+        form_name_mt: "Applikazzjoni gÄ§ar-ReÄ¡istrazzjoni EORI"
+        version: "2024"
+        effective_from: "2009-07-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Art. 9"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446 - Art. 4-9"
+          - "Commission Implementing Regulation (EU) 2015/2447"
+          - "Customs Ordinance Cap. 37"
+        administering_authority: "MTCA Customs"
+        tax_type: "Customs Registration"
+        taxpayer_category: "Economic Operator / Person"
+        filing_frequency: "One-time"
+        filing_deadline: "Before first customs interaction"
+        submission_method: "Electronic"
+        electronic_portal: "MTCA e-Forms"
+        eu_system_interface: "EOS (Economic Operator System)"
+        source_url: "https://customs.gov.mt/eori"
+        xml_schema_ref: "EOS Technical Specifications"
+        notes: |
+          EORI number required for all economic operators and persons involved
+          in customs operations. Malta EORI format: MT + VAT number (without MT)
+          or MT + TIN for non-VAT registered. Stored in EU EOS database.
+          Third country operators need EORI for specific EU operations.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Applicant Identification
+        # ----------------------------------------------------------------------
+        - section_id: "EORI_APPLICANT"
+          section_name: "Applicant Details"
+          section_description: "Identification of the economic operator"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "applicant_type"
+              field_code: "1"
+              field_name_en: "Applicant Type"
+              field_name_mt: "Tip tal-Applikant"
+              field_description: "Type of applicant (legal person or natural person)"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "1"
+                  description_en: "Legal person established in Malta"
+                - code: "2"
+                  description_en: "Natural person resident in Malta"
+                - code: "3"
+                  description_en: "Legal person established in third country"
+                - code: "4"
+                  description_en: "Natural person from third country"
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "applicant_type"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "applicant_type"
+                data_type: "FixedString(1)"
+
+            - field_id: "legal_name"
+              field_code: "2"
+              field_name_en: "Full Legal Name"
+              field_name_mt: "Isem Legali SÄ§iÄ§"
+              field_description: "Registered legal name as per MBR or ID card"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "3/1"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "legal_name"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "legal_name"
+                data_type: "String"
+
+            - field_id: "vat_number_eori"
+              field_code: "3"
+              field_name_en: "VAT Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tal-VAT"
+              field_description: "Malta VAT number if registered"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if VAT registered"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EORI_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid Malta VAT format"
+                  rule_expression: "^MT[0-9]{8}$"
+                  error_message_en: "Invalid VAT number format"
+                  error_message_mt: "Format tan-numru VAT mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "vat_register"
+              eu_data_element: "3/2"
+              cross_form_reference: "VAT_FORM_1.vat_number"
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "vat_no"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "vat_number"
+                data_type: "Nullable(FixedString(10))"
+
+            - field_id: "tin_eori"
+              field_code: "4"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "Malta TIN for non-VAT registered"
+              data_type: "TIN"
+              format: "########(#)"
+              max_length: 9
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if not VAT registered"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              eu_data_element: "3/4"
+              cross_form_reference: "e-CO.company_tin"
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "tin"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "tin"
+                data_type: "Nullable(String)"
+
+            - field_id: "registration_number"
+              field_code: "5"
+              field_name_en: "Company Registration Number"
+              field_name_mt: "Numru tar-ReÄ¡istrazzjoni tal-Kumpanija"
+              field_description: "MBR registration number (C-number)"
+              data_type: "STRING"
+              format: "C#####"
+              max_length: 10
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required for companies"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "mbr_company_register"
+              eu_data_element: "3/3"
+              cross_form_reference: "e-CO.company_roc"
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "mbr_no"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "company_registration_number"
+                data_type: "Nullable(String)"
+
+            - field_id: "establishment_date"
+              field_code: "6"
+              field_name_en: "Date of Establishment"
+              field_name_mt: "Data tat-Twaqqif"
+              field_description: "Date business/company was established"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EORI_002"
+                  rule_type: "date"
+                  rule_description: "Establishment date cannot be in future"
+                  rule_expression: "establishment_date <= CURRENT_DATE"
+                  error_message_en: "Establishment date cannot be in the future"
+                  error_message_mt: "Data tat-twaqqif ma tistax tkun fil-futur"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "3/6"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "est_date"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "establishment_date"
+                data_type: "Date"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Address Information
+        # ----------------------------------------------------------------------
+        - section_id: "EORI_ADDRESS"
+          section_name: "Registered Address"
+          section_description: "Official business address"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "street_and_number"
+              field_code: "7a"
+              field_name_en: "Street and Number"
+              field_name_mt: "Triq u Numru"
+              field_description: "Street address"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "3/1/A"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "address_street"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "street_and_number"
+                data_type: "String"
+
+            - field_id: "city"
+              field_code: "7b"
+              field_name_en: "City"
+              field_name_mt: "Belt"
+              field_description: "City or locality"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "malta_localities"
+              eu_data_element: "3/1/B"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "address_city"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "city"
+                data_type: "String"
+
+            - field_id: "postal_code"
+              field_code: "7c"
+              field_name_en: "Postal Code"
+              field_name_mt: "KodiÄ‹i Postali"
+              field_description: "Malta postal code"
+              data_type: "STRING"
+              format: "AAA ####"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EORI_003"
+                  rule_type: "pattern"
+                  rule_description: "Valid Malta postal code"
+                  rule_expression: "^[A-Z]{3} [0-9]{4}$"
+                  error_message_en: "Invalid postal code format"
+                  error_message_mt: "Format tal-kodiÄ‹i postali mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "malta_postcodes"
+              eu_data_element: "3/1/C"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "postcode"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "postal_code"
+                data_type: "FixedString(8)"
+
+            - field_id: "country_code_eori"
+              field_code: "7d"
+              field_name_en: "Country"
+              field_name_mt: "PajjiÅ¼"
+              field_description: "Country of establishment"
+              data_type: "COUNTRY_CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_countries"
+              eu_data_element: "3/1/D"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "country"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "country_code"
+                data_type: "FixedString(2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Contact Information
+        # ----------------------------------------------------------------------
+        - section_id: "EORI_CONTACT"
+          section_name: "Contact Person"
+          section_description: "Primary contact for customs matters"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "contact_name"
+              field_code: "8a"
+              field_name_en: "Contact Person Name"
+              field_name_mt: "Isem tal-Persuna ta' Kuntatt"
+              field_description: "Name of primary contact"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "3/40"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "contact_name"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "contact_name"
+                data_type: "String"
+
+            - field_id: "contact_email"
+              field_code: "8b"
+              field_name_en: "Email Address"
+              field_name_mt: "Indirizz tal-Email"
+              field_description: "Contact email"
+              data_type: "EMAIL"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "EORI_004"
+                  rule_type: "pattern"
+                  rule_description: "Valid email format"
+                  rule_expression: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                  error_message_en: "Invalid email format"
+                  error_message_mt: "Format tal-email mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "3/41"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_applications"
+                column: "contact_email"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "contact_email"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 4: EORI Number (Output)
+        # ----------------------------------------------------------------------
+        - section_id: "EORI_NUMBER"
+          section_name: "EORI Number"
+          section_description: "Assigned EORI number"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "eori_number"
+              field_code: "EORI"
+              field_name_en: "EORI Number"
+              field_name_mt: "Numru EORI"
+              field_description: "Assigned Economic Operator Registration and Identification number"
+              data_type: "EORI"
+              format: "MT + VAT(8) or MT + TIN"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Assigned upon approval"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "'MT' + VAT_NUMBER (without MT) OR 'MT' + TIN"
+              validation_rules:
+                - rule_id: "EORI_010"
+                  rule_type: "pattern"
+                  rule_description: "Valid EORI format"
+                  rule_expression: "^MT[A-Z0-9]{1,15}$"
+                  error_message_en: "Invalid EORI format"
+                  error_message_mt: "Format EORI mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "3/2"
+              cross_form_reference: "SAD_H1.declarant_eori"
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_register"
+                column: "eori_no"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "eori_number"
+                data_type: "String"
+
+            - field_id: "eori_status"
+              field_code: "Status"
+              field_name_en: "EORI Status"
+              field_name_mt: "Status EORI"
+              field_description: "Current status of EORI registration"
+              data_type: "CODE"
+              format: "A"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "A"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "A"
+                  description_en: "Active"
+                - code: "S"
+                  description_en: "Suspended"
+                - code: "I"
+                  description_en: "Invalidated"
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eori_register"
+                column: "status"
+              ors_mapping:
+                table: "mtca_ors.eori_registrations"
+                column: "eori_status"
+                data_type: "FixedString(1)"
+
+      eu_system_integration:
+        trans_european_system: "EOS (Economic Operator System)"
+        message_exchange: "Portal / Batch upload"
+        interface_specification: "EOS Technical Specifications"
+        connected_systems:
+          - system: "AIS/AES"
+            purpose: "Declarant/operator validation"
+          - system: "NCTS"
+            purpose: "Principal validation"
+          - system: "EU CDS"
+            purpose: "Authorization reference"
+
+      submission_workflow:
+        authentication_required: "e-ID Malta"
+        signature_required: false
+        guarantee_required: false
+        payment_integration: false
+        acknowledgment_type: "EORI number"
+        processing_time: "1-3 business days"
+
+  # ==========================================================================
+  # AEO Application: Authorised Economic Operator
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "AEO_APPLICATION"
+        form_name_en: "Authorised Economic Operator Application"
+        form_name_mt: "Applikazzjoni gÄ§al Operatur Ekonomiku Awtorizzat"
+        version: "2024"
+        effective_from: "2008-01-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Art. 38-41"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446 - Art. 24-35"
+          - "Commission Implementing Regulation (EU) 2015/2447 - Art. 26-35"
+          - "AEO Guidelines"
+        administering_authority: "MTCA Customs"
+        tax_type: "Customs Authorisation"
+        taxpayer_category: "Economic Operator"
+        filing_frequency: "One-time (application)"
+        filing_deadline: "No deadline - voluntary"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "EU Customs Decisions System (EU CDS)"
+        eu_system_interface: "EU CDS / eAEO"
+        source_url: "https://customs.gov.mt/aeo"
+        xml_schema_ref: "EU CDS Technical Specifications"
+        notes: |
+          AEO status provides simplified customs procedures and reduced controls.
+          Three types: AEO-C (Customs Simplifications), AEO-S (Security and Safety),
+          AEO-F (Full - combined). Requires compliance with criteria including
+          customs compliance record, financial solvency, practical standards of
+          competence, and security/safety standards.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Applicant Information
+        # ----------------------------------------------------------------------
+        - section_id: "AEO_APPLICANT"
+          section_name: "Applicant Details"
+          section_description: "Economic operator applying for AEO status"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "applicant_eori"
+              field_code: "1"
+              field_name_en: "Applicant EORI Number"
+              field_name_mt: "Numru EORI tal-Applikant"
+              field_description: "EORI of the applicant"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "AEO_001"
+                  rule_type: "lookup"
+                  rule_description: "Must have valid EORI"
+                  rule_expression: "EXISTS(eori_register.eori_no) AND status = 'A'"
+                  error_message_en: "Valid EORI required"
+                  error_message_mt: "EORI validu meÄ§tieÄ¡"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eori_register"
+              eu_data_element: "5/3"
+              cross_form_reference: "EORI_APPLICATION.eori_number"
+              legacy_mapping:
+                database: "customs_db"
+                table: "aeo_applications"
+                column: "applicant_eori"
+              ors_mapping:
+                table: "mtca_ors.aeo_authorizations"
+                column: "applicant_eori"
+                data_type: "String"
+
+            - field_id: "aeo_type_requested"
+              field_code: "2"
+              field_name_en: "AEO Status Type Requested"
+              field_name_mt: "Tip ta' Status AEO Mitlub"
+              field_description: "Type of AEO authorization requested"
+              data_type: "CODE"
+              format: "AAAA"
+              max_length: 5
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "AEOC"
+                  description_en: "AEO for Customs Simplifications"
+                - code: "AEOS"
+                  description_en: "AEO for Security and Safety"
+                - code: "AEOF"
+                  description_en: "AEO Full (Customs + Security)"
+              reference_table: "aeo_types"
+              eu_data_element: "5/8"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "aeo_applications"
+                column: "aeo_type"
+              ors_mapping:
+                table: "mtca_ors.aeo_authorizations"
+                column: "aeo_type"
+                data_type: "FixedString(5)"
+
+            - field_id: "role_in_supply_chain"
+              field_code: "3"
+              field_name_en: "Role in International Supply Chain"
+              field_name_mt: "Rwol fil-Katina tal-Forniment Internazzjonali"
+              field_description: "Primary role of the applicant"
+              data_type: "ARRAY"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "MAN"
+                  description_en: "Manufacturer"
+                - code: "EXP"
+                  description_en: "Exporter"
+                - code: "IMP"
+                  description_en: "Importer"
+                - code: "BRK"
+                  description_en: "Customs broker/agent"
+                - code: "CAR"
+                  description_en: "Carrier"
+                - code: "FWD"
+                  description_en: "Freight forwarder"
+                - code: "WHK"
+                  description_en: "Warehouse keeper"
+                - code: "CON"
+                  description_en: "Consolidator"
+                - code: "TSA"
+                  description_en: "Terminal/port operator"
+              reference_table: "supply_chain_roles"
+              eu_data_element: "5/9"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "aeo_applications"
+                column: "supply_chain_role"
+              ors_mapping:
+                table: "mtca_ors.aeo_authorizations"
+                column: "supply_chain_roles"
+                data_type: "Array(String)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Compliance Record
+        # ----------------------------------------------------------------------
+        - section_id: "AEO_COMPLIANCE"
+          section_name: "Compliance Record"
+          section_description: "Customs and tax compliance history"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "infringements_declaration"
+              field_code: "4a"
+              field_name_en: "Declaration of Infringements"
+              field_name_mt: "Dikjarazzjoni ta' Ksur"
+              field_description: "Any customs/tax infringements in past 3 years"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "5/10"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "aeo_applications"
+                column: "has_infringements"
+              ors_mapping:
+                table: "mtca_ors.aeo_authorizations"
+                column: "infringements_declared"
+                data_type: "UInt8"
+
+            - field_id: "criminal_record_declaration"
+              field_code: "4b"
+              field_name_en: "Criminal Record Declaration"
+              field_name_mt: "Dikjarazzjoni tal-Kondotta"
+              field_description: "Criminal record of applicant/key personnel"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "5/11"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "aeo_applications"
+                column: "criminal_record"
+              ors_mapping:
+                table: "mtca_ors.aeo_authorizations"
+                column: "criminal_record_declared"
+                data_type: "UInt8"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Self-Assessment Questionnaire Reference
+        # ----------------------------------------------------------------------
+        - section_id: "AEO_SAQ"
+          section_name: "Self-Assessment"
+          section_description: "Reference to completed SAQ"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "saq_reference"
+              field_code: "5"
+              field_name_en: "Self-Assessment Questionnaire Reference"
+              field_name_mt: "Referenza tal-Kwestjonarju ta' Awtovalutazzjoni"
+              field_description: "Reference to attached SAQ"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "aeo_applications"
+                column: "saq_ref"
+              ors_mapping:
+                table: "mtca_ors.aeo_authorizations"
+                column: "saq_reference"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 4: AEO Authorization Details (Output)
+        # ----------------------------------------------------------------------
+        - section_id: "AEO_AUTHORIZATION"
+          section_name: "Authorization"
+          section_description: "Granted AEO authorization details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "aeo_authorization_number"
+              field_code: "Auth No"
+              field_name_en: "AEO Authorization Number"
+              field_name_mt: "Numru tal-Awtorizzazzjoni AEO"
+              field_description: "Unique AEO authorization reference"
+              data_type: "STRING"
+              format: "CCAEOTNNNNNNNNNN"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Upon approval"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "1/1"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "aeo_register"
+                column: "aeo_auth_no"
+              ors_mapping:
+                table: "mtca_ors.aeo_authorizations"
+                column: "authorization_number"
+                data_type: "String"
+
+            - field_id: "aeo_valid_from"
+              field_code: "Valid From"
+              field_name_en: "Valid From Date"
+              field_name_mt: "Validu Minn"
+              field_description: "Start date of AEO status"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Upon approval"
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "1/2"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "aeo_register"
+                column: "valid_from"
+              ors_mapping:
+                table: "mtca_ors.aeo_authorizations"
+                column: "valid_from"
+                data_type: "Date"
+
+      attachments:
+        - attachment_code: "SAQ"
+          description_en: "Self-Assessment Questionnaire"
+          description_mt: "Kwestjonarju ta' Awtovalutazzjoni"
+          required: true
+          file_types: ["PDF", "XLSX"]
+        - attachment_code: "ORG_CHART"
+          description_en: "Organizational Chart"
+          description_mt: "ÄŠart Organizzattiv"
+          required: true
+          file_types: ["PDF"]
+        - attachment_code: "FINANCIAL_STATEMENTS"
+          description_en: "Audited Financial Statements (3 years)"
+          description_mt: "Rapporti Finanzjarji Awditjati (3 snin)"
+          required: true
+          file_types: ["PDF"]
+        - attachment_code: "SECURITY_PLAN"
+          description_en: "Security Plan (for AEOS/AEOF)"
+          description_mt: "Pjan ta' SigurtÃ "
+          required: false
+          required_condition: "Required for AEOS and AEOF"
+          file_types: ["PDF"]
+
+      eu_system_integration:
+        trans_european_system: "EU CDS (Customs Decisions System)"
+        message_exchange: "Portal"
+        interface_specification: "EU CDS v2.0"
+        connected_systems:
+          - system: "AIS/AES"
+            purpose: "Simplified procedures indicator"
+          - system: "EOS"
+            purpose: "EORI validation"
+          - system: "Mutual Recognition"
+            purpose: "Third country AEO programs"
+
+      submission_workflow:
+        authentication_required: "UUM&DS"
+        signature_required: true
+        guarantee_required: false
+        payment_integration: false
+        acknowledgment_type: "Application reference"
+        processing_time: "120 calendar days (extendable)"
+
+  # ==========================================================================
+  # BTI Application: Binding Tariff Information
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "BTI_APPLICATION"
+        form_name_en: "Binding Tariff Information Application"
+        form_name_mt: "Applikazzjoni gÄ§al Informazzjoni Vinkolanti fuq Tariffi"
+        version: "2024"
+        effective_from: "2016-05-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Art. 33-37"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446"
+          - "Commission Implementing Regulation (EU) 2015/2447"
+        administering_authority: "MTCA Customs"
+        tax_type: "Customs Classification"
+        taxpayer_category: "Economic Operator"
+        filing_frequency: "Per product"
+        filing_deadline: "Before import/export"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "EBTI (EU BTI System)"
+        eu_system_interface: "EBTI-3"
+        source_url: "https://customs.gov.mt/bti"
+        xml_schema_ref: "EBTI Technical Specifications"
+        notes: |
+          BTI provides binding tariff classification for specific goods.
+          Valid for 3 years. BTI holder receives certainty on CN code
+          and applicable duty rate. Mandatory electronic filing via EBTI.
+
+      sections:
+        - section_id: "BTI_APPLICANT"
+          section_name: "Applicant"
+          section_description: "BTI applicant details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "bti_applicant_eori"
+              field_code: "1"
+              field_name_en: "Applicant EORI"
+              field_name_mt: "EORI tal-Applikant"
+              field_description: "EORI of BTI applicant"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eori_register"
+              eu_data_element: "5/3"
+              cross_form_reference: "EORI_APPLICATION.eori_number"
+              legacy_mapping:
+                database: "customs_db"
+                table: "bti_applications"
+                column: "applicant_eori"
+              ors_mapping:
+                table: "mtca_ors.bti_decisions"
+                column: "applicant_eori"
+                data_type: "String"
+
+        - section_id: "BTI_GOODS"
+          section_name: "Goods Description"
+          section_description: "Detailed description of goods for classification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "goods_description_bti"
+              field_code: "2"
+              field_name_en: "Detailed Goods Description"
+              field_name_mt: "Deskrizzjoni Dettaljata tal-Merkanzija"
+              field_description: "Comprehensive description for classification"
+              data_type: "STRING"
+              format: null
+              max_length: 2500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "BTI_001"
+                  rule_type: "format"
+                  rule_description: "Description must be detailed"
+                  rule_expression: "LENGTH(goods_description_bti) >= 100"
+                  error_message_en: "Description must be detailed (min 100 characters)"
+                  error_message_mt: "Deskrizzjoni trid tkun dettaljata (min 100 karattru)"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "7/3"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "bti_applications"
+                column: "goods_description"
+              ors_mapping:
+                table: "mtca_ors.bti_decisions"
+                column: "goods_description"
+                data_type: "String"
+
+            - field_id: "trade_name"
+              field_code: "3"
+              field_name_en: "Trade/Commercial Name"
+              field_name_mt: "Isem KummerÄ‹jali"
+              field_description: "Commercial name of the goods"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "7/4"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "bti_applications"
+                column: "trade_name"
+              ors_mapping:
+                table: "mtca_ors.bti_decisions"
+                column: "trade_name"
+                data_type: "Nullable(String)"
+
+            - field_id: "cn_code_proposed"
+              field_code: "4"
+              field_name_en: "Proposed CN Code"
+              field_name_mt: "KodiÄ‹i NK Propost"
+              field_description: "Applicant's proposed classification"
+              data_type: "CN_CODE"
+              format: "NNNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "BTI_002"
+                  rule_type: "pattern"
+                  rule_description: "Valid CN code format"
+                  rule_expression: "^[0-9]{8}$"
+                  error_message_en: "CN code must be 8 digits"
+                  error_message_mt: "KodiÄ‹i NK irid ikun 8 numri"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taric_cn_codes"
+              eu_data_element: "7/2"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "bti_applications"
+                column: "proposed_cn"
+              ors_mapping:
+                table: "mtca_ors.bti_decisions"
+                column: "cn_code_proposed"
+                data_type: "FixedString(8)"
+
+        - section_id: "BTI_DECISION"
+          section_name: "BTI Decision"
+          section_description: "Classification decision"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "bti_reference"
+              field_code: "BTI Ref"
+              field_name_en: "BTI Reference Number"
+              field_name_mt: "Numru ta' Referenza BTI"
+              field_description: "Unique BTI decision reference"
+              data_type: "STRING"
+              format: "MT-BTI-YYYY-NNNNNN"
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Upon decision"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "1/1"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "bti_decisions"
+                column: "bti_ref"
+              ors_mapping:
+                table: "mtca_ors.bti_decisions"
+                column: "bti_reference"
+                data_type: "String"
+
+            - field_id: "cn_code_classified"
+              field_code: "Classification"
+              field_name_en: "Classified CN Code"
+              field_name_mt: "KodiÄ‹i NK Klassifikat"
+              field_description: "Final CN classification by customs"
+              data_type: "CN_CODE"
+              format: "NNNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Upon decision"
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taric_cn_codes"
+              eu_data_element: "7/1"
+              cross_form_reference: "SAD_H1.commodity_code"
+              legacy_mapping:
+                database: "customs_db"
+                table: "bti_decisions"
+                column: "classified_cn"
+              ors_mapping:
+                table: "mtca_ors.bti_decisions"
+                column: "cn_code_classified"
+                data_type: "FixedString(8)"
+
+            - field_id: "bti_valid_from"
+              field_code: "Valid From"
+              field_name_en: "BTI Valid From"
+              field_name_mt: "BTI Validu Minn"
+              field_description: "Start date of BTI validity"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "1/2"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "bti_decisions"
+                column: "valid_from"
+              ors_mapping:
+                table: "mtca_ors.bti_decisions"
+                column: "valid_from"
+                data_type: "Date"
+
+            - field_id: "bti_valid_until"
+              field_code: "Valid Until"
+              field_name_en: "BTI Valid Until"
+              field_name_mt: "BTI Validu Sa"
+              field_description: "End date of BTI validity (3 years)"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "valid_from + 3 years"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "1/3"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "bti_decisions"
+                column: "valid_until"
+              ors_mapping:
+                table: "mtca_ors.bti_decisions"
+                column: "valid_until"
+                data_type: "Date"
+
+      attachments:
+        - attachment_code: "SAMPLE"
+          description_en: "Product Sample (if applicable)"
+          description_mt: "Kampjun tal-Prodott"
+          required: false
+          file_types: ["Physical sample"]
+        - attachment_code: "TECHNICAL_DOCS"
+          description_en: "Technical Documentation"
+          description_mt: "Dokumentazzjoni Teknika"
+          required: true
+          file_types: ["PDF"]
+        - attachment_code: "PHOTOS"
+          description_en: "Product Photographs"
+          description_mt: "Ritratti tal-Prodott"
+          required: true
+          file_types: ["JPG", "PNG", "PDF"]
+
+      eu_system_integration:
+        trans_european_system: "EBTI-3"
+        message_exchange: "Portal"
+        interface_specification: "EBTI Technical Specifications"
+
+      submission_workflow:
+        authentication_required: "UUM&DS"
+        signature_required: false
+        guarantee_required: false
+        payment_integration: false
+        acknowledgment_type: "Application reference"
+        processing_time: "120 days"
+
+  # ==========================================================================
+  # EUR.1: Movement Certificate
+  # Preferential origin proof (bilateral agreements)
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "EUR1"
+        form_name_en: "EUR.1 Movement Certificate"
+        form_name_mt: "ÄŠertifikat ta' Moviment EUR.1"
+        version: "2024"
+        effective_from: "1972-01-01"
+        effective_to: "current"
+        legislative_basis: "Various EU Free Trade Agreements"
+        subsidiary_legislation:
+          - "Protocol on Rules of Origin"
+          - "Customs Ordinance Cap. 37"
+        administering_authority: "MTCA Customs"
+        tax_type: "Preferential Origin"
+        taxpayer_category: "Exporter"
+        filing_frequency: "Per export consignment"
+        filing_deadline: "At or before export"
+        submission_method: "Paper (customs stamped)"
+        electronic_portal: null
+        eu_system_interface: null
+        source_url: "https://customs.gov.mt/origin"
+        xml_schema_ref: null
+        notes: |
+          EUR.1 certificate of origin for preferential treatment under EU
+          bilateral trade agreements. Paper form stamped by customs. Being
+          progressively replaced by origin declarations on invoice or REX
+          self-certification for certain agreements.
+
+      sections:
+        - section_id: "EUR1_EXPORTER"
+          section_name: "Exporter"
+          section_description: "Details of the exporter"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "exporter_name_eur1"
+              field_code: "Box 1"
+              field_name_en: "Exporter Name and Address"
+              field_name_mt: "Isem u Indirizz tal-Esportatur"
+              field_description: "Full name and address of exporter"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eur1_certificates"
+                column: "exporter_details"
+              ors_mapping:
+                table: "mtca_ors.origin_certificates"
+                column: "exporter_name_address"
+                data_type: "String"
+
+            - field_id: "exporter_eori_eur1"
+              field_code: "Box 1(EORI)"
+              field_name_en: "Exporter EORI"
+              field_name_mt: "EORI tal-Esportatur"
+              field_description: "EORI number of exporter"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eori_register"
+              eu_data_element: null
+              cross_form_reference: "EORI_APPLICATION.eori_number"
+              legacy_mapping:
+                database: "customs_db"
+                table: "eur1_certificates"
+                column: "exporter_eori"
+              ors_mapping:
+                table: "mtca_ors.origin_certificates"
+                column: "exporter_eori"
+                data_type: "String"
+
+        - section_id: "EUR1_CONSIGNEE"
+          section_name: "Consignee"
+          section_description: "Details of the consignee"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "consignee_name_eur1"
+              field_code: "Box 2"
+              field_name_en: "Consignee Name and Address"
+              field_name_mt: "Isem u Indirizz tal-Konsenjatarju"
+              field_description: "Full name and address of consignee"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eur1_certificates"
+                column: "consignee_details"
+              ors_mapping:
+                table: "mtca_ors.origin_certificates"
+                column: "consignee_name_address"
+                data_type: "String"
+
+            - field_id: "destination_country"
+              field_code: "Box 2(country)"
+              field_name_en: "Country of Destination"
+              field_name_mt: "PajjiÅ¼ tad-Destinazzjoni"
+              field_description: "FTA partner country"
+              data_type: "COUNTRY_CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "fta_partner_countries"
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eur1_certificates"
+                column: "dest_country"
+              ors_mapping:
+                table: "mtca_ors.origin_certificates"
+                column: "destination_country"
+                data_type: "FixedString(2)"
+
+        - section_id: "EUR1_GOODS"
+          section_name: "Goods"
+          section_description: "Description of goods"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "goods_description_eur1"
+              field_code: "Box 8"
+              field_name_en: "Description of Goods"
+              field_name_mt: "Deskrizzjoni tal-Merkanzija"
+              field_description: "Description of originating goods"
+              data_type: "STRING"
+              format: null
+              max_length: 1000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eur1_certificates"
+                column: "goods_description"
+              ors_mapping:
+                table: "mtca_ors.origin_certificates"
+                column: "goods_description"
+                data_type: "String"
+
+            - field_id: "gross_mass_eur1"
+              field_code: "Box 9"
+              field_name_en: "Gross Mass (kg)"
+              field_name_mt: "Massa Grossa (kg)"
+              field_description: "Gross weight of goods"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 16
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eur1_certificates"
+                column: "gross_mass"
+              ors_mapping:
+                table: "mtca_ors.origin_certificates"
+                column: "gross_mass_kg"
+                data_type: "Decimal(16,3)"
+
+            - field_id: "origin_country"
+              field_code: "Box 4"
+              field_name_en: "Country of Origin"
+              field_name_mt: "PajjiÅ¼ ta' OriÄ¡ini"
+              field_description: "Country of preferential origin"
+              data_type: "COUNTRY_CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eu_member_states"
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eur1_certificates"
+                column: "origin_country"
+              ors_mapping:
+                table: "mtca_ors.origin_certificates"
+                column: "country_of_origin"
+                data_type: "FixedString(2)"
+
+        - section_id: "EUR1_CERTIFICATION"
+          section_name: "Certification"
+          section_description: "Customs certification details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "certificate_number"
+              field_code: "Box 5"
+              field_name_en: "Certificate Number"
+              field_name_mt: "Numru taÄ‹-ÄŠertifikat"
+              field_description: "EUR.1 serial number"
+              data_type: "STRING"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Assigned by customs"
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: "SAD_H1.preference_code"
+              legacy_mapping:
+                database: "customs_db"
+                table: "eur1_certificates"
+                column: "cert_no"
+              ors_mapping:
+                table: "mtca_ors.origin_certificates"
+                column: "certificate_number"
+                data_type: "String"
+
+            - field_id: "date_of_issue"
+              field_code: "Box 11"
+              field_name_en: "Date of Issue"
+              field_name_mt: "Data tal-Ä¦ruÄ¡"
+              field_description: "Date certificate issued by customs"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "eur1_certificates"
+                column: "issue_date"
+              ors_mapping:
+                table: "mtca_ors.origin_certificates"
+                column: "date_of_issue"
+                data_type: "Date"
+
+      submission_workflow:
+        authentication_required: "Physical presence or authorized agent"
+        signature_required: true
+        guarantee_required: false
+        payment_integration: false
+        acknowledgment_type: "Stamped certificate"
+
+  # ==========================================================================
+  # REX Registration: Registered Exporter System
+  # GSP self-certification
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "REX_REGISTRATION"
+        form_name_en: "Registered Exporter (REX) Registration"
+        form_name_mt: "ReÄ¡istrazzjoni bÄ§ala Esportatur ReÄ¡istrat (REX)"
+        version: "2024"
+        effective_from: "2017-01-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) 2015/2447 - Art. 72"
+        subsidiary_legislation:
+          - "REX Guidelines"
+        administering_authority: "MTCA Customs"
+        tax_type: "Preferential Origin"
+        taxpayer_category: "Exporter"
+        filing_frequency: "One-time"
+        filing_deadline: "Before self-certification"
+        submission_method: "Electronic"
+        electronic_portal: "REX System"
+        eu_system_interface: "EU REX System"
+        source_url: "https://customs.gov.mt/rex"
+        xml_schema_ref: "REX Technical Specifications"
+        notes: |
+          REX allows exporters to self-certify origin on commercial documents
+          for GSP, certain FTAs (Canada, Japan, UK, etc.). REX number assigned
+          by customs and published in EU REX database. Valid until revoked.
+
+      sections:
+        - section_id: "REX_APPLICANT"
+          section_name: "Applicant"
+          section_description: "REX applicant details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "rex_applicant_eori"
+              field_code: "1"
+              field_name_en: "Applicant EORI"
+              field_name_mt: "EORI tal-Applikant"
+              field_description: "EORI of exporter"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eori_register"
+              eu_data_element: null
+              cross_form_reference: "EORI_APPLICATION.eori_number"
+              legacy_mapping:
+                database: "customs_db"
+                table: "rex_registrations"
+                column: "applicant_eori"
+              ors_mapping:
+                table: "mtca_ors.rex_registrations"
+                column: "applicant_eori"
+                data_type: "String"
+
+            - field_id: "rex_number"
+              field_code: "REX No"
+              field_name_en: "REX Number"
+              field_name_mt: "Numru REX"
+              field_description: "Assigned Registered Exporter number"
+              data_type: "STRING"
+              format: "CCREXXXXXXXXX"
+              max_length: 14
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Assigned upon registration"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "'MTRE' + sequence"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "rex_registrations"
+                column: "rex_no"
+              ors_mapping:
+                table: "mtca_ors.rex_registrations"
+                column: "rex_number"
+                data_type: "String"
+
+            - field_id: "product_description_rex"
+              field_code: "2"
+              field_name_en: "Products Description"
+              field_name_mt: "Deskrizzjoni tal-Prodotti"
+              field_description: "General description of exported products"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "rex_registrations"
+                column: "products_desc"
+              ors_mapping:
+                table: "mtca_ors.rex_registrations"
+                column: "product_description"
+                data_type: "String"
+
+            - field_id: "rex_status"
+              field_code: "Status"
+              field_name_en: "REX Status"
+              field_name_mt: "Status REX"
+              field_description: "Current registration status"
+              data_type: "CODE"
+              format: "A"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "A"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "A"
+                  description_en: "Active"
+                - code: "R"
+                  description_en: "Revoked"
+                - code: "S"
+                  description_en: "Suspended"
+              reference_table: null
+              eu_data_element: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "rex_registrations"
+                column: "status"
+              ors_mapping:
+                table: "mtca_ors.rex_registrations"
+                column: "rex_status"
+                data_type: "FixedString(1)"
+
+      eu_system_integration:
+        trans_european_system: "EU REX System"
+        message_exchange: "Portal"
+        interface_specification: "REX Technical Specifications"
+
+      submission_workflow:
+        authentication_required: "e-ID Malta"
+        signature_required: false
+        guarantee_required: false
+        payment_integration: false
+        acknowledgment_type: "REX number"
+
+# ============================================================================
+# Reference Tables for Priority 4D: Trader Registration & Origin
+# ============================================================================
+reference_tables:
+  aeo_types:
+    - code: "AEOC"
+      description_en: "AEO Customs Simplifications"
+      benefits:
+        - "Reduced physical and documentary controls"
+        - "Priority treatment if selected for control"
+        - "Choice of place of control"
+        - "Prior notification"
+    - code: "AEOS"
+      description_en: "AEO Security and Safety"
+      benefits:
+        - "Reduced ENS data set"
+        - "Prior notification before control"
+        - "Mutual recognition with third countries"
+    - code: "AEOF"
+      description_en: "AEO Full (C + S)"
+      benefits:
+        - "All AEOC benefits"
+        - "All AEOS benefits"
+
+  fta_agreements:
+    - code: "EU-UK"
+      name: "EU-UK Trade and Cooperation Agreement"
+      origin_proof: ["EUR.1", "Invoice declaration", "REX"]
+    - code: "EU-CH"
+      name: "EU-Switzerland Agreement"
+      origin_proof: ["EUR.1", "Invoice declaration"]
+    - code: "EU-JP"
+      name: "EU-Japan EPA"
+      origin_proof: ["Invoice statement", "REX"]
+    - code: "EU-CA"
+      name: "EU-Canada CETA"
+      origin_proof: ["Invoice statement", "REX"]
+    - code: "GSP"
+      name: "Generalised Scheme of Preferences"
+      origin_proof: ["Form A", "REX", "Invoice declaration"]
+
+  origin_certificate_types:
+    - code: "EUR1"
+      description_en: "EUR.1 Movement Certificate"
+      usage: "Bilateral FTAs"
+    - code: "EURMED"
+      description_en: "EUR-MED Movement Certificate"
+      usage: "Pan-Euro-Mediterranean zone"
+    - code: "FORMA"
+      description_en: "Form A - GSP"
+      usage: "GSP beneficiary countries (being phased out)"
+    - code: "ATR"
+      description_en: "ATR Certificate"
+      usage: "EU-Turkey Customs Union"
+    - code: "INV"
+      description_en: "Invoice Declaration"
+      usage: "Various agreements (up to â‚¬6,000 or approved exporter)"
+    - code: "REX"
+      description_en: "REX Statement"
+      usage: "GSP and certain FTAs"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  customs_db:
+    tables:
+      - legacy_table: "eori_applications"
+        ors_table: "mtca_ors.eori_registrations"
+        description: "EORI application records"
+        key_columns:
+          - legacy: "app_ref"
+            ors: "application_reference"
+        volume_estimate: "~10,000 records"
+        
+      - legacy_table: "eori_register"
+        ors_table: "mtca_ors.eori_registrations"
+        description: "Active EORI numbers"
+        key_columns:
+          - legacy: "eori_no"
+            ors: "eori_number"
+        volume_estimate: "~15,000 records"
+        
+      - legacy_table: "aeo_applications"
+        ors_table: "mtca_ors.aeo_authorizations"
+        description: "AEO application records"
+        key_columns:
+          - legacy: "app_ref"
+            ors: "application_reference"
+        volume_estimate: "~500 records"
+        
+      - legacy_table: "aeo_register"
+        ors_table: "mtca_ors.aeo_authorizations"
+        description: "Active AEO authorizations"
+        key_columns:
+          - legacy: "aeo_auth_no"
+            ors: "authorization_number"
+        volume_estimate: "~100 records"
+        
+      - legacy_table: "bti_applications"
+        ors_table: "mtca_ors.bti_decisions"
+        description: "BTI applications"
+        key_columns:
+          - legacy: "app_ref"
+            ors: "application_reference"
+        volume_estimate: "~2,000 records"
+        
+      - legacy_table: "bti_decisions"
+        ors_table: "mtca_ors.bti_decisions"
+        description: "BTI decisions"
+        key_columns:
+          - legacy: "bti_ref"
+            ors: "bti_reference"
+        volume_estimate: "~1,500 records"
+        
+      - legacy_table: "eur1_certificates"
+        ors_table: "mtca_ors.origin_certificates"
+        description: "EUR.1 certificates issued"
+        key_columns:
+          - legacy: "cert_no"
+            ors: "certificate_number"
+        volume_estimate: "~5,000 records/year"
+        
+      - legacy_table: "rex_registrations"
+        ors_table: "mtca_ors.rex_registrations"
+        description: "REX registered exporters"
+        key_columns:
+          - legacy: "rex_no"
+            ors: "rex_number"
+        volume_estimate: "~500 records"

@@ -1,0 +1,2508 @@
+# ============================================================================
+# MTCA Forms - Priority 2A: Stamp Duty & Property Transfers
+# Forms: DDT1, Schedule B, B1, C, D, E, F, Eighth Schedule, Fifth/Sixth/Seventh
+# Version: 1.0
+# Date: 2025-12-05
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # DDT1: Notice of Transfer (Property)
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "DDT1"
+        form_name_en: "Notice of Transfer of Immovable Property"
+        form_name_mt: "AvviÅ¼ ta' Trasferiment ta' ProprjetÃ  Immobbli"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "Duty on Documents and Transfers Act Cap. 364"
+        subsidiary_legislation:
+          - "S.L.364.01 - Duty on Documents (Exemption) Rules"
+          - "S.L.364.05 - Property Transfer Duty Rules"
+        administering_authority: "Capital Transfer Duty Department (CTD)"
+        tax_type: "Stamp Duty"
+        taxpayer_category: "Individual, Company"
+        filing_frequency: "Event-driven"
+        filing_deadline: "Within 21 days of signing promise of sale"
+        submission_method: "Paper (via Notary)"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/Duties/Pages/Duty-on-Documents.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Property transfer notification submitted by notary on behalf of 
+          purchaser. Triggers provisional 1% duty payment. Balance 4% 
+          (of total 5%) due at final deed execution. Reduced rates apply 
+          for first-time buyers and specific property types.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Transferor (Seller) Details
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSFEROR"
+          section_name: "Transferor Details"
+          section_description: "Person or entity selling/transferring the property"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "transferor_tin"
+              field_code: "Box 1"
+              field_name_en: "Transferor TIN"
+              field_name_mt: "TIN tat-Trasferent"
+              field_description: "Tax ID of seller"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "DDT1_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid TIN format"
+                  rule_expression: "^([0-9]{7}[MGAPLHBZ]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "transferor_tin"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "transferor_tin"
+                data_type: "String"
+
+            - field_id: "transferor_name"
+              field_code: "Box 2"
+              field_name_en: "Transferor Name"
+              field_name_mt: "Isem tat-Trasferent"
+              field_description: "Full name of seller"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "transferor_name"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "transferor_name"
+                data_type: "String"
+
+            - field_id: "transferor_share"
+              field_code: "Box 3"
+              field_name_en: "Share Being Transferred"
+              field_name_mt: "Sehem li Qed JiÄ¡i Trasferit"
+              field_description: "Fraction of property being transferred (e.g., 1/2, 1/4)"
+              data_type: "STRING"
+              format: "Fraction or percentage"
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "Full"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "share_transferred"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "transferor_share"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Transferee (Buyer) Details
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSFEREE"
+          section_name: "Transferee Details"
+          section_description: "Person or entity acquiring the property"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "transferee_tin"
+              field_code: "Box 4"
+              field_name_en: "Transferee TIN"
+              field_name_mt: "TIN tal-Akkwirent"
+              field_description: "Tax ID of buyer"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "DDT1_010"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid TIN format"
+                  rule_expression: "^([0-9]{7}[MGAPLHBZ]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "transferee_tin"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "transferee_tin"
+                data_type: "String"
+
+            - field_id: "transferee_name"
+              field_code: "Box 5"
+              field_name_en: "Transferee Name"
+              field_name_mt: "Isem tal-Akkwirent"
+              field_description: "Full name of buyer"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "transferee_name"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "transferee_name"
+                data_type: "String"
+
+            - field_id: "first_time_buyer"
+              field_code: "Box 6"
+              field_name_en: "First Time Buyer Declaration"
+              field_name_mt: "Dikjarazzjoni ta' Xerrej gÄ§all-Ewwel Darba"
+              field_description: "Whether buyer qualifies for first-time buyer reduced rate"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "N"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "Y"
+                  description_en: "Yes - First time buyer"
+                  description_mt: "Iva - Xerrej gÄ§all-ewwel darba"
+                - code: "N"
+                  description_en: "No"
+                  description_mt: "Le"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "first_time_buyer"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "first_time_buyer"
+                data_type: "UInt8"
+
+            - field_id: "transferee_share"
+              field_code: "Box 7"
+              field_name_en: "Share Being Acquired"
+              field_name_mt: "Sehem li Qed JiÄ¡i Akkwistat"
+              field_description: "Fraction of property being acquired"
+              data_type: "STRING"
+              format: "Fraction or percentage"
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "Full"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "share_acquired"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "transferee_share"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Property Details
+        # ----------------------------------------------------------------------
+        - section_id: "PROPERTY"
+          section_name: "Property Details"
+          section_description: "Details of the immovable property"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "property_address"
+              field_code: "Box 10"
+              field_name_en: "Property Address"
+              field_name_mt: "Indirizz tal-ProprjetÃ "
+              field_description: "Full address of property"
+              data_type: "STRING"
+              format: null
+              max_length: 300
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "Schedule_B.property_address"
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "property_address"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "property_address"
+                data_type: "String"
+
+            - field_id: "locality"
+              field_code: "Box 11"
+              field_name_en: "Locality"
+              field_name_mt: "LokalitÃ "
+              field_description: "Town or village"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "malta_localities"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "locality"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "locality"
+                data_type: "String"
+
+            - field_id: "property_type"
+              field_code: "Box 12"
+              field_name_en: "Property Type"
+              field_name_mt: "Tip ta' ProprjetÃ "
+              field_description: "Category of immovable property"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "RES"
+                  description_en: "Residential"
+                  description_mt: "Residenzjali"
+                - code: "COM"
+                  description_en: "Commercial"
+                  description_mt: "KummerÄ‹jali"
+                - code: "IND"
+                  description_en: "Industrial"
+                  description_mt: "Industrijali"
+                - code: "AGR"
+                  description_en: "Agricultural"
+                  description_mt: "Agrikolu"
+                - code: "LND"
+                  description_en: "Undeveloped Land"
+                  description_mt: "Art Mhux Å»viluppat"
+                - code: "GAR"
+                  description_en: "Garage"
+                  description_mt: "Garaxx"
+                - code: "MIX"
+                  description_en: "Mixed Use"
+                  description_mt: "UÅ¼u ImÄ§allat"
+              reference_table: "property_type_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "property_type"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "property_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "land_registry_number"
+              field_code: "Box 13"
+              field_name_en: "Land Registry Number"
+              field_name_mt: "Numru tar-ReÄ¡istru tal-Artijiet"
+              field_description: "Official land registry reference"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "land_registry_no"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "land_registry_number"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Transaction Details
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSACTION"
+          section_name: "Transaction Details"
+          section_description: "Value and duty calculation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "promise_of_sale_date"
+              field_code: "Box 20"
+              field_name_en: "Promise of Sale Date"
+              field_name_mt: "Data tal-WegÄ§da ta' BejgÄ§"
+              field_description: "Date promise of sale was signed"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "promise_date"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "promise_of_sale_date"
+                data_type: "Date"
+
+            - field_id: "agreed_price"
+              field_code: "Box 21"
+              field_name_en: "Agreed Price"
+              field_name_mt: "Prezz Miftiehem"
+              field_description: "Total agreed purchase price"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "DDT1_020"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "agreed_price > 0"
+                  error_message_en: "Price must be positive"
+                  error_message_mt: "Prezz irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "agreed_price"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "agreed_price"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "duty_rate"
+              field_code: "Box 22"
+              field_name_en: "Applicable Duty Rate"
+              field_name_mt: "Rata tal-Dazju Applikabbli"
+              field_description: "Stamp duty rate applicable"
+              data_type: "PERCENTAGE"
+              format: "#.#%"
+              max_length: null
+              precision: 3
+              scale: 1
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "Based on property type and first-time buyer status"
+              validation_rules: []
+              allowed_values:
+                - code: "5.0"
+                  description_en: "5% - Standard rate"
+                  description_mt: "5% - Rata standard"
+                - code: "3.5"
+                  description_en: "3.5% - First-time buyer (first â‚¬200,000)"
+                  description_mt: "3.5% - Xerrej l-ewwel darba (l-ewwel â‚¬200,000)"
+                - code: "2.0"
+                  description_en: "2% - Gozo property transfer"
+                  description_mt: "2% - Trasferiment GÄ§awdex"
+                - code: "1.5"
+                  description_en: "1.5% - Urban Conservation Area"
+                  description_mt: "1.5% - Å»ona ta' Konservazzjoni Urbana"
+              reference_table: "duty_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "duty_rate"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "duty_rate"
+                data_type: "Decimal(3,1)"
+
+            - field_id: "total_duty"
+              field_code: "Box 23"
+              field_name_en: "Total Duty Payable"
+              field_name_mt: "Dazju Totali Dovut"
+              field_description: "Total stamp duty amount"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "agreed_price * (duty_rate / 100)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "total_duty"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "total_duty"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "provisional_duty"
+              field_code: "Box 24"
+              field_name_en: "Provisional Duty (1%)"
+              field_name_mt: "Dazju ProviÅ¼orju (1%)"
+              field_description: "1% duty payable on promise of sale"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "agreed_price * 0.01"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "provisional_duty"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "provisional_duty"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "balance_duty"
+              field_code: "Box 25"
+              field_name_en: "Balance Duty Due on Final Deed"
+              field_name_mt: "BilanÄ‹ tal-Dazju Dovut fuq Kuntratt Finali"
+              field_description: "Remaining duty payable at final deed"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_duty - provisional_duty"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "balance_duty"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "balance_duty"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Notary Details
+        # ----------------------------------------------------------------------
+        - section_id: "NOTARY"
+          section_name: "Notary Details"
+          section_description: "Notary handling the transaction"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "notary_name"
+              field_code: "Box 30"
+              field_name_en: "Notary Name"
+              field_name_mt: "Isem in-Nutar"
+              field_description: "Name of the notary public"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "notary_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "notary_name"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "notary_name"
+                data_type: "String"
+
+            - field_id: "notary_warrant_number"
+              field_code: "Box 31"
+              field_name_en: "Notary Warrant Number"
+              field_name_mt: "Numru tal-Warrant tan-Nutar"
+              field_description: "Official notary warrant number"
+              data_type: "STRING"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "notary_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "notary_warrant"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "notary_warrant_number"
+                data_type: "String"
+
+            - field_id: "submission_date"
+              field_code: "Box 32"
+              field_name_en: "Submission Date"
+              field_name_mt: "Data tas-Sottomissjoni"
+              field_description: "Date form submitted to CTD"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "DDT1_030"
+                  rule_type: "date_logic"
+                  rule_description: "Must be within 21 days of promise date"
+                  rule_expression: "submission_date <= promise_of_sale_date + 21 days"
+                  error_message_en: "Submission must be within 21 days of promise of sale"
+                  error_message_mt: "Sottomissjoni trid tkun fi Å¼mien 21 jum mill-wegÄ§da ta' bejgÄ§"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_duty_db"
+                table: "ddt1"
+                column: "submission_date"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_duty"
+                column: "submission_date"
+                data_type: "Date"
+
+      attachments:
+        - attachment_code: "SCHEDULE_8"
+          attachment_name: "Schedule 8 - Physical Attributes"
+          required: true
+          required_condition: "property_type = RES"
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+            - "Paper"
+        - attachment_code: "ID_COPY"
+          attachment_name: "Copy of ID Card"
+          required: true
+          required_condition: null
+          max_file_size_mb: 2
+          allowed_formats:
+            - "PDF"
+            - "Paper"
+
+      related_forms:
+        - form_code: "Schedule_B"
+          relationship_type: "triggers"
+          relationship_description: "DDT1 triggers Schedule B notification to CFR"
+        - form_code: "Eighth_Schedule"
+          relationship_type: "attachment"
+          relationship_description: "Physical attributes form attached for residential"
+        - form_code: "TRA_53"
+          relationship_type: "related"
+          relationship_description: "Capital gains tax form for seller"
+
+      submission_workflow:
+        authentication_required: "Notary submission"
+        signature_required: true
+        payment_integration: true
+        acknowledgment_type: "Stamped receipt from CTD"
+
+  # ==========================================================================
+  # Schedule B: Notice of Transfer of Right
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "Schedule_B"
+        form_name_en: "Notice of Transfer of Right over Immovable Property"
+        form_name_mt: "AvviÅ¼ ta' Trasferiment ta' Dritt fuq ProprjetÃ  Immobbli"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "Income Tax Act Cap. 123, Article 5(1)"
+        subsidiary_legislation:
+          - "S.L.123.118 - Capital Gains Tax Rules"
+        administering_authority: "CFR"
+        tax_type: "Capital Gains Tax"
+        taxpayer_category: "Individual, Company"
+        filing_frequency: "Event-driven"
+        filing_deadline: "Within 21 days of transfer"
+        submission_method: "Paper (via Notary)"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/inlandrevenue/Pages/Capital-Gains-Tax.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Notification to CFR of property transfer for capital gains tax purposes.
+          Submitted by notary. Triggers 8%/10% final withholding tax calculation.
+          Must be accompanied by Eighth Schedule for physical property details.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Transferor Details
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSFEROR"
+          section_name: "Transferor Details"
+          section_description: "Person transferring the property"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "transferor_tin"
+              field_code: "Part A.1"
+              field_name_en: "Transferor TIN"
+              field_name_mt: "TIN tat-Trasferent"
+              field_description: "Tax ID of seller"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SCHB_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid TIN format"
+                  rule_expression: "^([0-9]{7}[MGAPLHBZ]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: "DDT1.transferor_tin"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "transferor_tin"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "transferor_tin"
+                data_type: "String"
+
+            - field_id: "transferor_name"
+              field_code: "Part A.2"
+              field_name_en: "Transferor Full Name"
+              field_name_mt: "Isem SÄ§iÄ§ tat-Trasferent"
+              field_description: "Full name of person transferring"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "transferor_name"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "transferor_name"
+                data_type: "String"
+
+            - field_id: "transferor_address"
+              field_code: "Part A.3"
+              field_name_en: "Transferor Address"
+              field_name_mt: "Indirizz tat-Trasferent"
+              field_description: "Current address of transferor"
+              data_type: "STRING"
+              format: null
+              max_length: 300
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "transferor_address"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "transferor_address"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Transferee Details
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSFEREE"
+          section_name: "Transferee Details"
+          section_description: "Person acquiring the property"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "transferee_tin"
+              field_code: "Part B.1"
+              field_name_en: "Transferee TIN"
+              field_name_mt: "TIN tal-Akkwirent"
+              field_description: "Tax ID of buyer"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: "DDT1.transferee_tin"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "transferee_tin"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "transferee_tin"
+                data_type: "String"
+
+            - field_id: "transferee_name"
+              field_code: "Part B.2"
+              field_name_en: "Transferee Full Name"
+              field_name_mt: "Isem SÄ§iÄ§ tal-Akkwirent"
+              field_description: "Full name of acquirer"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "transferee_name"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "transferee_name"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Property Details
+        # ----------------------------------------------------------------------
+        - section_id: "PROPERTY"
+          section_name: "Property Details"
+          section_description: "Immovable property being transferred"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "property_address"
+              field_code: "Part C.1"
+              field_name_en: "Property Address"
+              field_name_mt: "Indirizz tal-ProprjetÃ "
+              field_description: "Full address of property"
+              data_type: "STRING"
+              format: null
+              max_length: 300
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "DDT1.property_address"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "property_address"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "property_address"
+                data_type: "String"
+
+            - field_id: "nature_of_right"
+              field_code: "Part C.2"
+              field_name_en: "Nature of Right Transferred"
+              field_name_mt: "Natura tad-Dritt Trasferit"
+              field_description: "Type of right being transferred"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "FRH"
+                  description_en: "Freehold"
+                  description_mt: "Freehold"
+                - code: "GRT"
+                  description_en: "Ground Rent"
+                  description_mt: "ÄŠens"
+                - code: "LES"
+                  description_en: "Leasehold"
+                  description_mt: "Leasehold"
+                - code: "EMP"
+                  description_en: "Emphyteusis"
+                  description_mt: "Enfitewsi"
+                - code: "USU"
+                  description_en: "Usufruct"
+                  description_mt: "UÅ¼ufrutt"
+                - code: "USE"
+                  description_en: "Right of Use"
+                  description_mt: "Dritt ta' UÅ¼u"
+              reference_table: "property_right_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "nature_of_right"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "nature_of_right"
+                data_type: "FixedString(3)"
+
+            - field_id: "original_acquisition_date"
+              field_code: "Part C.3"
+              field_name_en: "Date of Original Acquisition"
+              field_name_mt: "Data tal-Akkwist OriÄ¡inali"
+              field_description: "When transferor acquired the property"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_53.acquisition_date"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "acquisition_date"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "original_acquisition_date"
+                data_type: "Date"
+
+            - field_id: "original_acquisition_cost"
+              field_code: "Part C.4"
+              field_name_en: "Original Acquisition Cost"
+              field_name_mt: "SpiÅ¼a tal-Akkwist OriÄ¡inali"
+              field_description: "Price paid when property was acquired"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_53.acquisition_cost"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "acquisition_cost"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "original_acquisition_cost"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Transfer Details
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSFER"
+          section_name: "Transfer Details"
+          section_description: "Current transfer transaction details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "transfer_date"
+              field_code: "Part D.1"
+              field_name_en: "Date of Transfer"
+              field_name_mt: "Data tat-Trasferiment"
+              field_description: "Date of deed execution"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_53.transfer_date"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "transfer_date"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "transfer_date"
+                data_type: "Date"
+
+            - field_id: "transfer_value"
+              field_code: "Part D.2"
+              field_name_en: "Transfer Value"
+              field_name_mt: "Valur tat-Trasferiment"
+              field_description: "Price or market value of transfer"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SCHB_010"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "transfer_value > 0"
+                  error_message_en: "Transfer value must be positive"
+                  error_message_mt: "Valur tat-trasferiment irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "DDT1.agreed_price"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "transfer_value"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "transfer_value"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "fwt_rate"
+              field_code: "Part D.3"
+              field_name_en: "Final Withholding Tax Rate"
+              field_name_mt: "Rata tat-Taxxa Finali MiÅ¼muma"
+              field_description: "Applicable CGT rate"
+              data_type: "PERCENTAGE"
+              format: "#%"
+              max_length: null
+              precision: 2
+              scale: 0
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "IF holding_period < 5 years THEN 10 ELSE 8"
+              validation_rules: []
+              allowed_values:
+                - code: "8"
+                  description_en: "8% - Standard rate (held 5+ years)"
+                  description_mt: "8% - Rata standard"
+                - code: "10"
+                  description_en: "10% - Short-term (held < 5 years)"
+                  description_mt: "10% - Å»mien qasir"
+              reference_table: "cgt_rates"
+              cross_form_reference: "TRA_53.fwt_rate"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "fwt_rate"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "fwt_rate"
+                data_type: "UInt8"
+
+            - field_id: "fwt_amount"
+              field_code: "Part D.4"
+              field_name_en: "Final Withholding Tax Amount"
+              field_name_mt: "Ammont tat-Taxxa Finali MiÅ¼muma"
+              field_description: "CGT amount withheld"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "transfer_value * (fwt_rate / 100)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_53.fwt_amount"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_b"
+                column: "fwt_amount"
+              ors_mapping:
+                table: "mtca_ors.property_cgt_notification"
+                column: "fwt_amount"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "EIGHTH_SCHEDULE"
+          attachment_name: "Eighth Schedule - Physical Attributes"
+          required: true
+          required_condition: null
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+            - "Paper"
+
+      related_forms:
+        - form_code: "DDT1"
+          relationship_type: "triggered_by"
+          relationship_description: "Schedule B triggered by DDT1 submission"
+        - form_code: "Eighth_Schedule"
+          relationship_type: "attachment"
+          relationship_description: "Physical attributes form"
+        - form_code: "TRA_53"
+          relationship_type: "related"
+          relationship_description: "CGT calculation form"
+
+      submission_workflow:
+        authentication_required: "Notary submission"
+        signature_required: true
+        payment_integration: true
+        acknowledgment_type: "CFR receipt"
+
+  # ==========================================================================
+  # Schedule C: Transfer of Shares - Controlling Interest
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "Schedule_C"
+        form_name_en: "Transfer of Shares - Controlling Interest"
+        form_name_mt: "Trasferiment ta' Ishma - Interess li Jikkontrolla"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "Income Tax Act Cap. 123, Article 5(2)"
+        subsidiary_legislation: []
+        administering_authority: "CFR"
+        tax_type: "Capital Gains Tax"
+        taxpayer_category: "Individual, Company"
+        filing_frequency: "Event-driven"
+        filing_deadline: "Within 21 days of transfer"
+        submission_method: "Paper/Electronic"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/inlandrevenue/Pages/Capital-Gains-Tax.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Notification of share transfer representing 25% or more of voting rights.
+          Controlling interest transfers may trigger CGT on underlying property.
+          Used when shares in property-holding company are transferred.
+
+      sections:
+        - section_id: "TRANSFEROR"
+          section_name: "Transferor Details"
+          section_description: "Person transferring shares"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "transferor_tin"
+              field_code: "Box 1"
+              field_name_en: "Transferor TIN"
+              field_name_mt: "TIN tat-Trasferent"
+              field_description: "Tax ID of share seller"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "transferor_tin"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "transferor_tin"
+                data_type: "String"
+
+            - field_id: "transferor_name"
+              field_code: "Box 2"
+              field_name_en: "Transferor Name"
+              field_name_mt: "Isem tat-Trasferent"
+              field_description: "Full name of share seller"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "transferor_name"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "transferor_name"
+                data_type: "String"
+
+        - section_id: "COMPANY"
+          section_name: "Company Details"
+          section_description: "Company whose shares are being transferred"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "company_tin"
+              field_code: "Box 10"
+              field_name_en: "Company TIN"
+              field_name_mt: "TIN tal-Kumpanija"
+              field_description: "Tax ID of company"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "company_tin"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "company_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "company_name"
+              field_code: "Box 11"
+              field_name_en: "Company Name"
+              field_name_mt: "Isem tal-Kumpanija"
+              field_description: "Legal name of company"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "company_name"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "company_name"
+                data_type: "String"
+
+            - field_id: "company_roc"
+              field_code: "Box 12"
+              field_name_en: "Company Registration Number"
+              field_name_mt: "Numru tar-ReÄ¡istrazzjoni tal-Kumpanija"
+              field_description: "MBR registration number"
+              data_type: "STRING"
+              format: "C #####"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "mbr_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "company_roc"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "company_roc"
+                data_type: "String"
+
+        - section_id: "SHARES"
+          section_name: "Share Transfer Details"
+          section_description: "Details of shares being transferred"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "shares_transferred"
+              field_code: "Box 20"
+              field_name_en: "Number of Shares Transferred"
+              field_name_mt: "Numru ta' Ishma Trasferiti"
+              field_description: "Quantity of shares being transferred"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SCHC_010"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "shares_transferred > 0"
+                  error_message_en: "Shares must be positive"
+                  error_message_mt: "Ishma iridu jkunu poÅ¼ittivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "shares_transferred"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "shares_transferred"
+                data_type: "UInt64"
+
+            - field_id: "total_issued_shares"
+              field_code: "Box 21"
+              field_name_en: "Total Issued Share Capital"
+              field_name_mt: "Kapital ta' Ishma Totali MaÄ§ruÄ¡"
+              field_description: "Total shares in issue"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "total_shares"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "total_issued_shares"
+                data_type: "UInt64"
+
+            - field_id: "percentage_transferred"
+              field_code: "Box 22"
+              field_name_en: "Percentage of Voting Rights Transferred"
+              field_name_mt: "PerÄ‹entwali ta' Drittijiet tal-Vot Trasferiti"
+              field_description: "Percentage of company being transferred"
+              data_type: "PERCENTAGE"
+              format: "##.##%"
+              max_length: null
+              precision: 5
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "(shares_transferred / total_issued_shares) * 100"
+              validation_rules:
+                - rule_id: "SCHC_011"
+                  rule_type: "range"
+                  rule_description: "Must be >= 25% for Schedule C"
+                  rule_expression: "percentage_transferred >= 25"
+                  error_message_en: "Schedule C is for transfers of 25% or more"
+                  error_message_mt: "Schedule C huwa gÄ§al trasferimenti ta' 25% jew aktar"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "percentage"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "percentage_transferred"
+                data_type: "Decimal(5,2)"
+
+            - field_id: "transfer_value"
+              field_code: "Box 23"
+              field_name_en: "Transfer Value"
+              field_name_mt: "Valur tat-Trasferiment"
+              field_description: "Total consideration for shares"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "transfer_value"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "transfer_value"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "property_holding"
+              field_code: "Box 24"
+              field_name_en: "Is Company Property Holding?"
+              field_name_mt: "Il-Kumpanija GÄ§andha ProprjetÃ ?"
+              field_description: "Whether company holds immovable property"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "Y"
+                  description_en: "Yes - Company holds immovable property"
+                  description_mt: "Iva"
+                - code: "N"
+                  description_en: "No"
+                  description_mt: "Le"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_c"
+                column: "property_holding"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_cgt"
+                column: "property_holding"
+                data_type: "UInt8"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "Schedule_D"
+          relationship_type: "alternative"
+          relationship_description: "Use Schedule D for transfers < 25%"
+        - form_code: "Schedule_E"
+          relationship_type: "alternative"
+          relationship_description: "Use Schedule E for exempt transfers"
+        - form_code: "Schedule_F"
+          relationship_type: "related"
+          relationship_description: "Capital changes notification"
+
+      submission_workflow:
+        authentication_required: "e-ID or accountant submission"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "CFR receipt"
+
+  # ==========================================================================
+  # Schedule D: Transfer of Shares - Non-Controlling
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "Schedule_D"
+        form_name_en: "Transfer of Shares - Non-Controlling Interest"
+        form_name_mt: "Trasferiment ta' Ishma - Interess li Ma Jikkontrollax"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "Income Tax Act Cap. 123, Article 5(2)"
+        subsidiary_legislation: []
+        administering_authority: "CFR"
+        tax_type: "Capital Gains Tax"
+        taxpayer_category: "Individual, Company"
+        filing_frequency: "Event-driven"
+        filing_deadline: "Within 21 days of transfer"
+        submission_method: "Paper/Electronic"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/inlandrevenue/Pages/Capital-Gains-Tax.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Notification of share transfer representing less than 25% of voting rights.
+          Generally exempt from CGT unless company holds immovable property.
+
+      sections:
+        - section_id: "TRANSFEROR"
+          section_name: "Transferor Details"
+          section_description: "Person transferring shares"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "transferor_tin"
+              field_code: "Box 1"
+              field_name_en: "Transferor TIN"
+              field_name_mt: "TIN tat-Trasferent"
+              field_description: "Tax ID of share seller"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_d"
+                column: "transferor_tin"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_non_controlling"
+                column: "transferor_tin"
+                data_type: "String"
+
+            - field_id: "transferor_name"
+              field_code: "Box 2"
+              field_name_en: "Transferor Name"
+              field_name_mt: "Isem tat-Trasferent"
+              field_description: "Full name"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_d"
+                column: "transferor_name"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_non_controlling"
+                column: "transferor_name"
+                data_type: "String"
+
+        - section_id: "SHARES"
+          section_name: "Share Transfer Details"
+          section_description: "Non-controlling share transfer"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "company_tin"
+              field_code: "Box 10"
+              field_name_en: "Company TIN"
+              field_name_mt: "TIN tal-Kumpanija"
+              field_description: "Tax ID of company"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_d"
+                column: "company_tin"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_non_controlling"
+                column: "company_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "shares_transferred"
+              field_code: "Box 11"
+              field_name_en: "Number of Shares Transferred"
+              field_name_mt: "Numru ta' Ishma Trasferiti"
+              field_description: "Quantity of shares"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_d"
+                column: "shares_transferred"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_non_controlling"
+                column: "shares_transferred"
+                data_type: "UInt64"
+
+            - field_id: "percentage_transferred"
+              field_code: "Box 12"
+              field_name_en: "Percentage Transferred"
+              field_name_mt: "PerÄ‹entwali Trasferit"
+              field_description: "Must be less than 25%"
+              data_type: "PERCENTAGE"
+              format: "##.##%"
+              max_length: null
+              precision: 5
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SCHD_010"
+                  rule_type: "range"
+                  rule_description: "Must be < 25% for Schedule D"
+                  rule_expression: "percentage_transferred < 25"
+                  error_message_en: "Schedule D is for transfers under 25%"
+                  error_message_mt: "Schedule D huwa gÄ§al trasferimenti taÄ§t 25%"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_d"
+                column: "percentage"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_non_controlling"
+                column: "percentage_transferred"
+                data_type: "Decimal(5,2)"
+
+            - field_id: "transfer_value"
+              field_code: "Box 13"
+              field_name_en: "Transfer Value"
+              field_name_mt: "Valur tat-Trasferiment"
+              field_description: "Consideration for shares"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "schedule_d"
+                column: "transfer_value"
+              ors_mapping:
+                table: "mtca_ors.share_transfer_non_controlling"
+                column: "transfer_value"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "Schedule_C"
+          relationship_type: "alternative"
+          relationship_description: "Use Schedule C for transfers >= 25%"
+        - form_code: "Schedule_E"
+          relationship_type: "alternative"
+          relationship_description: "Use Schedule E for exempt transfers"
+
+      submission_workflow:
+        authentication_required: "e-ID or accountant"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "CFR receipt"
+
+  # ==========================================================================
+  # Eighth Schedule: Physical Attributes of Immovable Property
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "Eighth_Schedule"
+        form_name_en: "Physical Attributes of Immovable Property"
+        form_name_mt: "Attributi FiÅ¼iÄ‹i tal-ProprjetÃ  Immobbli"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "Income Tax Act Cap. 123"
+        subsidiary_legislation: []
+        administering_authority: "CFR"
+        tax_type: "Capital Gains Tax"
+        taxpayer_category: "Individual, Company"
+        filing_frequency: "Event-driven"
+        filing_deadline: "With Schedule B"
+        submission_method: "Paper (via Notary)"
+        electronic_portal: null
+        source_url: "https://cfr.gov.mt/en/inlandrevenue/Pages/Capital-Gains-Tax.aspx"
+        pdf_available: true
+        online_form_available: false
+        xml_schema_ref: null
+        notes: |
+          Detailed physical description of property for CGT assessment.
+          Mandatory attachment to Schedule B for all property transfers.
+          Provides basis for property valuation verification.
+
+      sections:
+        - section_id: "PROPERTY_ID"
+          section_name: "Property Identification"
+          section_description: "Basic property identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "property_address"
+              field_code: "Part 1"
+              field_name_en: "Property Address"
+              field_name_mt: "Indirizz tal-ProprjetÃ "
+              field_description: "Full address"
+              data_type: "STRING"
+              format: null
+              max_length: 300
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "Schedule_B.property_address"
+              legacy_mapping:
+                database: "cgt_db"
+                table: "eighth_schedule"
+                column: "property_address"
+              ors_mapping:
+                table: "mtca_ors.property_physical_attributes"
+                column: "property_address"
+                data_type: "String"
+
+        - section_id: "PHYSICAL"
+          section_name: "Physical Attributes"
+          section_description: "Physical characteristics of property"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_area_sqm"
+              field_code: "Part 2.1"
+              field_name_en: "Total Area (sq meters)"
+              field_name_mt: "Erja Totali (metri kwadri)"
+              field_description: "Total floor area in square meters"
+              data_type: "DECIMAL"
+              format: "###,###.##"
+              max_length: null
+              precision: 10
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ES_001"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "total_area_sqm > 0"
+                  error_message_en: "Area must be positive"
+                  error_message_mt: "Erja trid tkun poÅ¼ittiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "eighth_schedule"
+                column: "total_area"
+              ors_mapping:
+                table: "mtca_ors.property_physical_attributes"
+                column: "total_area_sqm"
+                data_type: "Decimal(10,2)"
+
+            - field_id: "num_bedrooms"
+              field_code: "Part 2.2"
+              field_name_en: "Number of Bedrooms"
+              field_name_mt: "Numru ta' Kmamar tas-Sodda"
+              field_description: "For residential property"
+              data_type: "INTEGER"
+              format: null
+              max_length: 2
+              precision: null
+              scale: null
+              required: false
+              required_condition: "property_type = RES"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "eighth_schedule"
+                column: "bedrooms"
+              ors_mapping:
+                table: "mtca_ors.property_physical_attributes"
+                column: "num_bedrooms"
+                data_type: "UInt8"
+
+            - field_id: "num_bathrooms"
+              field_code: "Part 2.3"
+              field_name_en: "Number of Bathrooms"
+              field_name_mt: "Numru ta' Kmamar tal-Banju"
+              field_description: "Full and half bathrooms"
+              data_type: "INTEGER"
+              format: null
+              max_length: 2
+              precision: null
+              scale: null
+              required: false
+              required_condition: "property_type = RES"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "eighth_schedule"
+                column: "bathrooms"
+              ors_mapping:
+                table: "mtca_ors.property_physical_attributes"
+                column: "num_bathrooms"
+                data_type: "UInt8"
+
+            - field_id: "garage_spaces"
+              field_code: "Part 2.4"
+              field_name_en: "Garage/Parking Spaces"
+              field_name_mt: "Spazji tal-Garaxx/ParkeÄ¡Ä¡"
+              field_description: "Number of parking spaces"
+              data_type: "INTEGER"
+              format: null
+              max_length: 2
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "eighth_schedule"
+                column: "garage_spaces"
+              ors_mapping:
+                table: "mtca_ors.property_physical_attributes"
+                column: "garage_spaces"
+                data_type: "UInt8"
+
+            - field_id: "year_built"
+              field_code: "Part 2.5"
+              field_name_en: "Year Built"
+              field_name_mt: "Sena li Inbena"
+              field_description: "Approximate year of construction"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "eighth_schedule"
+                column: "year_built"
+              ors_mapping:
+                table: "mtca_ors.property_physical_attributes"
+                column: "year_built"
+                data_type: "UInt16"
+
+            - field_id: "property_condition"
+              field_code: "Part 2.6"
+              field_name_en: "Property Condition"
+              field_name_mt: "Kondizzjoni tal-ProprjetÃ "
+              field_description: "General condition assessment"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "NEW"
+                  description_en: "New/Never Occupied"
+                  description_mt: "Ä did/Qatt Ma NtuÅ¼a"
+                - code: "EXC"
+                  description_en: "Excellent"
+                  description_mt: "EÄ‹Ä‹ellenti"
+                - code: "GOD"
+                  description_en: "Good"
+                  description_mt: "Tajjeb"
+                - code: "FAR"
+                  description_en: "Fair"
+                  description_mt: "AÄ‹Ä‹ettabbli"
+                - code: "REN"
+                  description_en: "Needs Renovation"
+                  description_mt: "JeÄ§tieÄ¡ Rinnovazzjoni"
+                - code: "DER"
+                  description_en: "Derelict"
+                  description_mt: "Abbandunata"
+              reference_table: "property_condition_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "eighth_schedule"
+                column: "condition"
+              ors_mapping:
+                table: "mtca_ors.property_physical_attributes"
+                column: "property_condition"
+                data_type: "FixedString(3)"
+
+            - field_id: "has_pool"
+              field_code: "Part 2.7"
+              field_name_en: "Swimming Pool"
+              field_name_mt: "Pixxina"
+              field_description: "Whether property has a pool"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "N"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "Y"
+                  description_en: "Yes"
+                  description_mt: "Iva"
+                - code: "N"
+                  description_en: "No"
+                  description_mt: "Le"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "eighth_schedule"
+                column: "has_pool"
+              ors_mapping:
+                table: "mtca_ors.property_physical_attributes"
+                column: "has_pool"
+                data_type: "UInt8"
+
+            - field_id: "sea_views"
+              field_code: "Part 2.8"
+              field_name_en: "Sea Views"
+              field_name_mt: "Veduti tal-BaÄ§ar"
+              field_description: "Whether property has sea views"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "N"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "Y"
+                  description_en: "Yes"
+                  description_mt: "Iva"
+                - code: "N"
+                  description_en: "No"
+                  description_mt: "Le"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "cgt_db"
+                table: "eighth_schedule"
+                column: "sea_views"
+              ors_mapping:
+                table: "mtca_ors.property_physical_attributes"
+                column: "sea_views"
+                data_type: "UInt8"
+
+      attachments:
+        - attachment_code: "PHOTOS"
+          attachment_name: "Property Photos"
+          required: false
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "JPG"
+            - "PDF"
+
+      related_forms:
+        - form_code: "Schedule_B"
+          relationship_type: "attachment_to"
+          relationship_description: "Attached to Schedule B transfer notification"
+        - form_code: "DDT1"
+          relationship_type: "related"
+          relationship_description: "Related to property duty form"
+
+      submission_workflow:
+        authentication_required: "Via Schedule B"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "With Schedule B receipt"
+
+# ============================================================================
+# Reference Tables for Priority 2A Forms
+# ============================================================================
+reference_tables:
+  property_type_codes:
+    - code: "RES"
+      description_en: "Residential"
+    - code: "COM"
+      description_en: "Commercial"
+    - code: "IND"
+      description_en: "Industrial"
+    - code: "AGR"
+      description_en: "Agricultural"
+    - code: "LND"
+      description_en: "Undeveloped Land"
+    - code: "GAR"
+      description_en: "Garage"
+    - code: "MIX"
+      description_en: "Mixed Use"
+
+  duty_rates:
+    - property_type: "Standard"
+      rate: 5.0
+      description: "Standard stamp duty rate"
+    - property_type: "First-time buyer (first â‚¬200K)"
+      rate: 3.5
+      description: "Reduced rate for first-time buyers"
+    - property_type: "Gozo"
+      rate: 2.0
+      description: "Gozo property incentive"
+    - property_type: "UCA"
+      rate: 1.5
+      description: "Urban Conservation Area"
+
+  property_right_codes:
+    - code: "FRH"
+      description_en: "Freehold"
+    - code: "GRT"
+      description_en: "Ground Rent"
+    - code: "LES"
+      description_en: "Leasehold"
+    - code: "EMP"
+      description_en: "Emphyteusis"
+    - code: "USU"
+      description_en: "Usufruct"
+    - code: "USE"
+      description_en: "Right of Use"
+
+  property_condition_codes:
+    - code: "NEW"
+      description_en: "New/Never Occupied"
+    - code: "EXC"
+      description_en: "Excellent"
+    - code: "GOD"
+      description_en: "Good"
+    - code: "FAR"
+      description_en: "Fair"
+    - code: "REN"
+      description_en: "Needs Renovation"
+    - code: "DER"
+      description_en: "Derelict"
+
+  malta_localities:
+    - code: "ATT"
+      name_en: "Attard"
+    - code: "BAL"
+      name_en: "Balzan"
+    - code: "BKK"
+      name_en: "Birkirkara"
+    - code: "BRZ"
+      name_en: "BirÅ¼ebbuÄ¡a"
+    - code: "BZN"
+      name_en: "Bormla"
+    - code: "DIN"
+      name_en: "Dingli"
+    - code: "FGR"
+      name_en: "Fgura"
+    - code: "FLR"
+      name_en: "Floriana"
+    - code: "GDJ"
+      name_en: "Gudja"
+    - code: "GZR"
+      name_en: "GÅ¼ira"
+    - code: "GRG"
+      name_en: "GÄ§argÄ§ur"
+    - code: "HAM"
+      name_en: "Ä¦amrun"
+    - code: "IKL"
+      name_en: "Iklin"
+    - code: "ISL"
+      name_en: "Isla"
+    - code: "KLK"
+      name_en: "Kalkara"
+    - code: "LIJ"
+      name_en: "Lija"
+    - code: "LUQ"
+      name_en: "Luqa"
+    - code: "MRS"
+      name_en: "Marsa"
+    - code: "MKL"
+      name_en: "Marsaskala"
+    - code: "MXL"
+      name_en: "Marsaxlokk"
+    - code: "MDN"
+      name_en: "Mdina"
+    - code: "MEL"
+      name_en: "MellieÄ§a"
+    - code: "MGR"
+      name_en: "MÄ¡arr"
+    - code: "MST"
+      name_en: "Mosta"
+    - code: "MQB"
+      name_en: "Mqabba"
+    - code: "MSA"
+      name_en: "Msida"
+    - code: "MTF"
+      name_en: "Mtarfa"
+    - code: "NAX"
+      name_en: "Naxxar"
+    - code: "PAO"
+      name_en: "Paola"
+    - code: "PMB"
+      name_en: "Pembroke"
+    - code: "PTA"
+      name_en: "PietÃ "
+    - code: "QRM"
+      name_en: "Qormi"
+    - code: "QRN"
+      name_en: "Qrendi"
+    - code: "RAB"
+      name_en: "Rabat"
+    - code: "SGW"
+      name_en: "Safi"
+    - code: "SGN"
+      name_en: "San Ä wann"
+    - code: "SNT"
+      name_en: "Santa LuÄ‹ija"
+    - code: "SNV"
+      name_en: "Santa Venera"
+    - code: "SGI"
+      name_en: "SiÄ¡Ä¡iewi"
+    - code: "SLM"
+      name_en: "Sliema"
+    - code: "SPB"
+      name_en: "St. Paul's Bay"
+    - code: "SWQ"
+      name_en: "Swieqi"
+    - code: "TXB"
+      name_en: "Ta' Xbiex"
+    - code: "TRX"
+      name_en: "Tarxien"
+    - code: "VLT"
+      name_en: "Valletta"
+    - code: "XGJ"
+      name_en: "XgÄ§ajra"
+    - code: "ZBR"
+      name_en: "Å»abbar"
+    - code: "ZBG"
+      name_en: "Å»ebbuÄ¡ (Malta)"
+    - code: "ZJT"
+      name_en: "Å»ejtun"
+    - code: "ZRQ"
+      name_en: "Å»urrieq"
+    # Gozo
+    - code: "GHJ"
+      name_en: "GÄ§ajnsielem"
+    - code: "GHR"
+      name_en: "GÄ§arb"
+    - code: "GHS"
+      name_en: "GÄ§asri"
+    - code: "KRC"
+      name_en: "KerÄ‹em"
+    - code: "MUN"
+      name_en: "Munxar"
+    - code: "NDR"
+      name_en: "Nadur"
+    - code: "QAL"
+      name_en: "Qala"
+    - code: "VIC"
+      name_en: "Victoria (Rabat Gozo)"
+    - code: "SAB"
+      name_en: "San Lawrenz"
+    - code: "SAN"
+      name_en: "Sannat"
+    - code: "XAG"
+      name_en: "XagÄ§ra"
+    - code: "XEW"
+      name_en: "Xewkija"
+    - code: "ZGZ"
+      name_en: "Å»ebbuÄ¡ (Gozo)"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping Summary
+# ============================================================================
+migration_mapping:
+  property_duty_db:
+    tables:
+      - legacy_table: "ddt1"
+        ors_table: "mtca_ors.property_transfer_duty"
+        key_columns:
+          - legacy: "transferor_tin"
+            ors: "transferor_tin"
+          - legacy: "transferee_tin"
+            ors: "transferee_tin"
+          - legacy: "promise_date"
+            ors: "promise_of_sale_date"
+
+  cgt_db:
+    tables:
+      - legacy_table: "schedule_b"
+        ors_table: "mtca_ors.property_cgt_notification"
+        key_columns:
+          - legacy: "transferor_tin"
+            ors: "transferor_tin"
+          - legacy: "transfer_date"
+            ors: "transfer_date"
+      - legacy_table: "schedule_c"
+        ors_table: "mtca_ors.share_transfer_cgt"
+        key_columns:
+          - legacy: "transferor_tin"
+            ors: "transferor_tin"
+          - legacy: "company_tin"
+            ors: "company_tin"
+      - legacy_table: "schedule_d"
+        ors_table: "mtca_ors.share_transfer_non_controlling"
+        key_columns:
+          - legacy: "transferor_tin"
+            ors: "transferor_tin"
+          - legacy: "company_tin"
+            ors: "company_tin"
+      - legacy_table: "eighth_schedule"
+        ors_table: "mtca_ors.property_physical_attributes"
+        key_columns:
+          - legacy: "property_address"
+            ors: "property_address"

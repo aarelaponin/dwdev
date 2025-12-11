@@ -1,0 +1,2089 @@
+# ============================================================================
+# MTCA Forms - Priority 1C: Additional TRA Series
+# Forms: TRA 19, TRA 20, TRA 53, TRA 61
+# Version: 1.0
+# Date: 2025-12-05
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # TRA 19: Group Loss Relief - Surrendering Company
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TRA_19"
+        form_name_en: "Group Loss Relief - Surrendering Company"
+        form_name_mt: "Rimedju ta' Telf Gruppali - Kumpanija li TÄ‹edi"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123, Article 17"
+        subsidiary_legislation:
+          - "S.L.123.53 - Group Loss Relief Rules"
+        administering_authority: "CFR"
+        tax_type: "Corporate Income Tax"
+        taxpayer_category: "Company"
+        filing_frequency: "Annual"
+        filing_deadline: "With e-CO return"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/TRA-Forms.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Used by a company with trading losses to surrender those losses 
+          to another company in the same 75% group. The claimant company 
+          must submit TRA 20. Both forms must match for relief to be granted.
+          Losses can only be surrendered for the same accounting period.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Surrendering Company Details
+        # ----------------------------------------------------------------------
+        - section_id: "SURRENDERING_CO"
+          section_name: "Surrendering Company Details"
+          section_description: "Company making the loss available for group relief"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "surrendering_tin"
+              field_code: "Box 1"
+              field_name_en: "Surrendering Company TIN"
+              field_name_mt: "TIN tal-Kumpanija li TÄ‹edi"
+              field_description: "Tax ID of company surrendering losses"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA19_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid 9-digit TIN"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid Company TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: "e-CO.company_tin"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "surrendering_tin"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "surrendering_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "surrendering_name"
+              field_code: "Box 2"
+              field_name_en: "Surrendering Company Name"
+              field_name_mt: "Isem tal-Kumpanija li TÄ‹edi"
+              field_description: "Legal name of surrendering company"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "surrendering_name"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "surrendering_name"
+                data_type: "String"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 3"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Tax year for which losses are surrendered"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.year_of_assessment"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+            - field_id: "accounting_period_start"
+              field_code: "Box 4a"
+              field_name_en: "Accounting Period Start"
+              field_name_mt: "Bidu tal-Perjodu ta' KontabilitÃ "
+              field_description: "Start of accounting period"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.accounting_period_start"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "acct_period_start"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "accounting_period_start"
+                data_type: "Date"
+
+            - field_id: "accounting_period_end"
+              field_code: "Box 4b"
+              field_name_en: "Accounting Period End"
+              field_name_mt: "Tmiem tal-Perjodu ta' KontabilitÃ "
+              field_description: "End of accounting period"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.accounting_period_end"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "acct_period_end"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "accounting_period_end"
+                data_type: "Date"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Loss Details
+        # ----------------------------------------------------------------------
+        - section_id: "LOSS_DETAILS"
+          section_name: "Loss Details"
+          section_description: "Details of trading losses available for surrender"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "trading_loss"
+              field_code: "Box 5"
+              field_name_en: "Trading Loss for Period"
+              field_name_mt: "Telf min-Negozju gÄ§all-Perjodu"
+              field_description: "Total trading loss incurred in the period"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA19_010"
+                  rule_type: "range"
+                  rule_description: "Must be positive (a loss)"
+                  rule_expression: "trading_loss >= 0"
+                  error_message_en: "Trading loss must be positive"
+                  error_message_mt: "Telf min-negozju irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "trading_loss"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "trading_loss"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "loss_utilized_own"
+              field_code: "Box 6"
+              field_name_en: "Loss Utilized Against Own Profits"
+              field_name_mt: "Telf UÅ¼at kontra Profitti Proprji"
+              field_description: "Loss set off against own other income"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA19_011"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed trading loss"
+                  rule_expression: "loss_utilized_own <= trading_loss"
+                  error_message_en: "Cannot utilize more than trading loss"
+                  error_message_mt: "Ma tistax tuÅ¼a aktar mit-telf min-negozju"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "loss_utilized_own"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "loss_utilized_own"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "loss_available_surrender"
+              field_code: "Box 7"
+              field_name_en: "Loss Available for Surrender"
+              field_name_mt: "Telf Disponibbli gÄ§aÄ‹-ÄŠediment"
+              field_description: "Loss remaining after own utilization"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "trading_loss - loss_utilized_own"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "loss_available"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "loss_available_surrender"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Claimant Company Details
+        # ----------------------------------------------------------------------
+        - section_id: "CLAIMANT_DETAILS"
+          section_name: "Claimant Company Details"
+          section_description: "Company(ies) to which losses are surrendered"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "claimant_tin"
+              field_code: "Column A"
+              field_name_en: "Claimant Company TIN"
+              field_name_mt: "TIN tal-Kumpanija li Titlob"
+              field_description: "Tax ID of company claiming the losses"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA19_020"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid 9-digit TIN"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid Company TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+                - rule_id: "TRA19_021"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot surrender to self"
+                  rule_expression: "claimant_tin != surrendering_tin"
+                  error_message_en: "Cannot surrender losses to own company"
+                  error_message_mt: "Ma tistax iÄ‹Ä‹edi telf lill-kumpanija tiegÄ§ek stess"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: "TRA_20.claimant_tin"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19_claimants"
+                column: "claimant_tin"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender_detail"
+                column: "claimant_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "claimant_name"
+              field_code: "Column B"
+              field_name_en: "Claimant Company Name"
+              field_name_mt: "Isem tal-Kumpanija li Titlob"
+              field_description: "Legal name of claimant company"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19_claimants"
+                column: "claimant_name"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender_detail"
+                column: "claimant_name"
+                data_type: "String"
+
+            - field_id: "loss_surrendered"
+              field_code: "Column C"
+              field_name_en: "Loss Surrendered"
+              field_name_mt: "Telf IÄ‹Ä‹edut"
+              field_description: "Amount of loss surrendered to this claimant"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA19_022"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "loss_surrendered > 0"
+                  error_message_en: "Loss surrendered must be positive"
+                  error_message_mt: "Telf iÄ‹Ä‹edut irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_20.loss_claimed"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19_claimants"
+                column: "loss_surrendered"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender_detail"
+                column: "loss_surrendered"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "group_relationship"
+              field_code: "Column D"
+              field_name_en: "Group Relationship"
+              field_name_mt: "Relazzjoni tal-Grupp"
+              field_description: "How claimant is connected (75% subsidiary/parent)"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "SUB"
+                  description_en: "75% Subsidiary"
+                  description_mt: "Sussidjarja 75%"
+                - code: "PAR"
+                  description_en: "75% Parent"
+                  description_mt: "Ä enitur 75%"
+                - code: "SIS"
+                  description_en: "75% Sister Company"
+                  description_mt: "Kumpanija OÄ§t 75%"
+              reference_table: "group_relationship_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19_claimants"
+                column: "relationship"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender_detail"
+                column: "group_relationship"
+                data_type: "FixedString(3)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Summary
+        # ----------------------------------------------------------------------
+        - section_id: "SUMMARY"
+          section_name: "Summary"
+          section_description: "Total losses surrendered"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_surrendered"
+              field_code: "Box 10"
+              field_name_en: "Total Loss Surrendered"
+              field_name_mt: "Telf Totali ÄŠÄ‹edut"
+              field_description: "Sum of losses surrendered to all claimants"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(loss_surrendered)"
+              validation_rules:
+                - rule_id: "TRA19_030"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed available loss"
+                  rule_expression: "total_surrendered <= loss_available_surrender"
+                  error_message_en: "Total surrendered exceeds available loss"
+                  error_message_mt: "Totali Ä‹Ä‹edut jaqbeÅ¼ it-telf disponibbli"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "total_surrendered"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "total_surrendered"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "loss_carried_forward"
+              field_code: "Box 11"
+              field_name_en: "Loss Carried Forward"
+              field_name_mt: "Telf MiÄ¡jub 'l Quddiem"
+              field_description: "Unsurrendered loss to carry forward"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "loss_available_surrender - total_surrendered"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra19"
+                column: "loss_cf"
+              ors_mapping:
+                table: "mtca_ors.group_loss_surrender"
+                column: "loss_carried_forward"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "e-CO"
+          relationship_type: "parent"
+          relationship_description: "Submitted with surrendering company's e-CO"
+        - form_code: "TRA_20"
+          relationship_type: "paired"
+          relationship_description: "Claimant company must submit matching TRA 20"
+
+      submission_workflow:
+        authentication_required: "Via e-CO submission"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Included in e-CO submission receipt"
+
+  # ==========================================================================
+  # TRA 20: Group Loss Relief - Claimant Company
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TRA_20"
+        form_name_en: "Group Loss Relief - Claimant Company"
+        form_name_mt: "Rimedju ta' Telf Gruppali - Kumpanija li Titlob"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123, Article 17"
+        subsidiary_legislation:
+          - "S.L.123.53 - Group Loss Relief Rules"
+        administering_authority: "CFR"
+        tax_type: "Corporate Income Tax"
+        taxpayer_category: "Company"
+        filing_frequency: "Annual"
+        filing_deadline: "With e-CO return"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/TRA-Forms.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Used by a company claiming losses surrendered by another group company.
+          Must match corresponding TRA 19 from the surrendering company.
+          Losses reduce claimant's chargeable income.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Claimant Company Details
+        # ----------------------------------------------------------------------
+        - section_id: "CLAIMANT_CO"
+          section_name: "Claimant Company Details"
+          section_description: "Company claiming the group loss relief"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "claimant_tin"
+              field_code: "Box 1"
+              field_name_en: "Claimant Company TIN"
+              field_name_mt: "TIN tal-Kumpanija li Titlob"
+              field_description: "Tax ID of company claiming losses"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA20_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid 9-digit TIN"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid Company TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: "e-CO.company_tin"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra20"
+                column: "claimant_tin"
+              ors_mapping:
+                table: "mtca_ors.group_loss_claim"
+                column: "claimant_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "claimant_name"
+              field_code: "Box 2"
+              field_name_en: "Claimant Company Name"
+              field_name_mt: "Isem tal-Kumpanija li Titlob"
+              field_description: "Legal name of claimant company"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra20"
+                column: "claimant_name"
+              ors_mapping:
+                table: "mtca_ors.group_loss_claim"
+                column: "claimant_name"
+                data_type: "String"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 3"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Tax year for which losses are claimed"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.year_of_assessment"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra20"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.group_loss_claim"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+            - field_id: "chargeable_income_before"
+              field_code: "Box 4"
+              field_name_en: "Chargeable Income Before Group Relief"
+              field_name_mt: "Introjtu Taxxabbli Qabel Rimedju Gruppali"
+              field_description: "Claimant's chargeable income before claiming group losses"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA20_010"
+                  rule_type: "range"
+                  rule_description: "Must be positive to claim relief"
+                  rule_expression: "chargeable_income_before > 0"
+                  error_message_en: "Must have positive income to claim group relief"
+                  error_message_mt: "Irid ikollok introjtu poÅ¼ittiv biex titlob rimedju gruppali"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra20"
+                column: "income_before_relief"
+              ors_mapping:
+                table: "mtca_ors.group_loss_claim"
+                column: "chargeable_income_before"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Surrendering Company Details
+        # ----------------------------------------------------------------------
+        - section_id: "SURRENDERING_DETAILS"
+          section_name: "Surrendering Company Details"
+          section_description: "Company(ies) from which losses are claimed"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "surrendering_tin"
+              field_code: "Column A"
+              field_name_en: "Surrendering Company TIN"
+              field_name_mt: "TIN tal-Kumpanija li TÄ‹edi"
+              field_description: "Tax ID of company surrendering losses"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA20_020"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid 9-digit TIN"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid Company TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: "TRA_19.surrendering_tin"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra20_sources"
+                column: "surrendering_tin"
+              ors_mapping:
+                table: "mtca_ors.group_loss_claim_detail"
+                column: "surrendering_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "surrendering_name"
+              field_code: "Column B"
+              field_name_en: "Surrendering Company Name"
+              field_name_mt: "Isem tal-Kumpanija li TÄ‹edi"
+              field_description: "Legal name of surrendering company"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra20_sources"
+                column: "surrendering_name"
+              ors_mapping:
+                table: "mtca_ors.group_loss_claim_detail"
+                column: "surrendering_name"
+                data_type: "String"
+
+            - field_id: "loss_claimed"
+              field_code: "Column C"
+              field_name_en: "Loss Claimed"
+              field_name_mt: "Telf PretiÅ¼"
+              field_description: "Amount of loss claimed from this company"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA20_021"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "loss_claimed > 0"
+                  error_message_en: "Loss claimed must be positive"
+                  error_message_mt: "Telf pretiÅ¼ irid ikun poÅ¼ittiv"
+                  severity: "error"
+                - rule_id: "TRA20_022"
+                  rule_type: "cross_field"
+                  rule_description: "Must match TRA 19 surrender"
+                  rule_expression: "loss_claimed = TRA19.loss_surrendered WHERE TRA19.claimant_tin = this.claimant_tin"
+                  error_message_en: "Loss claimed must match TRA 19 surrender amount"
+                  error_message_mt: "Telf pretiÅ¼ irid jaqbel mal-ammont iÄ‹Ä‹edut fit-TRA 19"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_19.loss_surrendered"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra20_sources"
+                column: "loss_claimed"
+              ors_mapping:
+                table: "mtca_ors.group_loss_claim_detail"
+                column: "loss_claimed"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Summary
+        # ----------------------------------------------------------------------
+        - section_id: "SUMMARY"
+          section_name: "Summary"
+          section_description: "Total losses claimed and impact on chargeable income"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_loss_claimed"
+              field_code: "Box 10"
+              field_name_en: "Total Loss Claimed"
+              field_name_mt: "Telf Totali PretiÅ¼"
+              field_description: "Sum of losses claimed from all surrendering companies"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(loss_claimed)"
+              validation_rules:
+                - rule_id: "TRA20_030"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed chargeable income"
+                  rule_expression: "total_loss_claimed <= chargeable_income_before"
+                  error_message_en: "Loss claimed cannot exceed chargeable income"
+                  error_message_mt: "Telf pretiÅ¼ ma jistax jaqbeÅ¼ l-introjtu taxxabbli"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.group_loss_claimed"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra20"
+                column: "total_claimed"
+              ors_mapping:
+                table: "mtca_ors.group_loss_claim"
+                column: "total_loss_claimed"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "chargeable_income_after"
+              field_code: "Box 11"
+              field_name_en: "Chargeable Income After Group Relief"
+              field_name_mt: "Introjtu Taxxabbli Wara Rimedju Gruppali"
+              field_description: "Reduced chargeable income after applying group losses"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "chargeable_income_before - total_loss_claimed"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra20"
+                column: "income_after_relief"
+              ors_mapping:
+                table: "mtca_ors.group_loss_claim"
+                column: "chargeable_income_after"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "e-CO"
+          relationship_type: "parent"
+          relationship_description: "Submitted with claimant company's e-CO"
+        - form_code: "TRA_19"
+          relationship_type: "paired"
+          relationship_description: "Surrendering company must submit matching TRA 19"
+
+      submission_workflow:
+        authentication_required: "Via e-CO submission"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Included in e-CO submission receipt"
+
+  # ==========================================================================
+  # TRA 53: Property Transfer Tax
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TRA_53"
+        form_name_en: "Property Transfer Tax"
+        form_name_mt: "Taxxa fuq Trasferiment ta' ProprjetÃ "
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123, Article 5A"
+        subsidiary_legislation:
+          - "S.L.123.118 - Property Transfers (Various Provisions) Rules"
+        administering_authority: "CFR"
+        tax_type: "Capital Gains Tax"
+        taxpayer_category: "Individual, Company"
+        filing_frequency: "Event-driven"
+        filing_deadline: "With e-CO or individual return"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/TRA-Forms.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Reports capital gains on transfer of immovable property. 
+          Final withholding tax (FWT) of 8% applies to most transfers.
+          10% rate applies to transfers within 5 years of acquisition.
+          Updated for reduced FWT rates effective from various Legal Notices.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Transferor Details
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSFEROR"
+          section_name: "Transferor Details"
+          section_description: "Person or entity transferring the property"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "transferor_tin"
+              field_code: "Box 1"
+              field_name_en: "Transferor TIN"
+              field_name_mt: "TIN tat-Trasferent"
+              field_description: "Tax ID of the property transferor"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA53_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid TIN format"
+                  rule_expression: "^([0-9]{7}[MGAPLHBZ]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "transferor_tin"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "transferor_tin"
+                data_type: "String"
+
+            - field_id: "transferor_name"
+              field_code: "Box 2"
+              field_name_en: "Transferor Name"
+              field_name_mt: "Isem tat-Trasferent"
+              field_description: "Full name of transferor"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "transferor_name"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "transferor_name"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Property Details
+        # ----------------------------------------------------------------------
+        - section_id: "PROPERTY"
+          section_name: "Property Details"
+          section_description: "Details of the immovable property transferred"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "property_address"
+              field_code: "Box 3"
+              field_name_en: "Property Address"
+              field_name_mt: "Indirizz tal-ProprjetÃ "
+              field_description: "Full address of the property"
+              data_type: "STRING"
+              format: null
+              max_length: 300
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "Schedule_B.property_address"
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "property_address"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "property_address"
+                data_type: "String"
+
+            - field_id: "property_type"
+              field_code: "Box 4"
+              field_name_en: "Property Type"
+              field_name_mt: "Tip ta' ProprjetÃ "
+              field_description: "Category of immovable property"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "RES"
+                  description_en: "Residential"
+                  description_mt: "Residenzjali"
+                - code: "COM"
+                  description_en: "Commercial"
+                  description_mt: "KummerÄ‹jali"
+                - code: "IND"
+                  description_en: "Industrial"
+                  description_mt: "Industrijali"
+                - code: "AGR"
+                  description_en: "Agricultural"
+                  description_mt: "Agrikolu"
+                - code: "LND"
+                  description_en: "Undeveloped Land"
+                  description_mt: "Art Mhux Å»viluppat"
+                - code: "GAR"
+                  description_en: "Garage"
+                  description_mt: "Garaxx"
+                - code: "MIX"
+                  description_en: "Mixed Use"
+                  description_mt: "UÅ¼u ImÄ§allat"
+              reference_table: "property_type_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "property_type"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "property_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "acquisition_date"
+              field_code: "Box 5"
+              field_name_en: "Date of Acquisition"
+              field_name_mt: "Data tal-Akkwist"
+              field_description: "Date when property was originally acquired"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA53_010"
+                  rule_type: "date_logic"
+                  rule_description: "Must be before transfer date"
+                  rule_expression: "acquisition_date < transfer_date"
+                  error_message_en: "Acquisition must be before transfer"
+                  error_message_mt: "L-akkwist irid ikun qabel it-trasferiment"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "acquisition_date"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "acquisition_date"
+                data_type: "Date"
+
+            - field_id: "transfer_date"
+              field_code: "Box 6"
+              field_name_en: "Date of Transfer"
+              field_name_mt: "Data tat-Trasferiment"
+              field_description: "Date of the property transfer (deed execution)"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "Schedule_B.transfer_date"
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "transfer_date"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "transfer_date"
+                data_type: "Date"
+
+            - field_id: "holding_period_years"
+              field_code: "Box 7"
+              field_name_en: "Holding Period (Years)"
+              field_name_mt: "Perjodu ta' Å»amma (Snin)"
+              field_description: "Years between acquisition and transfer"
+              data_type: "INTEGER"
+              format: "##"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "YEAR(transfer_date) - YEAR(acquisition_date)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "holding_years"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "holding_period_years"
+                data_type: "UInt8"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Transfer Values
+        # ----------------------------------------------------------------------
+        - section_id: "VALUES"
+          section_name: "Transfer Values"
+          section_description: "Acquisition cost and transfer value"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "acquisition_cost"
+              field_code: "Box 8"
+              field_name_en: "Acquisition Cost"
+              field_name_mt: "SpiÅ¼a tal-Akkwist"
+              field_description: "Original purchase price plus allowable costs"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA53_020"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "acquisition_cost > 0"
+                  error_message_en: "Acquisition cost must be positive"
+                  error_message_mt: "SpiÅ¼a tal-akkwist trid tkun poÅ¼ittiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "acquisition_cost"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "acquisition_cost"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "transfer_value"
+              field_code: "Box 9"
+              field_name_en: "Transfer Value"
+              field_name_mt: "Valur tat-Trasferiment"
+              field_description: "Sale price or market value"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA53_021"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "transfer_value > 0"
+                  error_message_en: "Transfer value must be positive"
+                  error_message_mt: "Valur tat-trasferiment irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "Schedule_B.transfer_value"
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "transfer_value"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "transfer_value"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "capital_gain"
+              field_code: "Box 10"
+              field_name_en: "Capital Gain"
+              field_name_mt: "QligÄ§ Kapitali"
+              field_description: "Gain on transfer (transfer value less acquisition cost)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MAX(0, transfer_value - acquisition_cost)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "capital_gain"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "capital_gain"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Tax Calculation
+        # ----------------------------------------------------------------------
+        - section_id: "TAX_CALC"
+          section_name: "Tax Calculation"
+          section_description: "Final withholding tax computation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "fwt_rate"
+              field_code: "Box 11"
+              field_name_en: "FWT Rate"
+              field_name_mt: "Rata FWT"
+              field_description: "Final withholding tax rate applicable"
+              data_type: "PERCENTAGE"
+              format: "#.#%"
+              max_length: null
+              precision: 3
+              scale: 1
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "IF holding_period_years < 5 THEN 10 ELSE 8"
+              validation_rules: []
+              allowed_values:
+                - code: "8"
+                  description_en: "8% - Standard rate (held 5+ years)"
+                  description_mt: "8% - Rata standard (miÅ¼muma 5+ snin)"
+                - code: "10"
+                  description_en: "10% - Short-term rate (held < 5 years)"
+                  description_mt: "10% - Rata qasira (miÅ¼muma < 5 snin)"
+              reference_table: "property_fwt_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "fwt_rate"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "fwt_rate"
+                data_type: "Decimal(3,1)"
+
+            - field_id: "fwt_base"
+              field_code: "Box 12"
+              field_name_en: "FWT Tax Base"
+              field_name_mt: "BaÅ¼i tat-Taxxa FWT"
+              field_description: "Amount subject to FWT (transfer value)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "transfer_value"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "fwt_base"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "fwt_base"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "fwt_amount"
+              field_code: "Box 13"
+              field_name_en: "FWT Amount"
+              field_name_mt: "Ammont FWT"
+              field_description: "Final withholding tax due"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "fwt_base * (fwt_rate / 100)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "fwt_amount"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "fwt_amount"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "notary_withheld"
+              field_code: "Box 14"
+              field_name_en: "Tax Withheld by Notary"
+              field_name_mt: "Taxxa MiÅ¼muma min-Nutar"
+              field_description: "FWT withheld and remitted by notary"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA53_030"
+                  rule_type: "cross_field"
+                  rule_description: "Should equal FWT amount"
+                  rule_expression: "notary_withheld = fwt_amount"
+                  error_message_en: "Tax withheld should equal FWT due"
+                  error_message_mt: "Taxxa miÅ¼muma gÄ§andha tkun ugwali gÄ§all-FWT dovuta"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "property_tax_db"
+                table: "tra53"
+                column: "notary_withheld"
+              ors_mapping:
+                table: "mtca_ors.property_transfer_tax"
+                column: "notary_withheld"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "DEED_COPY"
+          attachment_name: "Copy of Transfer Deed"
+          required: true
+          required_condition: null
+          max_file_size_mb: 10
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "Schedule_B"
+          relationship_type: "source"
+          relationship_description: "Property details from Schedule B notification"
+        - form_code: "DDT1"
+          relationship_type: "related"
+          relationship_description: "Property transfer duty form"
+        - form_code: "e-CO"
+          relationship_type: "parent"
+          relationship_description: "Attached to e-CO for corporate transferors"
+        - form_code: "Individual_Return"
+          relationship_type: "parent"
+          relationship_description: "Referenced in individual return capital gains"
+
+      submission_workflow:
+        authentication_required: "Via tax return submission"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Included in tax return receipt"
+
+  # ==========================================================================
+  # TRA 61: Final Tax Account Allocation
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TRA_61"
+        form_name_en: "Final Tax Account Allocation"
+        form_name_mt: "Allokazzjoni tal-Kont tat-Taxxa Finali"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "S.L.123.01 - Income Tax Management Act"
+        administering_authority: "CFR"
+        tax_type: "Corporate Income Tax"
+        taxpayer_category: "Company"
+        filing_frequency: "Annual"
+        filing_deadline: "With e-CO return"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/TRA-Forms.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Tracks movements in the Final Tax Account (FTA) which holds profits 
+          taxed at final withholding rates (15% rental, withholding tax, etc.).
+          Dividends from FTA are not subject to further shareholder refunds.
+          Works in conjunction with TRA 63 for full tax account tracking.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Company Identification
+        # ----------------------------------------------------------------------
+        - section_id: "COMPANY_ID"
+          section_name: "Company Identification"
+          section_description: "Company and assessment period details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "company_tin"
+              field_code: "Box 1"
+              field_name_en: "Company TIN"
+              field_name_mt: "TIN tal-Kumpanija"
+              field_description: "Tax identification number"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA61_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid 9-digit TIN"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: "e-CO.company_tin"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "company_tin"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "company_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Tax year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.year_of_assessment"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        # ----------------------------------------------------------------------
+        # Section 2: FTA Opening Balance
+        # ----------------------------------------------------------------------
+        - section_id: "OPENING"
+          section_name: "Opening Balance"
+          section_description: "FTA balance brought forward from prior year"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "fta_opening_balance"
+              field_code: "Box 3"
+              field_name_en: "FTA Opening Balance"
+              field_name_mt: "BilanÄ‹ tal-FtuÄ§ FTA"
+              field_description: "Balance brought forward from prior year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA61_010"
+                  rule_type: "cross_field"
+                  rule_description: "Should match prior year closing"
+                  rule_expression: "fta_opening_balance = prior_year.fta_closing_balance"
+                  error_message_en: "Opening balance should match prior year closing"
+                  error_message_mt: "BilanÄ‹ tal-ftuÄ§ gÄ§andu jaqbel mal-gÄ§eluq tas-sena ta' qabel"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "opening_balance"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "fta_opening_balance"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: FTA Additions (Income taxed at FWT)
+        # ----------------------------------------------------------------------
+        - section_id: "ADDITIONS"
+          section_name: "FTA Additions"
+          section_description: "Income taxed at final withholding rates allocated to FTA"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "rental_income_fwt"
+              field_code: "Box 4"
+              field_name_en: "Rental Income (15% FWT)"
+              field_name_mt: "Introjtu mill-Kera (15% FWT)"
+              field_description: "Rental income taxed at 15% final withholding"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA61_020"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "rental_income_fwt >= 0"
+                  error_message_en: "Rental income cannot be negative"
+                  error_message_mt: "Introjtu mill-kera ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "rental_fwt"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "rental_income_fwt"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "interest_income_fwt"
+              field_code: "Box 5"
+              field_name_en: "Interest Income (FWT)"
+              field_name_mt: "Introjtu mill-Interessi (FWT)"
+              field_description: "Interest income subject to final withholding"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "interest_fwt"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "interest_income_fwt"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "royalty_income_fwt"
+              field_code: "Box 6"
+              field_name_en: "Royalty Income (FWT)"
+              field_name_mt: "Introjtu minn Royalties (FWT)"
+              field_description: "Royalty income subject to final withholding"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "royalty_fwt"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "royalty_income_fwt"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "capital_gains_fwt"
+              field_code: "Box 7"
+              field_name_en: "Capital Gains (FWT)"
+              field_name_mt: "QligÄ§ Kapitali (FWT)"
+              field_description: "Property/share gains taxed at FWT rates"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_53.capital_gain"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "capital_gains_fwt"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "capital_gains_fwt"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "other_fwt_income"
+              field_code: "Box 8"
+              field_name_en: "Other FWT Income"
+              field_name_mt: "Introjtu FWT IeÄ§or"
+              field_description: "Any other income subject to FWT"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "other_fwt"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "other_fwt_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_fta_additions"
+              field_code: "Box 9"
+              field_name_en: "Total FTA Additions"
+              field_name_mt: "Å»idiet FTA Totali"
+              field_description: "Sum of all FWT income allocated to FTA"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "rental_income_fwt + interest_income_fwt + royalty_income_fwt + capital_gains_fwt + other_fwt_income"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_63.fta_allocation"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "total_additions"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "total_fta_additions"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: FTA Deductions (Dividends distributed from FTA)
+        # ----------------------------------------------------------------------
+        - section_id: "DEDUCTIONS"
+          section_name: "FTA Deductions"
+          section_description: "Dividends distributed from the Final Tax Account"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "dividends_from_fta"
+              field_code: "Box 10"
+              field_name_en: "Dividends Distributed from FTA"
+              field_name_mt: "Dividendi Mqassma mill-FTA"
+              field_description: "Dividends paid out of FTA profits"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA61_030"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "dividends_from_fta >= 0"
+                  error_message_en: "Dividends cannot be negative"
+                  error_message_mt: "Dividendi ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+                - rule_id: "TRA61_031"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed available FTA balance"
+                  rule_expression: "dividends_from_fta <= fta_opening_balance + total_fta_additions"
+                  error_message_en: "Dividends exceed FTA balance"
+                  error_message_mt: "Dividendi jaqbÅ¼u l-bilanÄ‹ FTA"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "dividends_distributed"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "dividends_from_fta"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Closing Balance
+        # ----------------------------------------------------------------------
+        - section_id: "CLOSING"
+          section_name: "Closing Balance"
+          section_description: "FTA balance carried forward"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "fta_closing_balance"
+              field_code: "Box 11"
+              field_name_en: "FTA Closing Balance"
+              field_name_mt: "BilanÄ‹ tal-GÄ§eluq FTA"
+              field_description: "Balance to carry forward to next year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "fta_opening_balance + total_fta_additions - dividends_from_fta"
+              validation_rules:
+                - rule_id: "TRA61_040"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "fta_closing_balance >= 0"
+                  error_message_en: "FTA balance cannot be negative"
+                  error_message_mt: "BilanÄ‹ FTA ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra61"
+                column: "closing_balance"
+              ors_mapping:
+                table: "mtca_ors.fta_movement"
+                column: "fta_closing_balance"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "e-CO"
+          relationship_type: "parent"
+          relationship_description: "Submitted with e-CO return"
+        - form_code: "TRA_63"
+          relationship_type: "related"
+          relationship_description: "FTA allocation flows from TRA 63"
+        - form_code: "TRA_53"
+          relationship_type: "source"
+          relationship_description: "Capital gains FWT feeds into FTA"
+
+      submission_workflow:
+        authentication_required: "Via e-CO submission"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Included in e-CO submission receipt"
+
+# ============================================================================
+# Reference Tables for Priority 1C Forms
+# ============================================================================
+reference_tables:
+  group_relationship_codes:
+    - code: "SUB"
+      description_en: "75% Subsidiary"
+    - code: "PAR"
+      description_en: "75% Parent"
+    - code: "SIS"
+      description_en: "75% Sister Company"
+
+  property_type_codes:
+    - code: "RES"
+      description_en: "Residential"
+    - code: "COM"
+      description_en: "Commercial"
+    - code: "IND"
+      description_en: "Industrial"
+    - code: "AGR"
+      description_en: "Agricultural"
+    - code: "LND"
+      description_en: "Undeveloped Land"
+    - code: "GAR"
+      description_en: "Garage"
+    - code: "MIX"
+      description_en: "Mixed Use"
+
+  property_fwt_rates:
+    - holding_period: "<5 years"
+      rate: 10
+      description_en: "Short-term holding"
+    - holding_period: ">=5 years"
+      rate: 8
+      description_en: "Standard rate"
+
+# ============================================================================
+# Cross-Form Relationships Summary
+# ============================================================================
+form_relationships:
+  group_relief_chain:
+    description: "Group loss relief matching between companies"
+    flow:
+      - source: "TRA_19"
+        target: "TRA_20"
+        relationship: "Surrender matches claim - amounts must be equal"
+      - source: "TRA_19"
+        target: "e-CO (surrendering)"
+        relationship: "Attached to surrendering company return"
+      - source: "TRA_20"
+        target: "e-CO (claimant)"
+        relationship: "Attached to claimant company return"
+
+  fta_tracking_chain:
+    description: "Final Tax Account movement tracking"
+    flow:
+      - source: "TRA_53"
+        target: "TRA_61"
+        relationship: "Capital gains FWT flows to FTA"
+      - source: "TRA_61"
+        target: "TRA_63"
+        relationship: "FTA allocation reconciles with TRA 63"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping Summary
+# ============================================================================
+migration_mapping:
+  corporate_tax_db:
+    tables:
+      - legacy_table: "tra19"
+        ors_table: "mtca_ors.group_loss_surrender"
+        key_columns:
+          - legacy: "surrendering_tin"
+            ors: "surrendering_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "tra19_claimants"
+        ors_table: "mtca_ors.group_loss_surrender_detail"
+        key_columns:
+          - legacy: "surrendering_tin"
+            ors: "surrendering_tin"
+          - legacy: "claimant_tin"
+            ors: "claimant_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "tra20"
+        ors_table: "mtca_ors.group_loss_claim"
+        key_columns:
+          - legacy: "claimant_tin"
+            ors: "claimant_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "tra20_sources"
+        ors_table: "mtca_ors.group_loss_claim_detail"
+        key_columns:
+          - legacy: "claimant_tin"
+            ors: "claimant_tin"
+          - legacy: "surrendering_tin"
+            ors: "surrendering_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "tra53"
+        ors_table: "mtca_ors.property_transfer_tax"
+        key_columns:
+          - legacy: "transferor_tin"
+            ors: "transferor_tin"
+          - legacy: "transfer_date"
+            ors: "transfer_date"
+          - legacy: "property_address"
+            ors: "property_address"
+      - legacy_table: "tra61"
+        ors_table: "mtca_ors.fta_movement"
+        key_columns:
+          - legacy: "company_tin"
+            ors: "company_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"

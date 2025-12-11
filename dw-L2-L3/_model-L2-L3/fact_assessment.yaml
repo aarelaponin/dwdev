@@ -1,0 +1,622 @@
+# =============================================================================
+# Malta L3 Warehouse: fact_assessment Fact Table
+# =============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Phase: C - L3 Warehouse Model Development
+# Step: 11a - Fact Table Framework & Core Facts
+# =============================================================================
+
+fact_table:
+  name: "fact_assessment"
+  schema: "warehouse"
+  description: |
+    Transactional fact table tracking all tax assessments.
+    Each row represents a single assessment event.
+    Includes self-assessments from returns, office assessments,
+    audit assessments, and amended assessments.
+    
+  fact_type: "TRANSACTIONAL"
+  grain: "One row per tax assessment"
+  
+  business_context:
+    domain: "Filing & Assessment"
+    primary_use: "Revenue analysis, compliance gap measurement, penalty tracking"
+    usage_pattern: "High read for revenue dashboards, reconciliation with payments"
+    refresh: "Daily incremental based on L2 modified_date"
+    
+  estimated_volume:
+    initial_rows: 3000000
+    annual_growth_rows: 300000
+    average_daily_inserts: 1000
+    
+  # ===========================================================================
+  # DIMENSION FOREIGN KEYS
+  # ===========================================================================
+  dimension_keys:
+    - name: "party_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_party"
+      description: "Taxpayer assessed"
+      
+    - name: "tax_type_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_tax_type"
+      description: "Type of tax assessed"
+      
+    - name: "tax_period_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_tax_period"
+      description: "Tax period assessed"
+      
+    - name: "registration_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_registration"
+      description: "Registration status at assessment time"
+      
+    - name: "assessment_type_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_assessment_type"
+      description: |
+        Assessment classification:
+        - Self-assessed
+        - Office assessment
+        - Audit assessment
+        - Amended assessment
+        - Provisional assessment
+      
+    - name: "risk_category_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_risk_category"
+      description: "Risk profile at assessment time"
+      default_value: -1
+
+  # ===========================================================================
+  # ROLE-PLAYING DATE KEYS
+  # ===========================================================================
+  date_keys:
+    - name: "assessment_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Assessment Date"
+      description: "Date assessment was created/calculated"
+      format: "YYYYMMDD smart key"
+      source: "assessment.assessment_date"
+      
+    - name: "issue_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Issue Date"
+      description: "Date assessment was issued to taxpayer"
+      format: "YYYYMMDD smart key"
+      source: "assessment.issue_date"
+      
+    - name: "due_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Due Date"
+      description: "Payment due date for the assessment"
+      format: "YYYYMMDD smart key"
+      source: "assessment.due_date"
+      
+    - name: "appeal_deadline_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Appeal Deadline"
+      description: |
+        Last date taxpayer can appeal the assessment.
+        Malta: 30 days from issue date for objection,
+        60 days from objection decision for appeal to TAT.
+      format: "YYYYMMDD smart key"
+      source: "assessment.appeal_deadline_date"
+      default_value: -1
+
+  # ===========================================================================
+  # DEGENERATE DIMENSIONS
+  # ===========================================================================
+  degenerate_dimensions:
+    - name: "assessment_source_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "L2 assessment_id - primary key from source"
+      source: "filing_assessment.assessment.assessment_id"
+      role: "PRIMARY_KEY"
+      
+    - name: "assessment_reference"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "Assessment reference number (business key)"
+      source: "assessment.assessment_reference"
+      
+    - name: "filing_source_id"
+      data_type: "BIGINT"
+      nullable: true
+      description: |
+        Related tax_return_id for self-assessments.
+        Links to fact_filing for return-to-assessment traceability.
+        NULL for office/audit assessments.
+      source: "assessment.tax_return_id"
+      cross_reference: "fact_filing.filing_source_id"
+      
+    - name: "audit_case_id"
+      data_type: "BIGINT"
+      nullable: true
+      description: |
+        Related audit_case_id if from audit.
+        NULL for self-assessments.
+        Links to compliance_control.audit_case.
+      source: "assessment.audit_case_id"
+      
+    - name: "assessment_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Current status of the assessment"
+      source: "assessment.assessment_status_code"
+      allowed_values: ["DRAFT", "ISSUED", "FINAL", "APPEALED", "AMENDED", "CANCELLED"]
+      
+    - name: "assessment_reason_code"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: |
+        Reason for non-self assessment:
+        - NON_FILING: Taxpayer failed to file
+        - UNDERSTATEMENT: Detected underreporting
+        - AUDIT_FINDING: Result of audit
+        - ESTIMATION: Estimated assessment
+        - CORRECTION: Administrative correction
+      source: "assessment.assessment_reason_code"
+      allowed_values: ["NON_FILING", "UNDERSTATEMENT", "AUDIT_FINDING", "ESTIMATION", "CORRECTION", null]
+
+  # ===========================================================================
+  # ADDITIVE MEASURES - TAX AMOUNTS
+  # ===========================================================================
+  measures_additive:
+    # Core Tax Amounts
+    - name: "original_tax_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Original self-assessed tax amount from return.
+        NULL for office/audit assessments.
+      source: "COALESCE(linked_return.tax_liability_amount, NULL)"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "assessed_tax_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: "Final assessed tax amount"
+      source: "assessment.assessed_tax_amount"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Primary tax measure for revenue reporting"
+      
+    - name: "additional_tax_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Additional tax assessed above original.
+        Calculated as: assessed_tax - original_tax.
+        Positive = additional liability.
+        Negative = reduced liability (from appeal).
+      source: "assessed_tax_amount - COALESCE(original_tax_amount, 0)"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Key measure for compliance gap analysis"
+      
+    # Penalty and Interest
+    - name: "penalty_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Total penalties imposed.
+        Aggregated from penalty_assessment table.
+        Includes: late filing, late payment, understatement.
+      source: "SUM(penalty_assessment.penalty_amount) WHERE assessment_id = ?"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "interest_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Total interest charged.
+        Aggregated from interest_assessment table.
+        Calculated on outstanding tax from due date.
+      source: "SUM(interest_assessment.interest_amount) WHERE assessment_id = ?"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "total_amount_due"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: "Total amount due: tax + penalty + interest"
+      source: "assessment.total_amount_due"
+      unit: "EUR"
+      aggregation: "SUM"
+      derivation: "assessed_tax_amount + COALESCE(penalty_amount, 0) + COALESCE(interest_amount, 0)"
+      
+    # Payment Status
+    - name: "amount_paid"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Total amount paid against this assessment"
+      source: "SUM(payment_allocation.allocated_amount) WHERE assessment_id = ?"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Updated periodically from payment allocations"
+      
+    - name: "amount_outstanding"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Remaining unpaid balance"
+      source: "total_amount_due - COALESCE(amount_paid, 0)"
+      unit: "EUR"
+      aggregation: "SUM"
+      derivation: "total_amount_due - amount_paid"
+      
+    # Adjustments
+    - name: "reduction_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Amount reduced through appeal or revision.
+        Positive value indicates reduction granted.
+      source: "assessment.reduction_amount"
+      unit: "EUR"
+      aggregation: "SUM"
+      
+    - name: "waiver_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Penalty or interest amount waived.
+        Granted through administrative discretion.
+      source: "assessment.waiver_amount"
+      unit: "EUR"
+      aggregation: "SUM"
+
+  # ===========================================================================
+  # SEMI-ADDITIVE MEASURES
+  # ===========================================================================
+  measures_semi_additive:
+    - name: "days_to_issue"
+      data_type: "INT"
+      nullable: true
+      description: "Days from assessment creation to issue"
+      source: "DATEDIFF(issue_date, assessment_date)"
+      aggregation: "AVG across non-time dimensions"
+
+  # ===========================================================================
+  # FLAGS (BOOLEAN INDICATORS)
+  # ===========================================================================
+  flags:
+    - name: "is_self_assessed"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if assessment from self-assessment (return)"
+      source: "assessment_type_code = 'SELF_ASSESSMENT'"
+      
+    - name: "is_from_audit"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if assessment resulted from audit"
+      source: "audit_case_id IS NOT NULL"
+      
+    - name: "has_penalty"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if assessment includes penalties"
+      source: "COALESCE(penalty_amount, 0) > 0"
+      
+    - name: "has_interest"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if assessment includes interest"
+      source: "COALESCE(interest_amount, 0) > 0"
+      
+    - name: "is_appealed"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if assessment has been appealed"
+      source: "assessment_status_code = 'APPEALED' OR objection_id IS NOT NULL"
+      
+    - name: "is_final"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: |
+        TRUE if assessment is final (no further appeal possible).
+        Appeal deadline passed OR appeal concluded.
+      source: "assessment_status_code = 'FINAL'"
+
+  # ===========================================================================
+  # ETL METADATA
+  # ===========================================================================
+  metadata:
+    - name: "etl_batch_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for this load"
+      
+    - name: "etl_load_timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "When this record was loaded into warehouse"
+      default_value: "CURRENT_TIMESTAMP"
+      
+    - name: "source_system"
+      data_type: "VARCHAR(50)"
+      nullable: false
+      description: "Source system identifier"
+      default_value: "'SIGTAS'"
+
+  # ===========================================================================
+  # INDEXES
+  # ===========================================================================
+  indexes:
+    - name: "pk_fact_assessment"
+      columns: ["assessment_source_id"]
+      primary: true
+      description: "Primary key on L2 source ID"
+      
+    - name: "idx_fact_assessment_party_date"
+      columns: ["party_key", "assessment_date_key"]
+      description: "Party-centric queries with date"
+      
+    - name: "idx_fact_assessment_tax_period"
+      columns: ["tax_type_key", "tax_period_key"]
+      description: "Tax type and period analysis"
+      
+    - name: "idx_fact_assessment_type"
+      columns: ["assessment_type_key", "assessment_date_key"]
+      description: "Assessment type analysis"
+      
+    - name: "idx_fact_assessment_filing"
+      columns: ["filing_source_id"]
+      description: "Cross-reference to filing fact"
+      where: "filing_source_id IS NOT NULL"
+      
+    - name: "idx_fact_assessment_audit"
+      columns: ["audit_case_id"]
+      description: "Cross-reference to audit case"
+      where: "audit_case_id IS NOT NULL"
+
+  # ===========================================================================
+  # PARTITIONING STRATEGY
+  # ===========================================================================
+  partitioning:
+    enabled: true
+    strategy: "RANGE"
+    column: "assessment_date_key"
+    interval: "MONTHLY"
+    description: "Partition by assessment month"
+    retention_months: 120  # 10 years online
+
+  # ===========================================================================
+  # SOURCE MAPPING
+  # ===========================================================================
+  source_mapping:
+    primary_table: "filing_assessment.assessment"
+    alias: "a"
+    
+    joins:
+      # Dimension lookups
+      - table: "warehouse.dim_party"
+        alias: "dp"
+        type: "INNER"
+        condition: "a.party_id = dp.party_source_id AND dp.is_current_flag = TRUE"
+        
+      - table: "warehouse.dim_tax_type"
+        alias: "dtt"
+        type: "INNER"
+        condition: "a.tax_type_code = dtt.tax_type_code"
+        
+      - table: "warehouse.dim_tax_period"
+        alias: "dtp"
+        type: "INNER"
+        condition: "a.tax_period_id = dtp.tax_period_source_id"
+        
+      - table: "warehouse.dim_assessment_type"
+        alias: "dat"
+        type: "INNER"
+        condition: "a.assessment_type_code = dat.assessment_type_code"
+        
+      - table: "warehouse.dim_registration"
+        alias: "dr"
+        type: "INNER"
+        condition: |
+          a.party_id = dr.party_source_id 
+          AND a.tax_type_code = dr.tax_type_code
+          AND dr.is_current_flag = TRUE
+          
+      # Related return (for self-assessments)
+      - table: "filing_assessment.tax_return"
+        alias: "tr"
+        type: "LEFT"
+        condition: "a.tax_return_id = tr.tax_return_id"
+        
+      # Penalty aggregation
+      - table: "filing_assessment.penalty_assessment"
+        alias: "pa"
+        type: "LEFT"
+        condition: "a.assessment_id = pa.assessment_id"
+        aggregation: "SUM(pa.penalty_amount)"
+        
+      # Interest aggregation
+      - table: "filing_assessment.interest_assessment"
+        alias: "ia"
+        type: "LEFT"
+        condition: "a.assessment_id = ia.assessment_id"
+        aggregation: "SUM(ia.interest_amount)"
+        
+      # Payment allocation aggregation
+      - table: "payment_refund.payment_allocation"
+        alias: "pal"
+        type: "LEFT"
+        condition: "a.assessment_id = pal.assessment_id"
+        aggregation: "SUM(pal.allocated_amount)"
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+  business_rules:
+    - rule_id: "FA_001"
+      description: "Total due must equal components"
+      validation_sql: |
+        SELECT assessment_source_id
+        FROM warehouse.fact_assessment
+        WHERE ABS(total_amount_due - (assessed_tax_amount 
+              + COALESCE(penalty_amount, 0) 
+              + COALESCE(interest_amount, 0))) > 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FA_002"
+      description: "Self-assessed must have filing link"
+      validation_sql: |
+        SELECT assessment_source_id
+        FROM warehouse.fact_assessment
+        WHERE is_self_assessed = TRUE 
+          AND filing_source_id IS NULL
+      expected_result: "0 rows"
+      severity: "WARNING"
+      note: "Some self-assessments may not have L2 return link"
+      
+    - rule_id: "FA_003"
+      description: "Audit assessment must have audit case"
+      validation_sql: |
+        SELECT assessment_source_id
+        FROM warehouse.fact_assessment
+        WHERE is_from_audit = TRUE 
+          AND audit_case_id IS NULL
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FA_004"
+      description: "Outstanding amount consistency"
+      validation_sql: |
+        SELECT assessment_source_id
+        FROM warehouse.fact_assessment
+        WHERE ABS(amount_outstanding - (total_amount_due - COALESCE(amount_paid, 0))) > 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FA_005"
+      description: "Penalty flag consistency"
+      validation_sql: |
+        SELECT assessment_source_id
+        FROM warehouse.fact_assessment
+        WHERE (has_penalty = TRUE AND COALESCE(penalty_amount, 0) <= 0)
+           OR (has_penalty = FALSE AND COALESCE(penalty_amount, 0) > 0)
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FA_006"
+      description: "All dimension keys must be valid"
+      validation_sql: |
+        SELECT 'party' AS dimension, COUNT(*) AS missing
+        FROM warehouse.fact_assessment fa
+        WHERE NOT EXISTS (SELECT 1 FROM warehouse.dim_party dp WHERE dp.party_key = fa.party_key)
+        UNION ALL
+        SELECT 'assessment_type', COUNT(*)
+        FROM warehouse.fact_assessment fa
+        WHERE NOT EXISTS (SELECT 1 FROM warehouse.dim_assessment_type dat WHERE dat.assessment_type_key = fa.assessment_type_key)
+      expected_result: "All counts = 0"
+      severity: "CRITICAL"
+
+  # ===========================================================================
+  # SAMPLE QUERIES
+  # ===========================================================================
+  sample_queries:
+    - name: "Revenue by Assessment Type"
+      description: "Tax revenue breakdown by assessment origin"
+      sql: |
+        SELECT 
+            dat.assessment_type_name,
+            dtt.tax_type_name,
+            SUM(fa.assessed_tax_amount) AS total_tax,
+            SUM(fa.penalty_amount) AS total_penalty,
+            SUM(fa.interest_amount) AS total_interest,
+            SUM(fa.total_amount_due) AS total_due,
+            COUNT(*) AS assessment_count
+        FROM warehouse.fact_assessment fa
+        JOIN warehouse.dim_assessment_type dat ON fa.assessment_type_key = dat.assessment_type_key
+        JOIN warehouse.dim_tax_type dtt ON fa.tax_type_key = dtt.tax_type_key
+        WHERE fa.is_final = TRUE
+        GROUP BY dat.assessment_type_name, dtt.tax_type_name
+        ORDER BY total_tax DESC;
+        
+    - name: "Compliance Gap Analysis"
+      description: "Additional tax from audits vs self-assessment"
+      sql: |
+        SELECT 
+            dtp.period_name,
+            dtt.tax_type_name,
+            SUM(CASE WHEN fa.is_self_assessed THEN fa.assessed_tax_amount ELSE 0 END) AS self_assessed_tax,
+            SUM(CASE WHEN fa.is_from_audit THEN fa.additional_tax_amount ELSE 0 END) AS audit_additional,
+            ROUND(100.0 * SUM(CASE WHEN fa.is_from_audit THEN fa.additional_tax_amount ELSE 0 END) /
+                  NULLIF(SUM(CASE WHEN fa.is_self_assessed THEN fa.assessed_tax_amount ELSE 0 END), 0), 2) AS gap_percentage
+        FROM warehouse.fact_assessment fa
+        JOIN warehouse.dim_tax_period dtp ON fa.tax_period_key = dtp.tax_period_key
+        JOIN warehouse.dim_tax_type dtt ON fa.tax_type_key = dtt.tax_type_key
+        GROUP BY dtp.period_name, dtt.tax_type_name
+        ORDER BY dtp.period_start_date DESC;
+        
+    - name: "Assessment Appeal Rate"
+      description: "Appeal rates by tax type and taxpayer segment"
+      sql: |
+        SELECT 
+            dp.segment_name,
+            dtt.tax_type_name,
+            COUNT(*) AS total_assessments,
+            SUM(CASE WHEN fa.is_appealed THEN 1 ELSE 0 END) AS appealed,
+            ROUND(100.0 * SUM(CASE WHEN fa.is_appealed THEN 1 ELSE 0 END) / COUNT(*), 2) AS appeal_rate,
+            SUM(fa.reduction_amount) AS total_reductions
+        FROM warehouse.fact_assessment fa
+        JOIN warehouse.dim_party dp ON fa.party_key = dp.party_key
+        JOIN warehouse.dim_tax_type dtt ON fa.tax_type_key = dtt.tax_type_key
+        WHERE dp.is_current_flag = TRUE
+        GROUP BY dp.segment_name, dtt.tax_type_name
+        HAVING COUNT(*) > 10
+        ORDER BY appeal_rate DESC;
+        
+    - name: "Outstanding Assessment Aging"
+      description: "Aging of unpaid assessments"
+      sql: |
+        SELECT 
+            dtt.tax_type_name,
+            CASE 
+                WHEN DATEDIFF(CURRENT_DATE, dd.calendar_date) <= 30 THEN '0-30 days'
+                WHEN DATEDIFF(CURRENT_DATE, dd.calendar_date) <= 90 THEN '31-90 days'
+                WHEN DATEDIFF(CURRENT_DATE, dd.calendar_date) <= 180 THEN '91-180 days'
+                WHEN DATEDIFF(CURRENT_DATE, dd.calendar_date) <= 365 THEN '181-365 days'
+                ELSE 'Over 1 year'
+            END AS aging_bucket,
+            COUNT(*) AS assessment_count,
+            SUM(fa.amount_outstanding) AS outstanding_amount
+        FROM warehouse.fact_assessment fa
+        JOIN warehouse.dim_tax_type dtt ON fa.tax_type_key = dtt.tax_type_key
+        JOIN warehouse.dim_date dd ON fa.due_date_key = dd.date_key
+        WHERE fa.amount_outstanding > 0
+        GROUP BY dtt.tax_type_name, 
+                 CASE 
+                     WHEN DATEDIFF(CURRENT_DATE, dd.calendar_date) <= 30 THEN '0-30 days'
+                     WHEN DATEDIFF(CURRENT_DATE, dd.calendar_date) <= 90 THEN '31-90 days'
+                     WHEN DATEDIFF(CURRENT_DATE, dd.calendar_date) <= 180 THEN '91-180 days'
+                     WHEN DATEDIFF(CURRENT_DATE, dd.calendar_date) <= 365 THEN '181-365 days'
+                     ELSE 'Over 1 year'
+                 END
+        ORDER BY dtt.tax_type_name, outstanding_amount DESC;

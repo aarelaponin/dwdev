@@ -1,14 +1,53 @@
-# TA-RDM Data Warehouse - ETL Framework
+# TA-RDM Data Warehouse - Multi-Country ETL Framework
 
 **Tax Administration Reference Data Model - Complete ETL Solution**
 
-A production-ready, metadata-driven ETL framework for the Sri Lanka Inland Revenue Department's Tax Administration Data Warehouse, implementing the full data pipeline from source systems through to analytical data marts.
+A production-ready, metadata-driven ETL framework for **multi-country tax administration data warehouses**, implementing the full data pipeline from source systems through to analytical data marts. Currently supporting **Malta** and **Sri Lanka**, with architecture designed for additional countries.
+
+---
+
+## Current Development: Framework Generalization
+
+> **Active Development**: We are implementing a major generalization of the L2-L3 schemas to support multi-country deployment using 7 reusable patterns (P1-P7).
+
+### Implementation Status
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| L2 Canonical Schema | ✅ Complete | 112 tables, 12 domains, country-agnostic |
+| L3 Dimensional Schema | ✅ Complete | 16 dims, 8 facts, 2 bridges |
+| 7 Generalization Patterns | ✅ Documented | P1-P7 in pattern catalog |
+| dbt-based ETL Generator | 🔄 In Progress | 35-iteration implementation plan |
+| Malta Deployment | ⏳ Planned | First target country |
+| Sri Lanka Deployment | ⏳ Planned | Second target country |
+
+### Key Documentation
+
+| Document | Description |
+|----------|-------------|
+| [IMPLEMENTATION-PLAN.md](dw-L2-L3/_docs/IMPLEMENTATION-PLAN.md) | Master plan with 35 testable iterations |
+| [PROGRESS.md](dw-L2-L3/_docs/PROGRESS.md) | Live progress tracker |
+| [L3-Generalization-Patterns-Catalog.md](dw-L2-L3/_docs/L3-Generalization-Patterns-Catalog.md) | 7 patterns (P1-P7) |
+| [L2-00-model-overview.md](dw-L2-L3/_docs/L2-00-model-overview.md) | L2 canonical schema (112 tables) |
+| [L3-00-model-overview.md](dw-L2-L3/_docs/L3-00-model-overview.md) | L3 dimensional model |
+
+### The 7 Generalization Patterns
+
+| Pattern | Name | Purpose |
+|---------|------|---------|
+| P1 | Country Dimension | `dim_country` as foundation for all multi-country queries |
+| P2 | Multi-Identifier Party | Generic TIN/VAT/EORI via `bridge_party_identifier` |
+| P3 | Tax Scheme Dimension | Configurable registration schemes (Malta Articles, etc.) |
+| P4 | Generic Geography | 4-level hierarchy adaptable to any admin structure |
+| P5 | Account Subtype | Malta imputation system generalized |
+| P6 | Configurable Fiscal Year | Multiple fiscal year columns (Jan, Apr, Jul starts) |
+| P7 | Externalized Holidays | Country-specific holidays via `ref_country_holiday` |
 
 ---
 
 ## Overview
 
-This repository contains two complementary ETL packages that together implement the complete **TA-RDM (Tax Administration Reference Data Model)** data warehouse pipeline:
+This repository contains ETL components that together implement the complete **TA-RDM (Tax Administration Reference Data Model)** data warehouse pipeline:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -451,6 +490,16 @@ dwdev/
 ├── ta-rdm-testdata/                   # Test data generator (optional)
 │   └── generate_test_data.py
 │
+├── dw-L2-L3/                          # Reference schemas (MTCA)
+│   ├── _malta-forms/                  # 20 YAML form specifications
+│   ├── _model-L2-core/                # L2 canonical schema
+│   └── _model-L2-L3/                  # L3 dimensional schema
+│
+├── generators/                         # Code generation tools
+│   └── yaml_to_dbt_generator.py       # YAML → dbt model generator
+│
+├── TODO.md                            # MTCA implementation roadmap
+│
 └── README.md                          # This file - overarching documentation
 ```
 
@@ -726,7 +775,7 @@ Both packages follow:
 
 ## License
 
-Internal use for Sri Lanka Inland Revenue Department Tax Administration Data Warehouse.
+Internal use for tax administration digital transformation projects.
 
 ---
 
@@ -747,6 +796,52 @@ This TA-RDM Data Warehouse framework provides:
 
 ---
 
-**Last Updated**: 2025-11-07
+## MTCA Implementation (Malta Tax and Customs Administration)
 
-**Overall Status**: ✅ **PRODUCTION READY**
+### Overview
+
+This framework is being adapted for **MTCA** (Malta Tax and Customs Administration) digital transformation. The adaptation uses a **dbt-based approach** for improved scalability and efficiency.
+
+### Key Resources
+
+- **[TODO.md](TODO.md)** - Complete implementation roadmap for MTCA dbt pipeline
+- **[dw-L2-L3/](dw-L2-L3/)** - Reference schemas (L2 canonical + L3 dimensional models)
+- **[dw-L2-L3/_malta-forms/](dw-L2-L3/_malta-forms/)** - 20 YAML form specifications (108+ forms)
+- **[generators/](generators/)** - Code generation tools for dbt models
+
+### MTCA Architecture
+
+```
+Informix (9 DBs) → dbt Staging → dbt Intermediate → L2 Canonical → L3 DW
+     │                 │              │                  │            │
+  5,170 tables    1:1 extract    Form-based         TA-RDM       Kimball
+                                 transforms         13 schemas    dims/facts
+```
+
+### Quick Start (MTCA)
+
+```bash
+# Generate dbt models from form YAML specifications
+python generators/yaml_to_dbt_generator.py \
+  --input dw-L2-L3/_malta-forms/ \
+  --output mtca-dbt/models/ \
+  --generate-macros
+
+# See TODO.md for complete implementation phases
+```
+
+### Key Differences from RAMIS
+
+| Aspect | Sri Lanka (RAMIS) | Malta (MTCA) |
+|--------|-------------------|---------------|
+| Source DB | SQL Server | Informix (9 databases) |
+| ETL Tool | Python pipeline | dbt (declarative SQL) |
+| Forms | Manual mappings | YAML-driven generation |
+| Scale | ~50 tables | 5,170+ tables |
+| Parallelization | Manual | dbt DAG-based |
+
+---
+
+**Last Updated**: 2025-12-11
+
+**Overall Status**: ✅ **PRODUCTION READY** (Sri Lanka/RAMIS) | 🔄 **IN PROGRESS** (Malta/MTCA Framework Generalization)

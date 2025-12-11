@@ -1,0 +1,542 @@
+# =============================================================================
+# Malta L3 Warehouse: dim_tax_type Dimension
+# =============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Phase: C - L3 Warehouse Model Development
+# Step: 10b - Tax & Registration Dimensions
+# =============================================================================
+
+dimension:
+  name: "dim_tax_type"
+  schema: "warehouse"
+  description: |
+    Conformed dimension for Malta tax classification and hierarchy.
+    Provides a three-level taxonomy (Category → Subcategory → Tax Type)
+    for consistent reporting across all fact tables. Includes rate information,
+    administration details, and Malta-specific flags like imputation system
+    participation and EU harmonization status.
+    
+  scd_type: 1
+  natural_key: ["tax_type_code"]
+  surrogate_key: "tax_type_key"
+  
+  business_context:
+    domain: "Tax Framework"
+    grain: "One row per tax type (overwrite on change)"
+    usage: "All fact tables reference this dimension for tax type context"
+    refresh: "Event-driven (rare changes; legislative updates only)"
+    
+  estimated_volume:
+    initial: 50
+    annual_growth: 2
+    five_year: 60
+    
+  columns:
+    # =========================================================================
+    # KEYS
+    # =========================================================================
+    - name: "tax_type_key"
+      data_type: "INT"
+      nullable: false
+      auto_increment: true
+      description: "Surrogate key - auto-generated unique identifier"
+      role: "SURROGATE_KEY"
+      
+    - name: "tax_type_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: |
+        Business key - unique tax type code.
+        Examples: CIT (Corporate Income Tax), VAT10 (VAT Article 10),
+        FSS (Final Settlement System), SSC (Social Security Contribution)
+      role: "NATURAL_KEY"
+      source: "reference.ref_malta_tax_type.tax_type_code"
+      
+    # =========================================================================
+    # TAX TYPE NAMES
+    # =========================================================================
+    - name: "tax_type_name"
+      data_type: "VARCHAR(200)"
+      nullable: false
+      description: "Full tax type name in English"
+      source: "reference.ref_malta_tax_type.description_en"
+      
+    - name: "tax_type_name_short"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Abbreviated name for display in reports and dashboards"
+      derivation: "Derived from tax_type_code or first 50 chars of name"
+      
+    - name: "tax_type_name_mt"
+      data_type: "VARCHAR(200)"
+      nullable: true
+      description: "Full tax type name in Maltese"
+      source: "reference.ref_malta_tax_type.description_mt"
+      
+    # =========================================================================
+    # HIERARCHY LEVEL 1: CATEGORY
+    # =========================================================================
+    - name: "tax_category_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: |
+        Top-level tax classification:
+        - DIRECT: Direct taxes (income-based)
+        - INDIRECT: Indirect taxes (consumption-based)
+        - SOCIAL_SECURITY: Social security contributions
+        - ENVIRONMENTAL: Environmental levies
+        - INTERNATIONAL: International reporting obligations
+      allowed_values: ["DIRECT", "INDIRECT", "SOCIAL_SECURITY", "ENVIRONMENTAL", "INTERNATIONAL"]
+      source: "reference.ref_malta_tax_category.category_code"
+      
+    - name: "tax_category_name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Full name of tax category"
+      derived: true
+      derivation: "Lookup from ref_malta_tax_category"
+      
+    - name: "tax_category_name_mt"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Tax category name in Maltese"
+      derived: true
+      derivation: "Lookup from ref_malta_tax_category.description_mt"
+      
+    # =========================================================================
+    # HIERARCHY LEVEL 2: SUBCATEGORY
+    # =========================================================================
+    - name: "tax_subcategory_code"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: |
+        Second-level classification within category:
+        - INCOME_TAX: Personal and corporate income
+        - WITHHOLDING: Tax withheld at source
+        - PROPERTY: Property-related taxes
+        - VAT: Value Added Tax
+        - CUSTOMS: Customs duties
+        - EXCISE: Excise duties
+        - STAMP: Stamp duty
+        - GAMING: Gaming taxes
+        - SSC: Social security contributions
+      source: "reference.ref_malta_tax_category.category_code (parent lookup)"
+      
+    - name: "tax_subcategory_name"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Full name of tax subcategory"
+      derived: true
+      
+    # =========================================================================
+    # HIERARCHY SELF-REFERENCE
+    # =========================================================================
+    - name: "parent_tax_type_key"
+      data_type: "INT"
+      nullable: true
+      foreign_key: "warehouse.dim_tax_type(tax_type_key)"
+      description: "Parent tax type for aggregation (e.g., VAT10 rolls up to VAT)"
+      
+    - name: "parent_tax_type_code"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Parent tax type code (denormalized for query convenience)"
+      source: "reference.ref_malta_tax_type.parent_tax_type_code"
+      
+    - name: "is_parent_type"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if this is a rollup/category type (not a leaf tax type)"
+      derivation: "TRUE if any other tax_type has this as parent"
+      
+    - name: "hierarchy_level"
+      data_type: "SMALLINT"
+      nullable: false
+      default_value: 3
+      description: |
+        Position in hierarchy:
+        1 = Category (DIRECT, INDIRECT, etc.)
+        2 = Subcategory (INCOME_TAX, VAT, etc.)
+        3 = Tax Type (CIT, VAT10, FSS, etc.)
+      allowed_values: [1, 2, 3]
+      
+    # =========================================================================
+    # RATE INFORMATION
+    # =========================================================================
+    - name: "standard_rate"
+      data_type: "DECIMAL(10,4)"
+      nullable: true
+      description: |
+        Standard tax rate as decimal (e.g., 0.3500 for 35% corporate tax).
+        NULL for progressive rates or non-rated types.
+      example: "0.3500 (35% CIT), 0.1800 (18% VAT), NULL (progressive PIT)"
+      
+    - name: "rate_type"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "How the rate is applied"
+      allowed_values: ["FLAT", "PROGRESSIVE", "SPECIFIC", "MIXED", "VARIABLE"]
+      notes: |
+        FLAT: Single rate applies (CIT, VAT standard)
+        PROGRESSIVE: Rate increases with base (PIT)
+        SPECIFIC: Fixed amount per unit (excise per litre)
+        MIXED: Combination of ad valorem and specific (tobacco)
+        VARIABLE: Rate depends on circumstances
+        
+    - name: "rate_unit"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "Unit for specific rates (relevant for excise duties)"
+      allowed_values: ["PER_LITRE", "PER_KG", "PER_UNIT", "PER_HECTOLITRE", "PER_1000_UNITS"]
+      applicable_when: "rate_type = 'SPECIFIC' OR rate_type = 'MIXED'"
+      
+    - name: "rate_effective_from"
+      data_type: "DATE"
+      nullable: true
+      description: "Date from which current rate is effective"
+      
+    # =========================================================================
+    # ADMINISTRATION
+    # =========================================================================
+    - name: "administering_authority_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      default_value: "'CFR'"
+      description: "Authority responsible for administering this tax"
+      allowed_values: ["CFR", "MTCA_CUSTOMS", "MGA", "BCRS", "TM"]
+      notes: |
+        CFR: Commissioner for Revenue (most taxes)
+        MTCA_CUSTOMS: Malta Customs (customs, excise)
+        MGA: Malta Gaming Authority (gaming tax)
+        BCRS: Beverage Container Refund Scheme
+        TM: Transport Malta (vehicle registration)
+        
+    - name: "administering_authority_name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Full name of administering authority"
+      derived: true
+      
+    - name: "filing_frequency_code"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Default filing frequency for this tax type"
+      allowed_values: ["ANNUAL", "QUARTERLY", "MONTHLY", "SEMI_ANNUAL", "TRANSACTIONAL", "EVENT_DRIVEN"]
+      
+    - name: "filing_frequency_name"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Descriptive filing frequency"
+      derived: true
+      
+    - name: "legislative_basis"
+      data_type: "VARCHAR(200)"
+      nullable: true
+      description: "Primary legal reference"
+      example: "Income Tax Act (Cap. 123), VAT Act (Cap. 406)"
+      source: "reference.ref_malta_tax_type.legislative_basis"
+      
+    # =========================================================================
+    # MALTA-SPECIFIC FLAGS
+    # =========================================================================
+    - name: "has_imputation"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: |
+        TRUE if this tax type participates in Malta's imputation system.
+        Malta's imputation system allows shareholders to claim credit
+        for corporate tax paid (FTA, MTA, FIA, IPA, UA accounts).
+      applicable_types: ["CIT", "WHT_DIV"]
+      
+    - name: "requires_tra63"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if TRA 63 tax account allocation is mandatory"
+      applicable_types: ["CIT"]
+      
+    - name: "is_withholding_tax"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if tax is withheld at source by payer"
+      applicable_types: ["FSS", "WHT_INT", "WHT_DIV", "WHT_ROY"]
+      
+    - name: "is_final_tax"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: |
+        TRUE if this tax settles the full liability (no further assessment).
+        Example: 15% withholding on interest can be final.
+      applicable_types: ["WHT_INT", "CGT"]
+      
+    - name: "allows_refund"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: true
+      description: "TRUE if taxpayer can claim refunds for this tax type"
+      
+    - name: "is_eu_harmonized"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: |
+        TRUE if this tax is EU-harmonized (common rules across EU).
+        Applies to VAT, customs duties, and excise duties.
+      applicable_types: ["VAT10", "VAT11", "VAT12", "CUSTOMS", "EXCISE"]
+      
+    - name: "requires_eu_reporting"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if EU-level reporting obligations exist (VIES, Intrastat)"
+      
+    - name: "is_deductible"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if input tax is recoverable/deductible (VAT)"
+      applicable_types: ["VAT10"]
+      
+    # =========================================================================
+    # STATUS
+    # =========================================================================
+    - name: "is_active"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: true
+      description: "TRUE if tax type is currently in force"
+      
+    - name: "effective_from_date"
+      data_type: "DATE"
+      nullable: false
+      description: "Date from which this tax type exists"
+      
+    - name: "effective_to_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date until which this tax type is in force (NULL = current)"
+      
+    - name: "sunset_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Planned end date if the tax type has scheduled expiry"
+      
+    # =========================================================================
+    # DISPLAY AND SORTING
+    # =========================================================================
+    - name: "sort_order"
+      data_type: "INT"
+      nullable: false
+      default_value: 999
+      description: "Display order within category/subcategory"
+      source: "reference.ref_malta_tax_type.sort_order"
+      
+    - name: "display_color"
+      data_type: "VARCHAR(7)"
+      nullable: true
+      description: "Hex color code for dashboards (e.g., #FF5722)"
+      
+    - name: "icon_code"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Icon identifier for visual representation"
+      
+    # =========================================================================
+    # ETL METADATA
+    # =========================================================================
+    - name: "etl_batch_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for data lineage"
+      
+    - name: "etl_load_timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when record was loaded"
+      default_value: "CURRENT_TIMESTAMP"
+      
+    - name: "source_system"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Source system identifier"
+      default_value: "'REFERENCE'"
+
+  # ===========================================================================
+  # INDEXES
+  # ===========================================================================
+  indexes:
+    - name: "pk_dim_tax_type"
+      columns: ["tax_type_key"]
+      primary: true
+      
+    - name: "uk_dim_tax_type_code"
+      columns: ["tax_type_code"]
+      unique: true
+      description: "Business key uniqueness"
+      
+    - name: "idx_dim_tax_type_category"
+      columns: ["tax_category_code"]
+      description: "Category-based filtering and rollup"
+      
+    - name: "idx_dim_tax_type_subcategory"
+      columns: ["tax_subcategory_code"]
+      description: "Subcategory-based filtering"
+      
+    - name: "idx_dim_tax_type_parent"
+      columns: ["parent_tax_type_key"]
+      description: "Hierarchy navigation (parent lookup)"
+      
+    - name: "idx_dim_tax_type_authority"
+      columns: ["administering_authority_code"]
+      description: "Filter by administering authority"
+      
+    - name: "idx_dim_tax_type_eu"
+      columns: ["is_eu_harmonized"]
+      where: "is_eu_harmonized = TRUE"
+      description: "EU-harmonized tax type filter"
+      
+    - name: "idx_dim_tax_type_active"
+      columns: ["is_active", "sort_order"]
+      description: "Active tax types in display order"
+
+  # ===========================================================================
+  # SOURCE MAPPING
+  # ===========================================================================
+  source_mapping:
+    primary_table: "reference.ref_malta_tax_type"
+    
+    joins:
+      - table: "reference.ref_malta_tax_category"
+        alias: "cat"
+        type: "LEFT"
+        condition: "ref_malta_tax_type.category_code = cat.category_code"
+        
+    reference_lookups:
+      - target_column: "tax_category_name"
+        lookup_table: "reference.ref_malta_tax_category"
+        lookup_key: "category_code"
+        lookup_value: "description_en"
+        
+      - target_column: "tax_category_name_mt"
+        lookup_table: "reference.ref_malta_tax_category"
+        lookup_key: "category_code"
+        lookup_value: "description_mt"
+        
+      - target_column: "administering_authority_name"
+        lookup_table: "reference.ref_authority"
+        lookup_key: "authority_code"
+        lookup_value: "authority_name"
+        
+    derived_columns:
+      - column: "is_parent_type"
+        logic: |
+          CASE WHEN EXISTS (
+            SELECT 1 FROM reference.ref_malta_tax_type child
+            WHERE child.parent_tax_type_code = ref_malta_tax_type.tax_type_code
+          ) THEN TRUE ELSE FALSE END
+          
+      - column: "hierarchy_level"
+        logic: |
+          CASE 
+            WHEN parent_tax_type_code IS NULL 
+              AND tax_type_code IN ('DIRECT','INDIRECT','SOCIAL_SECURITY','ENVIRONMENTAL','INTERNATIONAL')
+            THEN 1
+            WHEN EXISTS (
+              SELECT 1 FROM ref_malta_tax_type child 
+              WHERE child.parent_tax_type_code = tax_type_code
+            )
+            THEN 2
+            ELSE 3
+          END
+
+  # ===========================================================================
+  # HIERARCHIES
+  # ===========================================================================
+  hierarchies:
+    - name: "tax_classification"
+      type: "LEVEL_BASED"
+      description: "Standard tax classification hierarchy"
+      levels:
+        - level: 1
+          name: "Category"
+          column: "tax_category_name"
+          code_column: "tax_category_code"
+        - level: 2
+          name: "Subcategory"
+          column: "tax_subcategory_name"
+          code_column: "tax_subcategory_code"
+        - level: 3
+          name: "Tax Type"
+          column: "tax_type_name"
+          code_column: "tax_type_code"
+          
+    - name: "tax_parent_child"
+      type: "PARENT_CHILD"
+      description: "Flexible parent-child hierarchy for custom rollups"
+      member_key: "tax_type_key"
+      parent_key: "parent_tax_type_key"
+      member_name: "tax_type_name"
+      max_depth: 3
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+  business_rules:
+    - rule_id: "TAXTYPE_001"
+      description: "Tax type code must be unique"
+      validation_sql: |
+        SELECT tax_type_code, COUNT(*) as cnt
+        FROM warehouse.dim_tax_type
+        GROUP BY tax_type_code
+        HAVING COUNT(*) > 1
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "TAXTYPE_002"
+      description: "Parent tax type must exist in dimension"
+      validation_sql: |
+        SELECT dt.tax_type_key, dt.tax_type_code, dt.parent_tax_type_key
+        FROM warehouse.dim_tax_type dt
+        WHERE dt.parent_tax_type_key IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM warehouse.dim_tax_type parent
+            WHERE parent.tax_type_key = dt.parent_tax_type_key
+          )
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "TAXTYPE_003"
+      description: "EU-harmonized taxes must have correct flag"
+      validation_sql: |
+        SELECT tax_type_code, is_eu_harmonized, tax_category_code
+        FROM warehouse.dim_tax_type
+        WHERE tax_type_code IN ('VAT10', 'VAT11', 'VAT12', 'CUSTOMS', 'EXCISE')
+          AND is_eu_harmonized = FALSE
+      expected_result: "0 rows"
+      severity: "WARNING"
+      
+    - rule_id: "TAXTYPE_004"
+      description: "Imputation flag only for corporate/dividend taxes"
+      validation_sql: |
+        SELECT tax_type_code, has_imputation, tax_category_code
+        FROM warehouse.dim_tax_type
+        WHERE has_imputation = TRUE
+          AND tax_type_code NOT IN ('CIT', 'WHT_DIV')
+      expected_result: "0 rows"
+      severity: "WARNING"
+      
+    - rule_id: "TAXTYPE_005"
+      description: "Withholding taxes must be flagged correctly"
+      validation_sql: |
+        SELECT tax_type_code, is_withholding_tax
+        FROM warehouse.dim_tax_type
+        WHERE tax_type_code IN ('FSS', 'WHT_INT', 'WHT_DIV', 'WHT_ROY')
+          AND is_withholding_tax = FALSE
+      expected_result: "0 rows"
+      severity: "ERROR"

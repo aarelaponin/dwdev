@@ -1,0 +1,759 @@
+# =============================================================================
+# TA-RDM L3 - Refund Account Bridge Table
+# =============================================================================
+# Purpose: Break down refund amounts by account subtype
+# Pattern: P5 (Account Subtype Dimension) + P10 (Bridge Table for Variants)
+# Priority: HIGH
+# Version: 1.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4e of L3 Generalization Implementation
+# =============================================================================
+#
+# This bridge table replaces Malta-specific columns in fact_refund:
+# - fta_refund_amount
+# - mta_refund_amount
+# - fia_refund_amount
+# - ipa_refund_amount
+# - ua_refund_amount
+#
+# Instead of hardcoding account type breakdowns as columns, each account
+# type becomes a row linked to the refund via this bridge table.
+#
+# Benefits:
+# 1. Country-agnostic: Any country can have any number of account subtypes
+# 2. Extensible: New account types don't require schema changes
+# 3. Sparse-efficient: Non-applicable account types don't consume space
+# 4. Auditable: Breakdown detail preserved for compliance
+#
+# Design Principles:
+# - Grain: One row per refund per account subtype
+# - Links fact_refund (via refund_source_id) to dim_account_subtype
+# - Stores amounts, rates, and breakdown details
+# - Denormalizes account_subtype_code for efficient filtering
+#
+# =============================================================================
+
+metadata:
+  table_name: bridge_refund_account
+  schema: warehouse
+  version: "1.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P5 - Account Subtype Dimension, P10 - Bridge Table"
+  description: |
+    Bridge table breaking down refund amounts by account subtype.
+    
+    This table enables:
+    - Malta imputation refund breakdown by FTA/MTA/FIA/IPA/UA
+    - Detailed audit trail of refund calculations
+    - Multi-country support without schema changes
+    
+    Replaces fact_refund columns:
+    - fta_refund_amount, mta_refund_amount, fia_refund_amount
+    - ipa_refund_amount, ua_refund_amount
+    - imputation_credit_amount, shareholder_refund_rate
+
+# =============================================================================
+# Bridge Table Specification
+# =============================================================================
+
+bridge:
+  name: bridge_refund_account
+  schema: warehouse
+  type: bridge
+  
+  grain: "One row per refund per account subtype"
+  
+  description: |
+    Bridge table for refund amount breakdown by account subtype.
+    
+    Each refund claim can have multiple rows, one per applicable account
+    type. For Malta imputation refunds, up to 5 rows exist (one per
+    imputation account). For non-imputation countries, typically one row
+    with the "STD" (Standard) account type.
+    
+    Key relationships:
+    - fact_refund: Linked via refund_source_id (N:1)
+    - dim_account_subtype: Linked via account_subtype_key (N:1)
+    
+    Primary use cases:
+    - Malta shareholder refund breakdown analysis
+    - Imputation account utilization reporting
+    - Compliance validation of refund calculations
+  
+  columns:
+    # ==========================================================================
+    # Primary Keys / Foreign Keys
+    # ==========================================================================
+    - name: refund_source_id
+      data_type: Int64
+      nullable: false
+      description: |
+        Business key linking to fact_refund.
+        This is the refund claim identifier from the source system.
+        Using source_id rather than surrogate key for ETL simplicity.
+      foreign_key: warehouse.fact_refund(refund_source_id)
+    
+    - name: account_subtype_key
+      data_type: Int32
+      nullable: false
+      foreign_key: warehouse.dim_account_subtype(account_subtype_key)
+      description: "FK to dim_account_subtype for account type context"
+    
+    # ==========================================================================
+    # Denormalized for Query Convenience
+    # ==========================================================================
+    - name: account_subtype_code
+      data_type: String
+      length: 20
+      nullable: false
+      description: |
+        Account subtype code denormalized from dim_account_subtype.
+        Values: FTA, MTA, FIA, IPA, UA (Malta); STD (standard)
+        Enables efficient filtering without dimension join.
+    
+    - name: country_code
+      data_type: String
+      length: 3
+      nullable: false
+      description: |
+        Country code denormalized for partition pruning.
+        ISO 3166-1 alpha-3 code.
+    
+    # ==========================================================================
+    # Amount Breakdown
+    # ==========================================================================
+    - name: gross_distribution_amount
+      data_type: Decimal64(2)
+      description: |
+        Gross dividend/distribution allocated to this account.
+        Malta: Amount of dividend sourced from this imputation account.
+        Additive measure - SUM across accounts = total distribution.
+    
+    - name: tax_at_source_amount
+      data_type: Decimal64(2)
+      description: |
+        Tax withheld or paid at source for this portion.
+        Malta: Underlying corporate tax (35% of taxable profit).
+        Used in refund calculation: refund = tax_at_source × refund_rate
+    
+    - name: tax_credit_amount
+      data_type: Decimal64(2)
+      description: |
+        Imputation tax credit associated with this account portion.
+        Malta: Tax credit = Gross dividend × 35/65
+        NULL for non-imputation accounts.
+    
+    - name: refund_amount
+      data_type: Decimal64(2)
+      nullable: false
+      description: |
+        Refund amount for this account subtype portion.
+        Malta calculation: tax_credit × refund_rate
+        This is the actual refund claimed/paid from this account.
+        Additive measure - SUM = total refund (should match fact_refund.claimed_amount)
+    
+    # ==========================================================================
+    # Rate Information
+    # ==========================================================================
+    - name: refund_rate_applied
+      data_type: Decimal64(4)
+      description: |
+        Actual refund rate applied for this breakdown.
+        Usually matches dim_account_subtype.refund_rate but may differ
+        for special cases (e.g., FIA 5/7 vs 6/7 depending on holding type).
+    
+    - name: refund_rate_type
+      data_type: String
+      length: 20
+      description: |
+        Type of refund rate applied.
+        Values: STANDARD, PARTICIPATING, TREATY, REDUCED, NONE
+        Malta FIA may be STANDARD (5/7) or PARTICIPATING (6/7).
+    
+    # ==========================================================================
+    # Percentage Allocation
+    # ==========================================================================
+    - name: allocation_percentage
+      data_type: Decimal64(4)
+      description: |
+        Percentage of total refund allocated to this account.
+        Calculated: (refund_amount / total_refund_amount) × 100
+        Useful for proportional analysis.
+    
+    # ==========================================================================
+    # Sequence and Validation
+    # ==========================================================================
+    - name: distribution_sequence
+      data_type: Int16
+      description: |
+        Order in which this account was applied in distribution.
+        Malta ordering: IPA(1) → FIA(2) → MTA(3) → FTA(4) → UA(5)
+        NULL if ordering not applicable.
+    
+    - name: is_primary_account
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: |
+        Whether this is the primary/largest account for the refund (1=Yes).
+        Useful for simplified reporting.
+    
+    # ==========================================================================
+    # Source Data Reference
+    # ==========================================================================
+    - name: source_document_reference
+      data_type: String
+      length: 100
+      description: |
+        Reference to source document (TRA 63 form, etc.) for this breakdown.
+        Used for audit trail.
+    
+    - name: calculation_notes
+      data_type: String
+      description: |
+        Notes on calculation method or special circumstances.
+        Example: "6/7 rate applied - qualifying participating holding"
+    
+    # ==========================================================================
+    # ETL Metadata
+    # ==========================================================================
+    - name: etl_batch_id
+      data_type: Int64
+      nullable: false
+      description: "ETL batch identifier for data lineage"
+    
+    - name: etl_load_timestamp
+      data_type: DateTime
+      nullable: false
+      description: "Timestamp when record was loaded"
+      default: "now()"
+
+  # ============================================================================
+  # Indexes
+  # ============================================================================
+  indexes:
+    - name: idx_bra_refund
+      columns: [refund_source_id]
+      description: "Primary lookup: find breakdown for a refund"
+    
+    - name: idx_bra_account_subtype
+      columns: [account_subtype_key]
+      description: "Reverse lookup: find refunds for an account type"
+    
+    - name: idx_bra_country_account
+      columns: [country_code, account_subtype_code]
+      description: "Filter by country and account type"
+
+  # ============================================================================
+  # Primary Key / Uniqueness
+  # ============================================================================
+  constraints:
+    - name: pk_bridge_refund_account
+      type: primary_key
+      columns: [refund_source_id, account_subtype_key]
+      description: "Each refund can have one entry per account subtype"
+    
+    - name: uk_bra_source_code
+      type: unique
+      columns: [refund_source_id, account_subtype_code]
+      description: "Alternative uniqueness using denormalized code"
+
+# =============================================================================
+# Sample Data
+# =============================================================================
+sample_data:
+  # ---------------------------------------------------------------------------
+  # Malta Imputation Refund with Multiple Account Types
+  # ---------------------------------------------------------------------------
+  - refund_source_id: 5001
+    account_subtype_key: 2  # MTA
+    account_subtype_code: "MTA"
+    country_code: "MLT"
+    gross_distribution_amount: 10000.00
+    tax_at_source_amount: 5384.62   # 10000 × 35/65
+    tax_credit_amount: 5384.62
+    refund_amount: 4615.39          # 5384.62 × 6/7
+    refund_rate_applied: 0.8571
+    refund_rate_type: "STANDARD"
+    allocation_percentage: 70.59
+    distribution_sequence: 3
+    is_primary_account: 1
+    source_document_reference: "TRA63-2024-001234"
+    calculation_notes: "Standard 6/7 MTA refund"
+    etl_batch_id: 100
+  
+  - refund_source_id: 5001
+    account_subtype_key: 3  # FIA
+    account_subtype_code: "FIA"
+    country_code: "MLT"
+    gross_distribution_amount: 5000.00
+    tax_at_source_amount: 2692.31   # 5000 × 35/65
+    tax_credit_amount: 2692.31
+    refund_amount: 1923.08          # 2692.31 × 5/7
+    refund_rate_applied: 0.7143
+    refund_rate_type: "STANDARD"
+    allocation_percentage: 29.41
+    distribution_sequence: 2
+    is_primary_account: 0
+    source_document_reference: "TRA63-2024-001234"
+    calculation_notes: "5/7 FIA refund - non-participating"
+    etl_batch_id: 100
+
+  # ---------------------------------------------------------------------------
+  # Malta Refund with FIA at 6/7 Rate (Participating Holding)
+  # ---------------------------------------------------------------------------
+  - refund_source_id: 5002
+    account_subtype_key: 3  # FIA
+    account_subtype_code: "FIA"
+    country_code: "MLT"
+    gross_distribution_amount: 20000.00
+    tax_at_source_amount: 10769.23
+    tax_credit_amount: 10769.23
+    refund_amount: 9230.77          # Using 6/7 rate for participating
+    refund_rate_applied: 0.8571     # 6/7 rate
+    refund_rate_type: "PARTICIPATING"
+    allocation_percentage: 100.00
+    distribution_sequence: 2
+    is_primary_account: 1
+    source_document_reference: "TRA63-2024-001567"
+    calculation_notes: "6/7 rate - qualifying participating holding in EU subsidiary"
+    etl_batch_id: 100
+
+  # ---------------------------------------------------------------------------
+  # Malta Refund from IPA (2/3 Rate)
+  # ---------------------------------------------------------------------------
+  - refund_source_id: 5003
+    account_subtype_key: 4  # IPA
+    account_subtype_code: "IPA"
+    country_code: "MLT"
+    gross_distribution_amount: 15000.00
+    tax_at_source_amount: 8076.92
+    tax_credit_amount: 8076.92
+    refund_amount: 5384.62          # 8076.92 × 2/3
+    refund_rate_applied: 0.6667
+    refund_rate_type: "STANDARD"
+    allocation_percentage: 100.00
+    distribution_sequence: 1
+    is_primary_account: 1
+    source_document_reference: "TRA63-2024-001890"
+    calculation_notes: "2/3 IPA refund - Malta property income"
+    etl_batch_id: 100
+
+  # ---------------------------------------------------------------------------
+  # Sri Lanka Standard (Non-Imputation)
+  # ---------------------------------------------------------------------------
+  - refund_source_id: 6001
+    account_subtype_key: 100  # LKA STD
+    account_subtype_code: "STD"
+    country_code: "LKA"
+    gross_distribution_amount: null
+    tax_at_source_amount: null
+    tax_credit_amount: null
+    refund_amount: 50000.00         # Standard VAT refund
+    refund_rate_applied: null       # Not applicable
+    refund_rate_type: "NONE"
+    allocation_percentage: 100.00
+    distribution_sequence: 1
+    is_primary_account: 1
+    source_document_reference: "VAT-REF-2024-0890"
+    calculation_notes: "VAT credit refund - no imputation system"
+    etl_batch_id: 100
+
+# =============================================================================
+# Business Rules
+# =============================================================================
+business_rules:
+  - rule_id: BR_BRA_001
+    description: "Refund source must exist in fact_refund"
+    severity: ERROR
+    validation_sql: |
+      SELECT b.refund_source_id
+      FROM warehouse.bridge_refund_account b
+      LEFT JOIN warehouse.fact_refund f ON b.refund_source_id = f.refund_source_id
+      WHERE f.refund_source_id IS NULL
+    expected_result: "0 rows"
+
+  - rule_id: BR_BRA_002
+    description: "Account subtype must exist in dim_account_subtype"
+    severity: ERROR
+    validation_sql: |
+      SELECT b.refund_source_id, b.account_subtype_key
+      FROM warehouse.bridge_refund_account b
+      LEFT JOIN warehouse.dim_account_subtype a ON b.account_subtype_key = a.account_subtype_key
+      WHERE a.account_subtype_key IS NULL
+    expected_result: "0 rows"
+
+  - rule_id: BR_BRA_003
+    description: "Sum of breakdown refund amounts should equal fact_refund claimed_amount"
+    severity: WARNING
+    validation_sql: |
+      SELECT 
+          f.refund_source_id,
+          f.claimed_amount,
+          SUM(b.refund_amount) as breakdown_total,
+          ABS(f.claimed_amount - SUM(b.refund_amount)) as difference
+      FROM warehouse.fact_refund f
+      JOIN warehouse.bridge_refund_account b ON f.refund_source_id = b.refund_source_id
+      GROUP BY f.refund_source_id, f.claimed_amount
+      HAVING ABS(f.claimed_amount - SUM(b.refund_amount)) > 0.01
+    expected_result: "0 rows"
+    note: "Tolerance of €0.01 for rounding"
+
+  - rule_id: BR_BRA_004
+    description: "Refund amount cannot be negative"
+    severity: ERROR
+    validation_sql: |
+      SELECT refund_source_id, account_subtype_code, refund_amount
+      FROM warehouse.bridge_refund_account
+      WHERE refund_amount < 0
+    expected_result: "0 rows"
+
+  - rule_id: BR_BRA_005
+    description: "Country code must match between bridge and account subtype"
+    severity: ERROR
+    validation_sql: |
+      SELECT b.refund_source_id, b.country_code as bridge_country, a.country_code as dim_country
+      FROM warehouse.bridge_refund_account b
+      JOIN warehouse.dim_account_subtype a ON b.account_subtype_key = a.account_subtype_key
+      WHERE b.country_code != a.country_code
+    expected_result: "0 rows"
+
+  - rule_id: BR_BRA_006
+    description: "Allocation percentages should sum to 100% per refund"
+    severity: WARNING
+    validation_sql: |
+      SELECT refund_source_id, SUM(allocation_percentage) as total_pct
+      FROM warehouse.bridge_refund_account
+      WHERE allocation_percentage IS NOT NULL
+      GROUP BY refund_source_id
+      HAVING ABS(SUM(allocation_percentage) - 100) > 0.1
+    expected_result: "0 rows"
+    note: "Tolerance of 0.1% for rounding"
+
+  - rule_id: BR_BRA_007
+    description: "Only one row per refund should be marked as primary"
+    severity: WARNING
+    validation_sql: |
+      SELECT refund_source_id, COUNT(*) as primary_count
+      FROM warehouse.bridge_refund_account
+      WHERE is_primary_account = 1
+      GROUP BY refund_source_id
+      HAVING COUNT(*) > 1
+    expected_result: "0 rows"
+
+  - rule_id: BR_BRA_008
+    description: "Refund rate applied should match dim_account_subtype for standard rates"
+    severity: WARNING
+    validation_sql: |
+      SELECT 
+          b.refund_source_id,
+          b.account_subtype_code,
+          b.refund_rate_applied,
+          a.refund_rate as expected_rate
+      FROM warehouse.bridge_refund_account b
+      JOIN warehouse.dim_account_subtype a ON b.account_subtype_key = a.account_subtype_key
+      WHERE b.refund_rate_type = 'STANDARD'
+        AND b.refund_rate_applied IS NOT NULL
+        AND ABS(b.refund_rate_applied - a.refund_rate) > 0.0001
+    expected_result: "0 rows"
+    note: "Warning only - rate may legitimately differ for special cases"
+
+# =============================================================================
+# ClickHouse DDL
+# =============================================================================
+clickhouse_ddl:
+  database: malta_warehouse
+  engine: MergeTree()
+  order_by: [refund_source_id, account_subtype_key]
+  partition_by: "toYYYYMM(etl_load_timestamp)"
+  
+  ddl: |
+    CREATE TABLE IF NOT EXISTS malta_warehouse.bridge_refund_account
+    (
+        -- Keys
+        refund_source_id Int64,
+        account_subtype_key Int32,
+        
+        -- Denormalized
+        account_subtype_code LowCardinality(String),
+        country_code FixedString(3),
+        
+        -- Amount Breakdown
+        gross_distribution_amount Nullable(Decimal64(2)),
+        tax_at_source_amount Nullable(Decimal64(2)),
+        tax_credit_amount Nullable(Decimal64(2)),
+        refund_amount Decimal64(2),
+        
+        -- Rate Information
+        refund_rate_applied Nullable(Decimal64(4)),
+        refund_rate_type Nullable(LowCardinality(String)),
+        
+        -- Allocation
+        allocation_percentage Nullable(Decimal64(4)),
+        
+        -- Sequence/Validation
+        distribution_sequence Nullable(Int16),
+        is_primary_account UInt8 DEFAULT 0,
+        
+        -- Source Reference
+        source_document_reference Nullable(String),
+        calculation_notes Nullable(String),
+        
+        -- ETL Metadata
+        etl_batch_id Int64,
+        etl_load_timestamp DateTime DEFAULT now()
+    )
+    ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(etl_load_timestamp)
+    ORDER BY (refund_source_id, account_subtype_key)
+    SETTINGS index_granularity = 8192;
+    
+    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_bra_account 
+        ON malta_warehouse.bridge_refund_account (account_subtype_key) TYPE minmax GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_bra_country 
+        ON malta_warehouse.bridge_refund_account (country_code) TYPE minmax GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_bra_subtype_code 
+        ON malta_warehouse.bridge_refund_account (account_subtype_code) TYPE bloom_filter GRANULARITY 1;
+
+# =============================================================================
+# ETL Source Mapping
+# =============================================================================
+etl_source:
+  source_system: "L2_CANONICAL"
+  source_tables:
+    - payment_refund.refund
+    - payment_refund.refund_line  # If available
+    - malta_corporate.shareholder_refund_claim
+    - malta_corporate.corporate_tax_account
+  load_strategy: "INCREMENTAL"
+  load_frequency: "DAILY"
+  
+  transformations:
+    - name: unpivot_malta_refund
+      description: |
+        For Malta, unpivot existing fact_refund columns:
+        INSERT INTO bridge_refund_account (refund_source_id, account_subtype_key, ...)
+        SELECT refund_source_id, 1, fta_refund_amount, ... FROM fact_refund WHERE fta_refund_amount > 0
+        UNION ALL
+        SELECT refund_source_id, 2, mta_refund_amount, ... FROM fact_refund WHERE mta_refund_amount > 0
+        -- etc.
+    
+    - name: calculate_allocation_percentage
+      description: "refund_amount / SUM(refund_amount) OVER (PARTITION BY refund_source_id)"
+    
+    - name: determine_primary_account
+      description: "Account with highest refund_amount gets is_primary_account = 1"
+  
+  column_mapping:
+    refund_source_id: "source.refund_id"
+    account_subtype_key: "LOOKUP(dim_account_subtype, country_code, account_type_code)"
+    gross_distribution_amount: "source.dividend_portion_amount"
+    tax_at_source_amount: "source.underlying_tax_amount"
+    tax_credit_amount: "source.tax_credit_amount"
+    refund_amount: "source.refund_amount_per_account"
+    refund_rate_applied: "source.applied_rate"
+  
+  change_detection:
+    method: "Source modified_date"
+    incremental_column: "modified_date"
+
+# =============================================================================
+# Query Patterns
+# =============================================================================
+query_patterns:
+  - pattern: "Refund breakdown by account type"
+    description: "Get full breakdown for a specific refund"
+    sql: |
+      SELECT 
+          f.refund_source_id,
+          f.claimed_amount,
+          b.account_subtype_code,
+          a.account_subtype_name,
+          b.gross_distribution_amount,
+          b.tax_credit_amount,
+          b.refund_amount,
+          b.refund_rate_applied,
+          a.refund_rate_display
+      FROM warehouse.fact_refund f
+      JOIN warehouse.bridge_refund_account b ON f.refund_source_id = b.refund_source_id
+      JOIN warehouse.dim_account_subtype a ON b.account_subtype_key = a.account_subtype_key
+      WHERE f.refund_source_id = :refund_id
+      ORDER BY b.distribution_sequence
+  
+  - pattern: "Malta imputation refunds by account type"
+    description: "Aggregate refunds by imputation account for Malta"
+    sql: |
+      SELECT 
+          a.account_subtype_code,
+          a.account_subtype_name,
+          a.refund_rate_display,
+          COUNT(*) as refund_count,
+          SUM(b.refund_amount) as total_refund_amount,
+          SUM(b.tax_credit_amount) as total_tax_credit
+      FROM warehouse.bridge_refund_account b
+      JOIN warehouse.dim_account_subtype a ON b.account_subtype_key = a.account_subtype_key
+      WHERE b.country_code = 'MLT'
+        AND a.is_imputation_account = 1
+      GROUP BY a.account_subtype_code, a.account_subtype_name, a.refund_rate_display
+      ORDER BY a.display_order
+  
+  - pattern: "Reconstruct legacy fact_refund columns (Malta)"
+    description: "For backward compatibility queries"
+    sql: |
+      SELECT 
+          f.refund_source_id,
+          f.party_key,
+          f.claimed_amount,
+          f.approved_amount,
+          MAX(CASE WHEN b.account_subtype_code = 'FTA' THEN b.refund_amount END) as fta_refund_amount,
+          MAX(CASE WHEN b.account_subtype_code = 'MTA' THEN b.refund_amount END) as mta_refund_amount,
+          MAX(CASE WHEN b.account_subtype_code = 'FIA' THEN b.refund_amount END) as fia_refund_amount,
+          MAX(CASE WHEN b.account_subtype_code = 'IPA' THEN b.refund_amount END) as ipa_refund_amount,
+          MAX(CASE WHEN b.account_subtype_code = 'UA' THEN b.refund_amount END) as ua_refund_amount,
+          SUM(b.tax_credit_amount) as total_imputation_credit
+      FROM warehouse.fact_refund f
+      LEFT JOIN warehouse.bridge_refund_account b ON f.refund_source_id = b.refund_source_id
+      WHERE f.country_key = (SELECT country_key FROM warehouse.dim_country WHERE country_code = 'MLT')
+      GROUP BY f.refund_source_id, f.party_key, f.claimed_amount, f.approved_amount
+
+  - pattern: "FIA 5/7 vs 6/7 analysis"
+    description: "Compare FIA refunds by rate type (participating vs standard)"
+    sql: |
+      SELECT 
+          b.refund_rate_type,
+          b.refund_rate_applied,
+          COUNT(*) as refund_count,
+          SUM(b.refund_amount) as total_refund,
+          AVG(b.refund_amount) as avg_refund
+      FROM warehouse.bridge_refund_account b
+      WHERE b.country_code = 'MLT'
+        AND b.account_subtype_code = 'FIA'
+      GROUP BY b.refund_rate_type, b.refund_rate_applied
+      ORDER BY b.refund_rate_type
+
+# =============================================================================
+# Migration Notes
+# =============================================================================
+migration:
+  description: |
+    For existing Malta data with imputation columns in fact_refund:
+    
+    1. Create bridge_refund_account records from existing columns
+    2. Validate totals match
+    3. After validation, drop Malta-specific columns from fact_refund
+  
+  migration_sql: |
+    -- Step 1: Create bridge records from existing fact_refund columns
+    
+    -- FTA refunds
+    INSERT INTO warehouse.bridge_refund_account 
+        (refund_source_id, account_subtype_key, account_subtype_code, country_code, 
+         refund_amount, refund_rate_applied, is_primary_account, etl_batch_id, etl_load_timestamp)
+    SELECT 
+        f.refund_source_id,
+        1,  -- FTA key
+        'FTA',
+        'MLT',
+        f.fta_refund_amount,
+        0.0000,
+        0,
+        -1,  -- Migration batch
+        now()
+    FROM warehouse.fact_refund f
+    WHERE f.fta_refund_amount IS NOT NULL AND f.fta_refund_amount > 0;
+    
+    -- MTA refunds
+    INSERT INTO warehouse.bridge_refund_account 
+        (refund_source_id, account_subtype_key, account_subtype_code, country_code, 
+         refund_amount, refund_rate_applied, is_primary_account, etl_batch_id, etl_load_timestamp)
+    SELECT 
+        f.refund_source_id,
+        2,  -- MTA key
+        'MTA',
+        'MLT',
+        f.mta_refund_amount,
+        0.8571,
+        0,
+        -1,
+        now()
+    FROM warehouse.fact_refund f
+    WHERE f.mta_refund_amount IS NOT NULL AND f.mta_refund_amount > 0;
+    
+    -- FIA refunds
+    INSERT INTO warehouse.bridge_refund_account 
+        (refund_source_id, account_subtype_key, account_subtype_code, country_code, 
+         refund_amount, refund_rate_applied, is_primary_account, etl_batch_id, etl_load_timestamp)
+    SELECT 
+        f.refund_source_id,
+        3,  -- FIA key
+        'FIA',
+        'MLT',
+        f.fia_refund_amount,
+        0.7143,  -- Default to 5/7; adjust if participating info available
+        0,
+        -1,
+        now()
+    FROM warehouse.fact_refund f
+    WHERE f.fia_refund_amount IS NOT NULL AND f.fia_refund_amount > 0;
+    
+    -- IPA refunds
+    INSERT INTO warehouse.bridge_refund_account 
+        (refund_source_id, account_subtype_key, account_subtype_code, country_code, 
+         refund_amount, refund_rate_applied, is_primary_account, etl_batch_id, etl_load_timestamp)
+    SELECT 
+        f.refund_source_id,
+        4,  -- IPA key
+        'IPA',
+        'MLT',
+        f.ipa_refund_amount,
+        0.6667,
+        0,
+        -1,
+        now()
+    FROM warehouse.fact_refund f
+    WHERE f.ipa_refund_amount IS NOT NULL AND f.ipa_refund_amount > 0;
+    
+    -- Step 2: Update is_primary_account for largest refund per claim
+    -- (Complex UPDATE - implement in ETL logic)
+    
+    -- Step 3: Validation
+    SELECT 
+        f.refund_source_id,
+        f.claimed_amount,
+        SUM(b.refund_amount) as bridge_total,
+        ABS(f.claimed_amount - SUM(b.refund_amount)) as variance
+    FROM warehouse.fact_refund f
+    JOIN warehouse.bridge_refund_account b ON f.refund_source_id = b.refund_source_id
+    WHERE f.is_imputation_refund = 1
+    GROUP BY f.refund_source_id, f.claimed_amount
+    HAVING ABS(f.claimed_amount - SUM(b.refund_amount)) > 0.01;
+    
+    -- Step 4: After validation passes, drop columns from fact_refund
+    -- ALTER TABLE warehouse.fact_refund DROP COLUMN fta_refund_amount;
+    -- ALTER TABLE warehouse.fact_refund DROP COLUMN mta_refund_amount;
+    -- ... etc.
+
+# =============================================================================
+# Validation Criteria
+# =============================================================================
+# | Check                        | Expected                                   |
+# |------------------------------|---------------------------------------------|
+# | Primary key                  | (refund_source_id, account_subtype_key)     |
+# | FK to fact_refund            | refund_source_id (business key)             |
+# | FK to dim_account_subtype    | account_subtype_key                         |
+# | Denormalized codes           | account_subtype_code, country_code          |
+# | Amount columns               | gross, tax_at_source, tax_credit, refund    |
+# | Rate columns                 | refund_rate_applied, refund_rate_type       |
+# | Allocation tracking          | allocation_percentage, is_primary_account   |
+# | Sample data: Malta           | Multiple accounts per refund                |
+# | Sample data: Sri Lanka       | Single STD account                          |
+# | Business rules               | 8 rules defined                             |
+# | ClickHouse DDL               | Partitioned by month                        |
+# | Migration script             | Unpivot existing columns                    |
+# | Query patterns               | 4 patterns documented                       |
+# =============================================================================

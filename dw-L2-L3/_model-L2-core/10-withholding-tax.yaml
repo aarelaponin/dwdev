@@ -1,0 +1,1317 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Withholding Tax Domain (FIXED - EXTENDS DOMAIN 4)
+# =============================================================================
+#
+# CHANGE LOG (2025-11-05):
+# - FIXED: Added tax_return_id FK to withholding_return (extends Domain 4)
+# - FIXED: Removed duplicate fields (tax_account_id, tax_period_id, filing_date, etc.)
+# - FIXED: Updated to follow hybrid extension pattern
+# - FIXED: Aligned with Domain 11 (VAT) and Domain 12 (Income Tax) patterns
+#
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "2.0.0"
+  version_date: "2025-11-05"
+  description: |
+    Withholding Tax Domain - EXTENDS Domain 4 (filing_assessment)
+
+    This domain manages withholding tax operations where employers or other
+    withholding agents deduct tax at source from payments to employees or
+    other payees. The domain covers:
+
+    - Employment relationships between employers and employees
+    - Withholding tax returns/declarations filed by employers
+    - Employee-level withholding details (PAYE calculations)
+    - Monthly and annual withholding reconciliations
+    - Compensation types and withholding transfer mechanisms
+
+    ARCHITECTURAL PATTERN (IMPORTANT):
+    This domain EXTENDS the core filing_assessment domain (Domain 4).
+    The withholding_return table has a one-to-one relationship with
+    tax_return (via tax_return_id FK). Generic return fields (filing date,
+    status, taxpayer, period) are accessed via this relationship.
+
+    SIGTAS Sources:
+    - TAX_WITHHELD_PAYE__OTHER schema (primary)
+    - TAX_WITHHELD table â†’ withholding_return
+    - TAX_WITHHELD_DETAIL table â†’ withholding_detail
+    - MON_YEAR_RECON table â†’ withholding_reconciliation
+    - EMPLOYMENT table â†’ employment_relationship
+    - COMPENSATION_TYPE table â†’ ref_compensation_type
+    - WITHHELD_TRANSFER_TYPE table â†’ ref_withholding_transfer_type
+
+    Tax Capabilities Sections:
+    - Filing Management (withholding returns)
+    - Assessment (withholding calculations using PAYE scales)
+    - Accounting (employer withholding accounts)
+
+    Key Business Concepts:
+
+    1. Withholding Agent Role:
+       - Employers act as withholding agents for employee income tax (PAYE)
+       - Payers withhold tax from dividends, interest, royalties, services
+       - Agents must register, calculate, withhold, file, and remit
+
+    2. PAYE (Pay-As-You-Earn):
+       - Progressive tax scales defined in tax_framework.paye_tax_scale
+       - Tax calculated per pay period (weekly, bi-weekly, monthly)
+       - Considers personal allowances, family situation, year-to-date cumulative
+
+    3. Filing Obligations:
+       - Employers file periodic returns (typically monthly)
+       - Returns include aggregate totals and employee-level details
+       - Reconciliation required between periodic filings and annual totals
+
+    4. Three-Party Relationship:
+       - Employer (withholding agent - party)
+       - Employee (taxpayer - individual)
+       - Tax Authority (recipient of withheld amounts)
+
+    5. Compliance Focus:
+       - Timely filing and payment by employers
+       - Accurate calculation per employee
+       - Reconciliation between reported and paid amounts
+       - Annual certificates to employees for their tax returns
+
+    Domain Dependencies:
+    - party_management: Employer and employee party records
+    - tax_framework: PAYE scales, tax types, tax periods
+    - registration: Employer tax accounts for withholding tax type
+    - filing_assessment: EXTENDS THIS (core tax return processing)
+    - accounting: Withholding transactions and balances
+    - payment_refund: Remittance of withheld amounts
+    - reference_data: Compensation types, transfer types
+
+    Volume Characteristics:
+    - Employment relationships: Medium-High (100K-5M)
+    - Withholding returns: High (1M-10M per year)
+    - Withholding details: Very High (10M-100M+ per year)
+    - Reconciliations: Medium (100K-1M per year)
+
+    Security Considerations:
+    - Employee earnings data is highly confidential (PII)
+    - GDPR-relevant: names, tax IDs, salary information
+    - Access restricted to employer HR, payroll, tax authority
+    - Encryption required for salary and tax amounts
+
+  authors:
+    - "Generated from SIGTAS analysis"
+    - "Moldova SRS collaboration"
+    - "GovStack TA-RDM Working Group"
+    - "Fixed 2025-11-05: Aligned with extension pattern"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Registration Building Block"
+    - "Payment Building Block"
+    - "Digital Registries Building Block"
+    - "Identity Building Block"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+# =============================================================================
+# DOMAIN DEFINITION
+# =============================================================================
+
+domains:
+  - name: "withholding_tax"
+    code: "WHT"
+    display_name: "Withholding Tax Management"
+    description: |
+      Withholding tax (PAYE) management extending core filing-assessment domain.
+      Handles employment relationships, employer withholding returns, employee-level
+      PAYE calculations, and remittance tracking.
+
+    dependencies:
+      - "party_management"
+      - "tax_framework"
+      - "registration"
+      - "filing_assessment"  # â† EXTENDS THIS
+      - "accounting"
+      - "payment_refund"
+      - "reference_data"
+
+    # =============================================================================
+    # EVENTS
+    # =============================================================================
+
+    events:
+      - event_name: "WithholdingReturnFiled"
+        description: "Emitted when employer files withholding return"
+        payload_schema: |
+          {
+            "withholding_return_id": "bigint",
+            "tax_return_id": "bigint",
+            "return_reference_number": "string",
+            "employee_count": "integer",
+            "total_tax_withheld": "decimal",
+            "filing_date": "timestamp",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "WithholdingReturnAccepted"
+        description: "Emitted when withholding return accepted by tax authority"
+        payload_schema: |
+          {
+            "withholding_return_id": "bigint",
+            "tax_return_id": "bigint",
+            "acceptance_date": "timestamp",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "WithholdingPaymentReceived"
+        description: "Emitted when employer remits withheld tax"
+        payload_schema: |
+          {
+            "withholding_return_id": "bigint",
+            "payment_reference": "string",
+            "amount_paid": "decimal",
+            "payment_date": "date",
+            "timestamp": "datetime"
+          }
+
+    # =============================================================================
+    # SCHEMAS
+    # =============================================================================
+
+    schemas:
+      - schema_name: "withholding_tax"
+        description: |
+          Schema containing all tables for withholding tax operations including
+          employment relationships, employer returns, employee details, and
+          reconciliations.
+
+        # =========================================================================
+        # TABLES
+        # =========================================================================
+
+        tables:
+          # ===================================================================
+          # EMPLOYMENT RELATIONSHIPS
+          # ===================================================================
+
+          - name: "employment_relationship"
+            display_name: "Employment Relationship"
+            description: |
+              Represents employment relationship between employer (party) and
+              employee (individual). Tracks employment period, job details, and
+              employment status.
+
+              SIGTAS Source: EMPLOYMENT table
+
+              Purpose:
+              - Link employer to employees for withholding purposes
+              - Track employment start and end dates
+              - Support withholding detail reporting
+              - Enable validation of employee-employer relationships
+
+              Business Rules:
+              - One employment record per employer-employee combination
+              - Employment dates must not overlap for same employee-employer
+              - Only active employments can have withholding details
+              - Employment must exist before filing withholding return
+
+            entity_type: "reference"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "employment_id"
+                display_name: "Employment ID"
+                type: "bigint"
+                description: "Unique identifier for employment relationship"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "employer_party_id"
+                display_name: "Employer"
+                type: "bigint"
+                description: |
+                  Foreign key to employer party (organization).
+                  The withholding agent who employs the individual.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "party_management.party"
+                    column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                pii: false
+                indexing:
+                  - type: "btree"
+                    name: "idx_employment_employer"
+
+              - name: "employee_party_id"
+                display_name: "Employee"
+                type: "bigint"
+                description: |
+                  Foreign key to employee party (individual).
+                  The person employed who receives salary subject to withholding.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "party_management.party"
+                    column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                pii: false
+                indexing:
+                  - type: "btree"
+                    name: "idx_employment_employee"
+
+              - name: "employment_start_date"
+                display_name: "Employment Start Date"
+                type: "date"
+                description: "Date when employment began"
+                constraints:
+                  not_null: true
+                pii: false
+
+              - name: "employment_end_date"
+                display_name: "Employment End Date"
+                type: "date"
+                description: |
+                  Date when employment ended (NULL if still employed).
+                  Used to validate withholding periods.
+                constraints:
+                  not_null: false
+                pii: false
+
+              - name: "is_active"
+                display_name: "Is Active"
+                type: "boolean"
+                description: |
+                  True if employment is currently active.
+                  Calculated: employment_end_date IS NULL OR employment_end_date >= CURRENT_DATE
+                constraints:
+                  not_null: true
+                  default: true
+                pii: false
+
+              - name: "job_title"
+                display_name: "Job Title"
+                type: "varchar(200)"
+                description: "Employee's job title or position"
+                constraints:
+                  not_null: false
+                pii: false
+
+              - name: "department"
+                display_name: "Department"
+                type: "varchar(100)"
+                description: "Department where employee works"
+                constraints:
+                  not_null: false
+                pii: false
+
+              - name: "employment_type"
+                display_name: "Employment Type"
+                type: "varchar(30)"
+                description: |
+                  Type of employment:
+                  - FULL_TIME: Regular full-time employment
+                  - PART_TIME: Part-time employment
+                  - CONTRACT: Fixed-term contract
+                  - TEMPORARY: Temporary/seasonal
+                  - CASUAL: Casual/irregular
+                constraints:
+                  not_null: false
+                reference_data: "ref_employment_type"
+
+              - name: "notes"
+                display_name: "Notes"
+                type: "text"
+                description: "Additional notes about employment"
+                constraints:
+                  not_null: false
+                pii: false
+
+              # Standard audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_employment_pk"
+                type: "primary_key"
+                columns: ["employment_id"]
+
+              - name: "idx_employment_employer_employee"
+                type: "btree"
+                columns: ["employer_party_id", "employee_party_id", "employment_start_date"]
+                unique: false
+                description: "Index for finding employment by employer and employee"
+
+              - name: "idx_employment_active"
+                type: "btree"
+                columns: ["employer_party_id", "is_active"]
+                where: "is_active = true"
+                description: "Partial index for active employments per employer"
+
+              - name: "idx_employment_dates"
+                type: "btree"
+                columns: ["employment_start_date", "employment_end_date"]
+                description: "Index for date range queries"
+
+            constraints:
+              - name: "chk_employment_dates"
+                type: "CHECK"
+                condition: "(employment_end_date IS NULL) OR (employment_end_date >= employment_start_date)"
+                description: "End date must be on or after start date"
+
+              - name: "chk_employment_start_not_future"
+                type: "CHECK"
+                condition: "employment_start_date <= CURRENT_DATE"
+                description: "Start date cannot be in future"
+
+              - name: "uk_employment_active"
+                type: "UNIQUE"
+                columns: ["employer_party_id", "employee_party_id", "employment_start_date"]
+                where: "is_active = true"
+                description: "Cannot have duplicate active employment"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "party_management.party"
+                source_column: "employer_party_id"
+                target_column: "party_id"
+                cardinality: "N:1"
+                description: "Many employments belong to one employer"
+
+              - type: "many_to_one"
+                target_table: "party_management.party"
+                source_column: "employee_party_id"
+                target_column: "party_id"
+                cardinality: "N:1"
+                description: "Many employments belong to one employee"
+
+              - type: "one_to_many"
+                target_table: "withholding_detail"
+                source_column: "employment_id"
+                target_column: "employment_id"
+                cardinality: "1:N"
+                description: "One employment has many withholding details"
+
+          # ===================================================================
+          # WITHHOLDING RETURNS (EXTENSION OF CORE TAX_RETURN)
+          # ===================================================================
+
+          - name: "withholding_return"
+            display_name: "Withholding Tax Return"
+            description: |
+              Withholding-specific return extending core tax_return.
+              Contains withholding-specific aggregate fields (employee counts,
+              gross salaries, tax withheld).
+
+              ARCHITECTURAL PATTERN:
+              This table EXTENDS filing_assessment.tax_return via one-to-one
+              relationship through tax_return_id foreign key. Generic return
+              fields (taxpayer, period, filing date, status) are accessed via
+              this relationship, not duplicated here.
+
+              Access Pattern:
+              SELECT tr.*, wr.*
+              FROM filing_assessment.tax_return tr
+              JOIN withholding_tax.withholding_return wr
+                ON tr.tax_return_id = wr.tax_return_id
+              WHERE tr.filing_date = CURRENT_DATE;
+
+              SIGTAS Source: TAX_WITHHELD table
+
+              A withholding return:
+              - Filed by employer (withholding agent) for a tax period
+              - Contains aggregate totals for all employees/payees
+              - Includes detailed employee-level data (withholding_detail)
+              - Must reconcile to amounts withheld and remitted
+              - Typically filed monthly (some jurisdictions weekly/quarterly)
+
+              Return includes:
+              - Total gross salary/payments
+              - Total taxable income
+              - Total benefits (taxable and non-taxable)
+              - Total tax withheld
+              - Number of employees
+              - Family allowances applied
+              - Deductions applied
+
+              Workflow:
+              1. Employer prepares return from payroll records
+              2. Files return electronically or on paper (creates core tax_return)
+              3. System validates return (totals, employee data)
+              4. Return accepted or rejected (with errors)
+              5. If accepted, creates accounting transaction
+              6. Employer remits withheld tax (payment domain)
+              7. Period reconciliation (withholding_reconciliation)
+
+              Business Rules:
+              - One return per employer per tax type per tax period
+              - Return period must match employer's filing frequency
+              - Aggregate totals must match sum of detail records
+              - Withheld amount must be remitted by due date
+              - Cannot file for future periods
+
+              Integration Points:
+              - filing_assessment.tax_return: EXTENDS (via tax_return_id FK)
+              - accounting: Creates debit (withholding liability)
+              - payment_refund: Links to payment of withheld tax
+              - withholding_detail: One-to-many child records
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+            retention_period: "10 years minimum (legal requirement)"
+
+            columns:
+              # ================================================================
+              # PRIMARY KEY
+              # ================================================================
+
+              - name: "withholding_return_id"
+                display_name: "Withholding Return ID"
+                type: "bigint"
+                description: "Unique identifier for withholding return"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              # ================================================================
+              # EXTENSION POINT (MANDATORY - ONE-TO-ONE TO CORE)
+              # ================================================================
+
+              - name: "tax_return_id"
+                display_name: "Tax Return"
+                type: "bigint"
+                description: |
+                  Extension point to core tax_return (Domain 4).
+
+                  This FK links the withholding-specific return to the generic
+                  tax return entity. Generic fields are accessed via this
+                  relationship:
+                  - tax_account_id â†’ via tax_return
+                  - tax_period_id â†’ via tax_return
+                  - filing_date â†’ via tax_return
+                  - return_status_code â†’ via tax_return
+                  - return_version â†’ via tax_return
+                  - [... all other core fields]
+
+                  One-to-one relationship enforced by UNIQUE constraint.
+                constraints:
+                  not_null: true
+                  unique: true  # â† ONE-TO-ONE relationship
+                  foreign_key:
+                    table: "filing_assessment.tax_return"
+                    column: "tax_return_id"
+                    on_delete: "CASCADE"   # â† If core return deleted, this deleted
+                    on_update: "CASCADE"   # â† If core return ID updated, this updated
+                pii: false
+                indexing:
+                  - type: "btree"
+                    name: "idx_withholding_return_tax_return"
+
+              # ================================================================
+              # WITHHOLDING-SPECIFIC REFERENCE FIELDS
+              # ================================================================
+
+              - name: "return_reference_number"
+                display_name: "Return Reference Number"
+                type: "varchar(50)"
+                description: |
+                  Withholding-specific reference number for this return.
+                  Format: WHT-{TAX_ACCOUNT_ID}-{YEAR}-{PERIOD}
+                  Example: WHT-123456-2025-01
+
+                  Note: Generic return_number is in core tax_return.
+                  This is withholding-specific reference for employer use.
+                constraints:
+                  not_null: true
+                  unique: true
+                pii: false
+
+              # ================================================================
+              # AGGREGATE AMOUNTS (WITHHOLDING-SPECIFIC)
+              # ================================================================
+
+              - name: "employee_count"
+                display_name: "Number of Employees"
+                type: "integer"
+                description: "Total number of employees included in this return"
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: false
+
+              - name: "total_gross_salary"
+                display_name: "Total Gross Salary"
+                type: "decimal(19,2)"
+                description: |
+                  Total gross salary/wages paid to all employees in period.
+                  Before any deductions or withholding.
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: false
+                encryption: "AES-256"
+                gdpr_relevant: true
+
+              - name: "total_taxable_benefits"
+                display_name: "Total Taxable Benefits"
+                type: "decimal(19,2)"
+                description: |
+                  Total value of taxable fringe benefits provided to employees.
+                  Examples: company car, housing allowance, medical insurance.
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: false
+                encryption: "AES-256"
+
+              - name: "total_non_taxable_benefits"
+                display_name: "Total Non-Taxable Benefits"
+                type: "decimal(19,2)"
+                description: |
+                  Total value of non-taxable benefits (for information only).
+                  Examples: per diem, business travel reimbursement.
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: false
+
+              - name: "total_other_taxable_income"
+                display_name: "Total Other Taxable Income"
+                type: "decimal(19,2)"
+                description: |
+                  Other taxable income paid (bonuses, commissions, allowances).
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: false
+                encryption: "AES-256"
+
+              - name: "total_deductions"
+                display_name: "Total Deductions"
+                type: "decimal(19,2)"
+                description: |
+                  Total deductions allowed (social security, pension contributions).
+                  Reduces taxable income.
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: false
+
+              - name: "total_taxable_income"
+                display_name: "Total Taxable Income"
+                type: "decimal(19,2)"
+                description: |
+                  Total taxable income for all employees.
+                  = gross_salary + taxable_benefits + other_income - deductions
+                constraints:
+                  not_null: true
+                  default: 0
+                pii: false
+                encryption: "AES-256"
+                business_rules:
+                  - "BR-WT-010: Must equal sum of employee taxable incomes"
+
+              - name: "total_tax_withheld"
+                display_name: "Total Tax Withheld"
+                type: "decimal(19,2)"
+                description: |
+                  Total PAYE tax withheld from all employees.
+                  This is the liability that must be remitted to tax authority.
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: false
+                encryption: "AES-256"
+                business_rules:
+                  - "BR-WT-011: Must equal sum of employee withholdings"
+
+              - name: "calculated_family_allowance"
+                display_name: "Calculated Family Allowance"
+                type: "decimal(19,2)"
+                description: |
+                  Total family allowance/dependent exemption applied.
+                  Reduces tax liability based on family situation.
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: false
+
+              # ================================================================
+              # PAYMENT TRACKING (WITHHOLDING-SPECIFIC)
+              # ================================================================
+
+              - name: "amount_paid"
+                display_name: "Amount Paid"
+                type: "decimal(19,2)"
+                description: |
+                  Amount of withheld tax actually paid to tax authority.
+                  Updated when payment received (from payment_refund domain).
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: false
+
+              - name: "payment_reference"
+                display_name: "Payment Reference"
+                type: "varchar(100)"
+                description: "Reference number of payment transaction"
+                constraints:
+                  not_null: false
+                pii: false
+
+              - name: "balance_outstanding"
+                display_name: "Balance Outstanding"
+                type: "decimal(19,2)"
+                description: |
+                  Outstanding balance (withheld but not yet paid).
+                  = total_tax_withheld - amount_paid
+                constraints:
+                  not_null: true
+                  default: 0
+                pii: false
+
+              # ================================================================
+              # PAYE SCALE INFORMATION (WITHHOLDING-SPECIFIC)
+              # ================================================================
+
+              - name: "paye_scale_id"
+                display_name: "PAYE Scale Used"
+                type: "bigint"
+                description: |
+                  PAYE tax scale used for calculations in this period.
+                  Links to tax_framework.paye_tax_scale.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "tax_framework.paye_tax_scale"
+                    column: "paye_tax_scale_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                pii: false
+
+              # ================================================================
+              # DECLARATION AND SIGNATURE (WITHHOLDING-SPECIFIC)
+              # ================================================================
+
+              - name: "is_declaration_confirmed"
+                display_name: "Declaration Confirmed"
+                type: "boolean"
+                description: |
+                  True if employer has confirmed the declaration that information
+                  is true and correct to the best of their knowledge.
+                constraints:
+                  not_null: true
+                  default: false
+                pii: false
+
+              - name: "declared_by_name"
+                display_name: "Declared By Name"
+                type: "varchar(200)"
+                description: "Name of person who signed/confirmed the return"
+                constraints:
+                  not_null: false
+                pii: true
+
+              - name: "declared_by_title"
+                display_name: "Declared By Title"
+                type: "varchar(100)"
+                description: "Title/position of person who signed return"
+                constraints:
+                  not_null: false
+                pii: false
+
+              - name: "declaration_date"
+                display_name: "Declaration Date"
+                type: "date"
+                description: "Date when declaration was made"
+                constraints:
+                  not_null: false
+                pii: false
+
+              # ================================================================
+              # VALIDATION AND PROCESSING (WITHHOLDING-SPECIFIC)
+              # ================================================================
+
+              - name: "validation_errors"
+                display_name: "Validation Errors"
+                type: "jsonb"
+                description: |
+                  JSON array of validation errors if return rejected.
+                  Format: [{"field": "employee_count", "error": "Does not match detail count"}]
+                constraints:
+                  not_null: false
+                pii: false
+
+              - name: "processing_notes"
+                display_name: "Processing Notes"
+                type: "text"
+                description: "Notes from tax authority staff during review"
+                constraints:
+                  not_null: false
+                pii: false
+
+              - name: "remarks"
+                display_name: "Remarks"
+                type: "text"
+                description: "Additional remarks or notes from employer"
+                constraints:
+                  not_null: false
+                pii: false
+
+              # ================================================================
+              # AUDIT COLUMNS (STANDARD)
+              # ================================================================
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: false
+
+            # ==================================================================
+            # INDEXES
+            # ==================================================================
+
+            indexes:
+              - name: "idx_withholding_return_pk"
+                type: "primary_key"
+                columns: ["withholding_return_id"]
+
+              - name: "idx_withholding_return_tax_return"
+                type: "btree"
+                columns: ["tax_return_id"]
+                unique: true
+                description: "Unique index on tax_return_id (one-to-one relationship)"
+
+              - name: "idx_withholding_return_ref"
+                type: "btree"
+                columns: ["return_reference_number"]
+                unique: true
+                description: "Unique index on return reference number"
+
+              - name: "idx_withholding_return_outstanding"
+                type: "btree"
+                columns: ["balance_outstanding"]
+                where: "balance_outstanding > 0"
+                description: "Partial index for outstanding balances"
+
+            # ==================================================================
+            # CONSTRAINTS
+            # ==================================================================
+
+            constraints:
+              - name: "chk_withholding_return_amounts"
+                type: "CHECK"
+                condition: |
+                  total_gross_salary >= 0 AND
+                  total_taxable_benefits >= 0 AND
+                  total_non_taxable_benefits >= 0 AND
+                  total_other_taxable_income >= 0 AND
+                  total_deductions >= 0 AND
+                  total_taxable_income >= 0 AND
+                  total_tax_withheld >= 0
+                description: "All amount fields must be non-negative"
+
+              - name: "chk_withholding_return_employee_count"
+                type: "CHECK"
+                condition: "employee_count >= 0"
+                description: "Employee count must be non-negative"
+
+            # ==================================================================
+            # RELATIONSHIPS
+            # ==================================================================
+
+            relationships:
+              - type: "one_to_one"
+                target_table: "filing_assessment.tax_return"
+                source_column: "tax_return_id"
+                target_column: "tax_return_id"
+                cardinality: "1:1"
+                description: "Withholding return extends one core tax return"
+
+              - type: "many_to_one"
+                target_table: "tax_framework.paye_tax_scale"
+                source_column: "paye_scale_id"
+                target_column: "paye_tax_scale_id"
+                cardinality: "N:1"
+                description: "Return uses one PAYE scale"
+
+              - type: "one_to_many"
+                target_table: "withholding_detail"
+                source_column: "withholding_return_id"
+                target_column: "withholding_return_id"
+                cardinality: "1:N"
+                description: "One return has many detail records"
+
+          # ===================================================================
+          # WITHHOLDING DETAILS (Employee Level)
+          # ===================================================================
+          # NOTE: This table remains unchanged - it correctly references
+          #       withholding_return, not the core tax_return directly
+          # ===================================================================
+
+          - name: "withholding_detail"
+            display_name: "Withholding Tax Detail"
+            description: |
+              Individual employee withholding detail for a specific withholding
+              return. Each row represents one employee's withholding for one
+              period as reported by the employer.
+
+              SIGTAS Source: TAX_WITHHELD_DETAIL table
+
+              Contains employee-specific information:
+              - Employee identification
+              - Gross salary/wages for period
+              - Taxable benefits
+              - Other taxable income
+              - Deductions applied
+              - Taxable income after deductions
+              - PAYE tax calculated and withheld
+              - Special withholding (if applicable)
+              - Family allowances used
+
+              PAYE Calculation Context:
+              - Uses PAYE scale defined at return or system level
+              - Applies progressive tax brackets to taxable income
+              - Considers personal allowances (standard + family)
+              - May use cumulative method (year-to-date)
+              - Week/month of year affects cumulative calculations
+
+              Business Rules:
+              - One detail record per employee per return
+              - Employee must have active employment with employer
+              - Taxable income = gross + benefits + other - deductions
+              - Tax withheld calculated per PAYE scale
+              - Cannot withhold more than 100% of gross income
+              - Detail amounts must aggregate to return totals
+
+              Data Sensitivity:
+              - HIGHLY CONFIDENTIAL: Individual salary information
+              - PII: Employee names, tax IDs
+              - GDPR: Requires employee consent and data protection
+              - Access restricted to employer HR/payroll and tax authority
+
+              Volume: VERY HIGH (10M-100M+ records)
+              - One record per employee per period
+              - Large employers: 10,000+ employees Ã— 12 months = 120K records/year
+              - Small employers: 5 employees Ã— 12 months = 60 records/year
+
+            entity_type: "transaction"
+            estimated_volume: "very_high"
+            data_sensitivity: "restricted"
+            retention_period: "10 years minimum (legal requirement)"
+
+            columns:
+              - name: "withholding_detail_id"
+                display_name: "Withholding Detail ID"
+                type: "bigint"
+                description: "Unique identifier for withholding detail record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "withholding_return_id"
+                display_name: "Withholding Return"
+                type: "bigint"
+                description: "Foreign key to parent withholding return"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "withholding_tax.withholding_return"
+                    column: "withholding_return_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                pii: false
+                indexing:
+                  - type: "btree"
+                    name: "idx_withholding_detail_return"
+
+              - name: "employment_id"
+                display_name: "Employment"
+                type: "bigint"
+                description: |
+                  Foreign key to employment relationship.
+                  Links detail to employer-employee relationship.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "withholding_tax.employment_relationship"
+                    column: "employment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                pii: false
+                indexing:
+                  - type: "btree"
+                    name: "idx_withholding_detail_employment"
+
+              - name: "employee_party_id"
+                display_name: "Employee"
+                type: "bigint"
+                description: |
+                  Foreign key to employee party (individual).
+                  Denormalized for query performance.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "party_management.party"
+                    column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                pii: false
+                indexing:
+                  - type: "btree"
+                    name: "idx_withholding_detail_employee"
+
+              - name: "employee_tax_id"
+                display_name: "Employee Tax ID"
+                type: "varchar(50)"
+                description: |
+                  Employee's tax identification number (TIN).
+                  Denormalized for reporting and compliance.
+                constraints:
+                  not_null: true
+                pii: true
+                encryption: "AES-256"
+                gdpr_relevant: true
+
+              - name: "employee_name"
+                display_name: "Employee Name"
+                type: "varchar(200)"
+                description: |
+                  Employee's full name.
+                  Denormalized for reporting purposes.
+                constraints:
+                  not_null: true
+                pii: true
+                encryption: "AES-256"
+                gdpr_relevant: true
+
+              # Income Components
+              - name: "gross_salary"
+                display_name: "Gross Salary"
+                type: "decimal(19,2)"
+                description: "Gross salary/wages for this period"
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: true
+                encryption: "AES-256"
+                gdpr_relevant: true
+
+              - name: "taxable_benefits"
+                display_name: "Taxable Benefits"
+                type: "decimal(19,2)"
+                description: "Taxable fringe benefits provided to employee"
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: true
+                encryption: "AES-256"
+
+              - name: "other_taxable_income"
+                display_name: "Other Taxable Income"
+                type: "decimal(19,2)"
+                description: "Other taxable income (bonuses, commissions, etc.)"
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: true
+                encryption: "AES-256"
+
+              - name: "deductions"
+                display_name: "Deductions"
+                type: "decimal(19,2)"
+                description: "Deductions allowed (pension, social security, etc.)"
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: true
+
+              - name: "taxable_income"
+                display_name: "Taxable Income"
+                type: "decimal(19,2)"
+                description: |
+                  Taxable income for PAYE calculation.
+                  = gross_salary + taxable_benefits + other_income - deductions
+                constraints:
+                  not_null: true
+                  default: 0
+                pii: true
+                encryption: "AES-256"
+                gdpr_relevant: true
+
+              # Tax Calculation
+              - name: "tax_withheld"
+                display_name: "Tax Withheld"
+                type: "decimal(19,2)"
+                description: "PAYE tax withheld from employee for this period"
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: true
+                encryption: "AES-256"
+                gdpr_relevant: true
+
+              - name: "family_allowance_applied"
+                display_name: "Family Allowance Applied"
+                type: "decimal(19,2)"
+                description: "Family allowance/dependent exemption applied"
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+                pii: true
+
+              - name: "effective_tax_rate"
+                display_name: "Effective Tax Rate"
+                type: "decimal(5,2)"
+                description: |
+                  Effective tax rate % for this employee.
+                  = (tax_withheld / taxable_income) * 100
+                constraints:
+                  not_null: false
+                pii: false
+
+              # Additional Info
+              - name: "payment_week_or_month"
+                display_name: "Payment Week or Month"
+                type: "integer"
+                description: |
+                  Week or month number in tax year (for cumulative PAYE).
+                  Week 1-52 for weekly, Month 1-12 for monthly.
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 1
+                  max_value: 52
+                pii: false
+
+              - name: "year_to_date_gross"
+                display_name: "Year-to-Date Gross"
+                type: "decimal(19,2)"
+                description: |
+                  Cumulative gross income for tax year.
+                  Used for cumulative PAYE calculations.
+                constraints:
+                  not_null: false
+                pii: true
+                encryption: "AES-256"
+
+              - name: "year_to_date_tax"
+                display_name: "Year-to-Date Tax"
+                type: "decimal(19,2)"
+                description: |
+                  Cumulative tax withheld for tax year.
+                  Used for cumulative PAYE calculations.
+                constraints:
+                  not_null: false
+                pii: true
+                encryption: "AES-256"
+
+              - name: "notes"
+                display_name: "Notes"
+                type: "text"
+                description: "Additional notes about this withholding detail"
+                constraints:
+                  not_null: false
+                pii: false
+
+              # Standard audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_withholding_detail_pk"
+                type: "primary_key"
+                columns: ["withholding_detail_id"]
+
+              - name: "idx_withholding_detail_return"
+                type: "btree"
+                columns: ["withholding_return_id"]
+                description: "Index for finding details by return"
+
+              - name: "idx_withholding_detail_employment"
+                type: "btree"
+                columns: ["employment_id"]
+                description: "Index for finding details by employment"
+
+              - name: "idx_withholding_detail_employee"
+                type: "btree"
+                columns: ["employee_party_id"]
+                description: "Index for finding details by employee"
+
+              - name: "idx_withholding_detail_employee_tax_id"
+                type: "btree"
+                columns: ["employee_tax_id"]
+                description: "Index for lookups by employee tax ID"
+
+            constraints:
+              - name: "chk_withholding_detail_amounts"
+                type: "CHECK"
+                condition: |
+                  gross_salary >= 0 AND
+                  taxable_benefits >= 0 AND
+                  other_taxable_income >= 0 AND
+                  deductions >= 0 AND
+                  taxable_income >= 0 AND
+                  tax_withheld >= 0
+                description: "All amount fields must be non-negative"
+
+              - name: "uk_withholding_detail_return_employee"
+                type: "UNIQUE"
+                columns: ["withholding_return_id", "employment_id"]
+                description: "One detail per employee per return"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "withholding_tax.withholding_return"
+                source_column: "withholding_return_id"
+                target_column: "withholding_return_id"
+                cardinality: "N:1"
+                description: "Many details belong to one withholding return"
+
+              - type: "many_to_one"
+                target_table: "withholding_tax.employment_relationship"
+                source_column: "employment_id"
+                target_column: "employment_id"
+                cardinality: "N:1"
+                description: "Many details belong to one employment relationship"
+
+              - type: "many_to_one"
+                target_table: "party_management.party"
+                source_column: "employee_party_id"
+                target_column: "party_id"
+                cardinality: "N:1"
+                description: "Many details belong to one employee"
+
+# =============================================================================
+# END OF DOMAIN 10 - WITHHOLDING TAX (FIXED VERSION)
+# =============================================================================
+#

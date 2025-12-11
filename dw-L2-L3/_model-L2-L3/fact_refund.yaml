@@ -1,0 +1,855 @@
+# =============================================================================
+# TA-RDM L3 - Refund Fact Table (Generalized)
+# =============================================================================
+# Purpose: Transactional fact for refund claims - GENERALIZED VERSION
+# Pattern: P5 (Account Subtype Dimension) + P9 (Country-Conditional Measures)
+# Priority: HIGH
+# Version: 2.0.0 (Generalized)
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4e of L3 Generalization Implementation
+# =============================================================================
+#
+# This is the GENERALIZED version of fact_refund, with Malta-specific
+# imputation columns moved to bridge_refund_account + dim_account_subtype.
+#
+# CHANGES FROM v1.0.0:
+# - REMOVED: fta_refund_amount (Malta imputation)
+# - REMOVED: mta_refund_amount (Malta imputation)
+# - REMOVED: fia_refund_amount (Malta imputation)
+# - REMOVED: ipa_refund_amount (Malta imputation)
+# - REMOVED: ua_refund_amount (Malta imputation)
+# - REMOVED: imputation_credit_amount (Malta imputation)
+# - REMOVED: shareholder_refund_rate (Malta imputation)
+# - ADDED: country_key (FK to dim_country)
+# - RETAINED: is_imputation_refund (flag, now used to identify bridge records)
+#
+# Imputation breakdown now available via:
+#   fact_refund JOIN bridge_refund_account JOIN dim_account_subtype
+#
+# =============================================================================
+
+metadata:
+  fact_name: fact_refund
+  schema: warehouse
+  version: "2.0.0"
+  previous_version: "1.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P5 - Account Subtype Dimension, P9 - Country-Conditional"
+  description: |
+    Generalized refund fact table supporting multi-country deployment.
+    
+    Malta-specific imputation columns have been moved to bridge_refund_account
+    to enable country-agnostic refund tracking while preserving detailed
+    breakdown capabilities for Malta's corporate imputation system.
+    
+    This version:
+    - Removes 7 Malta-specific columns
+    - Adds country_key for country context
+    - Retains is_imputation_refund flag for bridge table identification
+    - Maintains all generic refund measures (claimed, approved, paid, etc.)
+
+# =============================================================================
+# Change Summary
+# =============================================================================
+change_summary:
+  description: |
+    Summary of changes from v1.0.0 (Malta-specific) to v2.0.0 (Generalized)
+  
+  columns_removed:
+    - column: fta_refund_amount
+      reason: "Malta Final Tax Account refund - moved to bridge_refund_account"
+      bridge_equivalent: "SELECT refund_amount FROM bridge_refund_account WHERE account_subtype_code = 'FTA'"
+    
+    - column: mta_refund_amount
+      reason: "Malta Maltese Taxed Account refund - moved to bridge_refund_account"
+      bridge_equivalent: "SELECT refund_amount FROM bridge_refund_account WHERE account_subtype_code = 'MTA'"
+    
+    - column: fia_refund_amount
+      reason: "Malta Foreign Income Account refund - moved to bridge_refund_account"
+      bridge_equivalent: "SELECT refund_amount FROM bridge_refund_account WHERE account_subtype_code = 'FIA'"
+    
+    - column: ipa_refund_amount
+      reason: "Malta Immovable Property Account refund - moved to bridge_refund_account"
+      bridge_equivalent: "SELECT refund_amount FROM bridge_refund_account WHERE account_subtype_code = 'IPA'"
+    
+    - column: ua_refund_amount
+      reason: "Malta Untaxed Account refund - moved to bridge_refund_account"
+      bridge_equivalent: "SELECT refund_amount FROM bridge_refund_account WHERE account_subtype_code = 'UA'"
+    
+    - column: imputation_credit_amount
+      reason: "Total imputation credit - calculable from bridge_refund_account"
+      bridge_equivalent: "SELECT SUM(tax_credit_amount) FROM bridge_refund_account WHERE refund_source_id = ..."
+    
+    - column: shareholder_refund_rate
+      reason: "Available in dim_account_subtype.refund_rate"
+      bridge_equivalent: "JOIN dim_account_subtype ON account_subtype_key"
+  
+  columns_added:
+    - column: country_key
+      reason: "Country context for multi-country support"
+      foreign_key: "warehouse.dim_country(country_key)"
+  
+  columns_retained:
+    - column: is_imputation_refund
+      reason: "Flag to identify refunds with bridge_refund_account breakdown"
+      usage: "When TRUE, join to bridge_refund_account for detailed breakdown"
+  
+  backward_compatibility:
+    view_available: true
+    view_name: v_fact_refund_malta_legacy
+    view_description: |
+      Provides backward compatibility by pivoting bridge_refund_account
+      back into Malta-specific columns for existing reports.
+
+# =============================================================================
+# Fact Table Specification (Generalized)
+# =============================================================================
+
+fact_table:
+  name: fact_refund
+  schema: warehouse
+  type: TRANSACTIONAL
+  grain: "One row per refund claim"
+  
+  business_context:
+    domain: "Payment & Refund"
+    primary_use: "Refund processing analysis, approval monitoring, multi-country tracking"
+    usage_pattern: "Moderate read volume for refund dashboards and audit queries"
+    refresh: "Daily incremental based on L2 modified_date"
+    
+  estimated_volume:
+    initial_rows: 500000
+    annual_growth_rows: 100000
+    average_daily_inserts: 300
+    note: "Across all countries; Malta imputation detail in bridge table"
+  
+  # ===========================================================================
+  # DIMENSION FOREIGN KEYS
+  # ===========================================================================
+  dimension_keys:
+    # -------------------------------------------------------------------------
+    # NEW: Country Context
+    # -------------------------------------------------------------------------
+    - name: country_key
+      data_type: Int32
+      nullable: false
+      foreign_key: warehouse.dim_country(country_key)
+      description: |
+        Country context for this refund.
+        Determines applicable rules, currency, and bridge table content.
+      added_in_version: "2.0.0"
+      note: "CRITICAL for multi-country support"
+    
+    # -------------------------------------------------------------------------
+    # Existing Dimension Keys (Unchanged)
+    # -------------------------------------------------------------------------
+    - name: party_key
+      data_type: Int64
+      nullable: false
+      foreign_key: warehouse.dim_party(party_key)
+      description: |
+        Claimant - party requesting the refund.
+        For imputation refunds, this is the shareholder (not the company).
+    
+    - name: tax_type_key
+      data_type: Int32
+      nullable: false
+      foreign_key: warehouse.dim_tax_type(tax_type_key)
+      description: "Tax type for the refund (VAT, CIT, WHT, etc.)"
+    
+    - name: tax_period_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_tax_period(tax_period_key)
+      description: |
+        Tax period the refund relates to.
+        May be NULL for imputation refunds (related to distribution, not period).
+    
+    - name: registration_key
+      data_type: Int64
+      nullable: true
+      foreign_key: warehouse.dim_registration(registration_key)
+      description: "Registration this refund relates to (if applicable)"
+    
+    # -------------------------------------------------------------------------
+    # Date Role-Playing Dimensions
+    # -------------------------------------------------------------------------
+    - name: claim_date_key
+      data_type: Int32
+      nullable: false
+      foreign_key: warehouse.dim_date(date_key)
+      description: "Date refund claim was submitted"
+      role: "Claim Date"
+    
+    - name: review_date_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_date(date_key)
+      description: "Date claim was reviewed (NULL if not yet reviewed)"
+      role: "Review Date"
+    
+    - name: approval_date_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_date(date_key)
+      description: "Date claim was approved/rejected"
+      role: "Approval Date"
+    
+    - name: payment_date_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_date(date_key)
+      description: "Date refund was paid"
+      role: "Payment Date"
+    
+    - name: due_date_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_date(date_key)
+      description: "Statutory deadline for processing"
+      role: "Due Date"
+    
+    # -------------------------------------------------------------------------
+    # Additional Reference Dimensions
+    # -------------------------------------------------------------------------
+    - name: payment_method_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_payment_method(payment_method_key)
+      description: "How the refund was paid"
+    
+    - name: geography_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_geography(geography_key)
+      description: "Geographic location of claimant"
+  
+  # ===========================================================================
+  # DEGENERATE DIMENSIONS
+  # ===========================================================================
+  degenerate_dimensions:
+    - name: refund_source_id
+      data_type: Int64
+      nullable: false
+      description: |
+        Business key from source system (refund_id).
+        Used for linking to bridge_refund_account.
+      source: "payment_refund.refund.refund_id"
+      role: BUSINESS_KEY
+    
+    - name: claim_reference_number
+      data_type: String
+      length: 50
+      nullable: true
+      description: "Official claim reference number"
+      source: "refund.claim_reference"
+    
+    - name: refund_type_code
+      data_type: String
+      length: 30
+      nullable: false
+      description: |
+        Type of refund claim:
+        - VAT_CREDIT: Input VAT exceeds output VAT
+        - OVERPAYMENT: Excess payment identified
+        - IMPUTATION: Malta corporate tax credit refunds to shareholders
+        - WHT: Withholding tax excess
+        - EXPORT_VAT: Export-related VAT refunds
+        - AMENDED_RETURN: Refund from amended filing
+      source: "refund.refund_type_code"
+    
+    - name: refund_status_code
+      data_type: String
+      length: 20
+      nullable: false
+      description: |
+        Current status:
+        PENDING, UNDER_REVIEW, APPROVED, PARTIALLY_APPROVED, REJECTED, PAID, CANCELLED
+      source: "refund.status_code"
+    
+    - name: rejection_reason_code
+      data_type: String
+      length: 50
+      nullable: true
+      description: "Reason code if rejected"
+  
+  # ===========================================================================
+  # FLAG COLUMNS
+  # ===========================================================================
+  flags:
+    - name: is_imputation_refund
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: |
+        Flag indicating this is a Malta imputation refund (1=Yes, 0=No).
+        When TRUE, detailed breakdown available in bridge_refund_account.
+        RETAINED from v1.0.0 for bridge table identification.
+      note: "Unchanged from v1.0.0"
+    
+    - name: is_approved
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Flag indicating approval (1=Yes, 0=No)"
+    
+    - name: is_paid
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Flag indicating payment completed (1=Yes, 0=No)"
+    
+    - name: is_partial_approval
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Flag indicating partial approval (approved < claimed)"
+    
+    - name: is_offset_applied
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Flag indicating refund was offset against liabilities"
+  
+  # ===========================================================================
+  # ADDITIVE MEASURES - GENERIC (All Countries)
+  # ===========================================================================
+  measures_generic:
+    - name: claimed_amount
+      data_type: Decimal64(2)
+      nullable: false
+      description: |
+        Total amount claimed for refund (in local currency).
+        For Malta imputation: Sum of all account type refunds
+        (fta + mta + fia + ipa + ua historically, now SUM from bridge).
+      unit: "LOCAL_CURRENCY"
+      aggregation: SUM
+    
+    - name: approved_amount
+      data_type: Decimal64(2)
+      nullable: true
+      description: "Amount approved for refund (may differ from claimed)"
+      unit: "LOCAL_CURRENCY"
+      aggregation: SUM
+    
+    - name: rejected_amount
+      data_type: Decimal64(2)
+      nullable: true
+      description: "Amount rejected/disallowed"
+      unit: "LOCAL_CURRENCY"
+      aggregation: SUM
+    
+    - name: adjusted_amount
+      data_type: Decimal64(2)
+      nullable: true
+      description: "Amount adjusted during review"
+      unit: "LOCAL_CURRENCY"
+      aggregation: SUM
+    
+    - name: paid_amount
+      data_type: Decimal64(2)
+      nullable: true
+      description: "Actual amount paid to claimant"
+      unit: "LOCAL_CURRENCY"
+      aggregation: SUM
+    
+    - name: offset_amount
+      data_type: Decimal64(2)
+      nullable: true
+      description: "Amount offset against outstanding liabilities"
+      unit: "LOCAL_CURRENCY"
+      aggregation: SUM
+    
+    - name: interest_amount
+      data_type: Decimal64(2)
+      nullable: true
+      description: "Interest payable on late refund (if applicable)"
+      unit: "LOCAL_CURRENCY"
+      aggregation: SUM
+    
+    - name: penalty_amount
+      data_type: Decimal64(2)
+      nullable: true
+      description: "Penalty deducted from refund"
+      unit: "LOCAL_CURRENCY"
+      aggregation: SUM
+    
+    - name: net_refund_amount
+      data_type: Decimal64(2)
+      nullable: true
+      description: |
+        Net amount after offsets and adjustments.
+        = paid_amount - offset_amount (typically)
+      unit: "LOCAL_CURRENCY"
+      aggregation: SUM
+  
+  # ===========================================================================
+  # MALTA IMPUTATION MEASURES - REMOVED IN v2.0.0
+  # ===========================================================================
+  measures_removed:
+    description: |
+      The following Malta-specific measures have been REMOVED in v2.0.0.
+      They are now available via bridge_refund_account + dim_account_subtype.
+    
+    removed_columns:
+      - name: fta_refund_amount
+        removal_reason: "Moved to bridge_refund_account"
+        recovery_query: |
+          SELECT refund_amount FROM bridge_refund_account 
+          WHERE refund_source_id = :id AND account_subtype_code = 'FTA'
+      
+      - name: mta_refund_amount
+        removal_reason: "Moved to bridge_refund_account"
+        recovery_query: |
+          SELECT refund_amount FROM bridge_refund_account 
+          WHERE refund_source_id = :id AND account_subtype_code = 'MTA'
+      
+      - name: fia_refund_amount
+        removal_reason: "Moved to bridge_refund_account"
+        recovery_query: |
+          SELECT refund_amount FROM bridge_refund_account 
+          WHERE refund_source_id = :id AND account_subtype_code = 'FIA'
+      
+      - name: ipa_refund_amount
+        removal_reason: "Moved to bridge_refund_account"
+        recovery_query: |
+          SELECT refund_amount FROM bridge_refund_account 
+          WHERE refund_source_id = :id AND account_subtype_code = 'IPA'
+      
+      - name: ua_refund_amount
+        removal_reason: "Moved to bridge_refund_account"
+        note: "UA typically has 0 refund amount anyway"
+      
+      - name: imputation_credit_amount
+        removal_reason: "Calculable from bridge_refund_account.tax_credit_amount"
+        recovery_query: |
+          SELECT SUM(tax_credit_amount) FROM bridge_refund_account 
+          WHERE refund_source_id = :id
+      
+      - name: shareholder_refund_rate
+        removal_reason: "Available in dim_account_subtype.refund_rate"
+        recovery_query: |
+          SELECT a.refund_rate 
+          FROM bridge_refund_account b
+          JOIN dim_account_subtype a ON b.account_subtype_key = a.account_subtype_key
+          WHERE b.refund_source_id = :id AND b.is_primary_account = 1
+  
+  # ===========================================================================
+  # SEMI-ADDITIVE MEASURES - PROCESSING TIMES
+  # ===========================================================================
+  measures_processing:
+    - name: days_to_review
+      data_type: Int32
+      nullable: true
+      description: "Days from claim submission to review completion"
+      aggregation: AVG
+    
+    - name: days_to_approval
+      data_type: Int32
+      nullable: true
+      description: "Days from claim submission to approval"
+      aggregation: AVG
+    
+    - name: days_to_payment
+      data_type: Int32
+      nullable: true
+      description: "Days from approval to payment"
+      aggregation: AVG
+    
+    - name: total_processing_days
+      data_type: Int32
+      nullable: true
+      description: "Total days from claim submission to payment"
+      aggregation: AVG
+  
+  # ===========================================================================
+  # NON-ADDITIVE MEASURES
+  # ===========================================================================
+  measures_non_additive:
+    - name: approval_rate
+      data_type: Decimal64(4)
+      nullable: true
+      description: "Ratio of approved to claimed amount (0-1)"
+      aggregation: "AVG at row level"
+    
+    - name: effective_refund_rate
+      data_type: Decimal64(4)
+      nullable: true
+      description: |
+        For imputation refunds: weighted average refund rate.
+        Calculable from bridge_refund_account in v2.0.0.
+      aggregation: "AVG at row level"
+      note: "Now derived from bridge table rather than stored"
+
+# =============================================================================
+# Business Rules (Updated for v2.0.0)
+# =============================================================================
+business_rules:
+  - rule_id: FR_G_001
+    description: "Every refund must have country_key"
+    severity: ERROR
+    validation_sql: |
+      SELECT refund_source_id
+      FROM warehouse.fact_refund
+      WHERE country_key IS NULL
+    expected_result: "0 rows"
+    added_in_version: "2.0.0"
+
+  - rule_id: FR_G_002
+    description: "country_key must reference valid dim_country"
+    severity: ERROR
+    validation_sql: |
+      SELECT f.refund_source_id
+      FROM warehouse.fact_refund f
+      LEFT JOIN warehouse.dim_country c ON f.country_key = c.country_key
+      WHERE c.country_key IS NULL
+    expected_result: "0 rows"
+    added_in_version: "2.0.0"
+
+  - rule_id: FR_G_003
+    description: "Imputation refunds must have bridge_refund_account records"
+    severity: WARNING
+    validation_sql: |
+      SELECT f.refund_source_id
+      FROM warehouse.fact_refund f
+      LEFT JOIN warehouse.bridge_refund_account b ON f.refund_source_id = b.refund_source_id
+      WHERE f.is_imputation_refund = 1
+        AND b.refund_source_id IS NULL
+    expected_result: "0 rows"
+    added_in_version: "2.0.0"
+
+  - rule_id: FR_G_004
+    description: "Imputation refund claimed_amount should equal bridge total"
+    severity: WARNING
+    validation_sql: |
+      SELECT 
+          f.refund_source_id,
+          f.claimed_amount,
+          SUM(b.refund_amount) as bridge_total,
+          ABS(f.claimed_amount - SUM(b.refund_amount)) as variance
+      FROM warehouse.fact_refund f
+      JOIN warehouse.bridge_refund_account b ON f.refund_source_id = b.refund_source_id
+      WHERE f.is_imputation_refund = 1
+      GROUP BY f.refund_source_id, f.claimed_amount
+      HAVING ABS(f.claimed_amount - SUM(b.refund_amount)) > 0.01
+    expected_result: "0 rows"
+    tolerance: "€0.01"
+    added_in_version: "2.0.0"
+
+  # Retained from v1.0.0
+  - rule_id: FR_001
+    description: "Approved amount cannot exceed claimed amount"
+    severity: ERROR
+    validation_sql: |
+      SELECT refund_source_id
+      FROM warehouse.fact_refund
+      WHERE approved_amount > claimed_amount
+    expected_result: "0 rows"
+
+  - rule_id: FR_002
+    description: "Paid amount cannot exceed approved amount"
+    severity: ERROR
+    validation_sql: |
+      SELECT refund_source_id
+      FROM warehouse.fact_refund
+      WHERE paid_amount > COALESCE(approved_amount, claimed_amount)
+    expected_result: "0 rows"
+
+  - rule_id: FR_003
+    description: "Paid flag requires payment date"
+    severity: ERROR
+    validation_sql: |
+      SELECT refund_source_id
+      FROM warehouse.fact_refund
+      WHERE is_paid = 1 AND (payment_date_key IS NULL OR payment_date_key = -1)
+    expected_result: "0 rows"
+
+# =============================================================================
+# Backward Compatibility View
+# =============================================================================
+backward_compatibility:
+  view_name: v_fact_refund_malta_legacy
+  description: |
+    View that reconstructs Malta-specific columns from bridge_refund_account
+    for backward compatibility with existing reports and dashboards.
+  
+  ddl: |
+    CREATE VIEW warehouse.v_fact_refund_malta_legacy AS
+    SELECT 
+        f.refund_source_id,
+        f.party_key,
+        f.tax_type_key,
+        f.tax_period_key,
+        f.registration_key,
+        f.claim_date_key,
+        f.review_date_key,
+        f.approval_date_key,
+        f.payment_date_key,
+        f.claim_reference_number,
+        f.refund_type_code,
+        f.refund_status_code,
+        f.is_imputation_refund,
+        f.is_approved,
+        f.is_paid,
+        
+        -- Generic amounts
+        f.claimed_amount,
+        f.approved_amount,
+        f.paid_amount,
+        f.offset_amount,
+        f.net_refund_amount,
+        
+        -- Reconstructed Malta columns (PIVOTED from bridge)
+        MAX(CASE WHEN b.account_subtype_code = 'FTA' THEN b.refund_amount END) AS fta_refund_amount,
+        MAX(CASE WHEN b.account_subtype_code = 'MTA' THEN b.refund_amount END) AS mta_refund_amount,
+        MAX(CASE WHEN b.account_subtype_code = 'FIA' THEN b.refund_amount END) AS fia_refund_amount,
+        MAX(CASE WHEN b.account_subtype_code = 'IPA' THEN b.refund_amount END) AS ipa_refund_amount,
+        MAX(CASE WHEN b.account_subtype_code = 'UA' THEN b.refund_amount END) AS ua_refund_amount,
+        SUM(b.tax_credit_amount) AS imputation_credit_amount,
+        
+        -- Processing metrics
+        f.days_to_review,
+        f.days_to_approval,
+        f.days_to_payment,
+        f.total_processing_days
+        
+    FROM warehouse.fact_refund f
+    LEFT JOIN warehouse.bridge_refund_account b 
+        ON f.refund_source_id = b.refund_source_id
+    WHERE f.country_key = (SELECT country_key FROM warehouse.dim_country WHERE country_code = 'MLT')
+    GROUP BY 
+        f.refund_source_id, f.party_key, f.tax_type_key, f.tax_period_key,
+        f.registration_key, f.claim_date_key, f.review_date_key, f.approval_date_key,
+        f.payment_date_key, f.claim_reference_number, f.refund_type_code,
+        f.refund_status_code, f.is_imputation_refund, f.is_approved, f.is_paid,
+        f.claimed_amount, f.approved_amount, f.paid_amount, f.offset_amount,
+        f.net_refund_amount, f.days_to_review, f.days_to_approval,
+        f.days_to_payment, f.total_processing_days
+
+# =============================================================================
+# ClickHouse DDL (v2.0.0)
+# =============================================================================
+clickhouse_ddl:
+  database: malta_warehouse
+  engine: MergeTree()
+  order_by: [country_key, party_key, claim_date_key, refund_source_id]
+  partition_by: "toYYYYMM(toDate(claim_date_key))"
+  
+  ddl: |
+    CREATE TABLE IF NOT EXISTS malta_warehouse.fact_refund
+    (
+        -- Dimension Keys
+        country_key Int32 COMMENT 'NEW in v2.0.0: Country context',
+        party_key Int64,
+        tax_type_key Int32,
+        tax_period_key Nullable(Int32),
+        registration_key Nullable(Int64),
+        
+        -- Date Keys
+        claim_date_key Int32,
+        review_date_key Nullable(Int32),
+        approval_date_key Nullable(Int32),
+        payment_date_key Nullable(Int32),
+        due_date_key Nullable(Int32),
+        
+        -- Reference Keys
+        payment_method_key Nullable(Int32),
+        geography_key Nullable(Int32),
+        
+        -- Degenerate Dimensions
+        refund_source_id Int64 COMMENT 'Business key - links to bridge_refund_account',
+        claim_reference_number Nullable(String),
+        refund_type_code LowCardinality(String),
+        refund_status_code LowCardinality(String),
+        rejection_reason_code Nullable(LowCardinality(String)),
+        
+        -- Flags
+        is_imputation_refund UInt8 DEFAULT 0 COMMENT 'When 1, detail in bridge_refund_account',
+        is_approved UInt8 DEFAULT 0,
+        is_paid UInt8 DEFAULT 0,
+        is_partial_approval UInt8 DEFAULT 0,
+        is_offset_applied UInt8 DEFAULT 0,
+        
+        -- Generic Amounts
+        claimed_amount Decimal64(2),
+        approved_amount Nullable(Decimal64(2)),
+        rejected_amount Nullable(Decimal64(2)),
+        adjusted_amount Nullable(Decimal64(2)),
+        paid_amount Nullable(Decimal64(2)),
+        offset_amount Nullable(Decimal64(2)),
+        interest_amount Nullable(Decimal64(2)),
+        penalty_amount Nullable(Decimal64(2)),
+        net_refund_amount Nullable(Decimal64(2)),
+        
+        -- REMOVED in v2.0.0: fta_refund_amount, mta_refund_amount, fia_refund_amount,
+        --                    ipa_refund_amount, ua_refund_amount, imputation_credit_amount,
+        --                    shareholder_refund_rate
+        -- These are now in bridge_refund_account
+        
+        -- Processing Metrics
+        days_to_review Nullable(Int32),
+        days_to_approval Nullable(Int32),
+        days_to_payment Nullable(Int32),
+        total_processing_days Nullable(Int32),
+        
+        -- Non-Additive
+        approval_rate Nullable(Decimal64(4)),
+        
+        -- ETL Metadata
+        etl_batch_id Int64,
+        etl_load_timestamp DateTime DEFAULT now(),
+        etl_source_system String DEFAULT 'L2_CANONICAL'
+    )
+    ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(toDate(claim_date_key))
+    ORDER BY (country_key, party_key, claim_date_key, refund_source_id)
+    SETTINGS index_granularity = 8192;
+    
+    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_fact_refund_source_id 
+        ON malta_warehouse.fact_refund (refund_source_id) TYPE bloom_filter GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_fact_refund_country 
+        ON malta_warehouse.fact_refund (country_key) TYPE minmax GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_fact_refund_type 
+        ON malta_warehouse.fact_refund (refund_type_code) TYPE bloom_filter GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_fact_refund_status 
+        ON malta_warehouse.fact_refund (refund_status_code) TYPE minmax GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_fact_refund_imputation 
+        ON malta_warehouse.fact_refund (is_imputation_refund) TYPE minmax GRANULARITY 1;
+
+# =============================================================================
+# Migration from v1.0.0 to v2.0.0
+# =============================================================================
+migration:
+  description: |
+    Steps to migrate from v1.0.0 (Malta-specific) to v2.0.0 (Generalized)
+  
+  steps:
+    - step: 1
+      action: "Create dim_account_subtype"
+      sql: "See dim_account_subtype.yaml"
+    
+    - step: 2
+      action: "Create bridge_refund_account"
+      sql: "See bridge_refund_account.yaml"
+    
+    - step: 3
+      action: "Populate bridge_refund_account from existing columns"
+      sql: |
+        -- Unpivot Malta-specific columns to bridge table
+        -- (See bridge_refund_account.yaml migration section)
+    
+    - step: 4
+      action: "Add country_key to fact_refund"
+      sql: |
+        ALTER TABLE warehouse.fact_refund ADD COLUMN country_key Int32 AFTER refund_source_id;
+        
+        -- Set country_key for existing Malta data
+        UPDATE warehouse.fact_refund 
+        SET country_key = (SELECT country_key FROM warehouse.dim_country WHERE country_code = 'MLT')
+        WHERE country_key IS NULL;
+    
+    - step: 5
+      action: "Validate migration"
+      sql: |
+        -- Compare totals
+        SELECT 
+            'v1_columns' as source,
+            SUM(fta_refund_amount) + SUM(mta_refund_amount) + 
+            SUM(fia_refund_amount) + SUM(ipa_refund_amount) as total
+        FROM warehouse.fact_refund
+        WHERE is_imputation_refund = 1
+        UNION ALL
+        SELECT 
+            'bridge_table' as source,
+            SUM(refund_amount) as total
+        FROM warehouse.bridge_refund_account;
+    
+    - step: 6
+      action: "Drop Malta-specific columns (after validation)"
+      sql: |
+        ALTER TABLE warehouse.fact_refund DROP COLUMN fta_refund_amount;
+        ALTER TABLE warehouse.fact_refund DROP COLUMN mta_refund_amount;
+        ALTER TABLE warehouse.fact_refund DROP COLUMN fia_refund_amount;
+        ALTER TABLE warehouse.fact_refund DROP COLUMN ipa_refund_amount;
+        ALTER TABLE warehouse.fact_refund DROP COLUMN ua_refund_amount;
+        ALTER TABLE warehouse.fact_refund DROP COLUMN imputation_credit_amount;
+        ALTER TABLE warehouse.fact_refund DROP COLUMN shareholder_refund_rate;
+    
+    - step: 7
+      action: "Create backward compatibility view"
+      sql: "See backward_compatibility section above"
+
+# =============================================================================
+# Query Patterns (Updated for v2.0.0)
+# =============================================================================
+query_patterns:
+  - pattern: "Refund summary by country"
+    description: "Aggregate refunds by country"
+    sql: |
+      SELECT 
+          c.country_name,
+          COUNT(*) as refund_count,
+          SUM(f.claimed_amount) as total_claimed,
+          SUM(f.approved_amount) as total_approved,
+          SUM(f.paid_amount) as total_paid,
+          AVG(f.approval_rate) as avg_approval_rate
+      FROM warehouse.fact_refund f
+      JOIN warehouse.dim_country c ON f.country_key = c.country_key
+      GROUP BY c.country_name
+  
+  - pattern: "Malta imputation refund with breakdown"
+    description: "Get refund with account type breakdown"
+    sql: |
+      SELECT 
+          f.refund_source_id,
+          f.claim_reference_number,
+          f.claimed_amount,
+          b.account_subtype_code,
+          a.account_subtype_name,
+          b.refund_amount,
+          b.refund_rate_applied,
+          a.refund_rate_display
+      FROM warehouse.fact_refund f
+      JOIN warehouse.bridge_refund_account b ON f.refund_source_id = b.refund_source_id
+      JOIN warehouse.dim_account_subtype a ON b.account_subtype_key = a.account_subtype_key
+      WHERE f.is_imputation_refund = 1
+        AND f.country_key = (SELECT country_key FROM dim_country WHERE country_code = 'MLT')
+      ORDER BY f.refund_source_id, a.distribution_priority
+  
+  - pattern: "Imputation account utilization analysis"
+    description: "Which account types are most used for imputation refunds"
+    sql: |
+      SELECT 
+          a.account_subtype_code,
+          a.account_subtype_name,
+          a.refund_rate_display,
+          COUNT(DISTINCT b.refund_source_id) as refund_count,
+          SUM(b.refund_amount) as total_refund_amount,
+          AVG(b.refund_amount) as avg_refund_amount
+      FROM warehouse.bridge_refund_account b
+      JOIN warehouse.dim_account_subtype a ON b.account_subtype_key = a.account_subtype_key
+      WHERE a.is_imputation_account = 1
+      GROUP BY a.account_subtype_code, a.account_subtype_name, a.refund_rate_display
+      ORDER BY total_refund_amount DESC
+
+# =============================================================================
+# Validation Criteria
+# =============================================================================
+# | Check                        | v1.0.0                | v2.0.0 (Generalized)       |
+# |------------------------------|-----------------------|----------------------------|
+# | Malta columns                | 7 imputation columns  | REMOVED - use bridge       |
+# | country_key                  | Not present           | ADDED - required FK        |
+# | is_imputation_refund         | Present               | RETAINED - bridge flag     |
+# | Generic measures             | Present               | Unchanged                  |
+# | Processing metrics           | Present               | Unchanged                  |
+# | Bridge table link            | N/A                   | Via refund_source_id       |
+# | Backward compatibility       | N/A                   | v_fact_refund_malta_legacy |
+# | Business rules               | 3 rules               | 7 rules (4 new)            |
+# =============================================================================

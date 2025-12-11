@@ -1,0 +1,2891 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Registration Domain
+# =============================================================================
+#
+# This domain manages taxpayer registration for specific tax types, implementing
+# the TTT (TIN-Tax Type-Tax Period) principle that is fundamental to tax
+# administration operations.
+#
+# Generated from: SIGTAS schemas (TAX_ACCOUNT, TAXABLE_OBJECT, LICENSE,
+#                 VAT_REGIST__CERTIF) + tax-capabilities.docx
+#
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    Registration Domain - Manages the registration of taxpayers for specific
+    tax types, creating the critical link between parties and the tax framework.
+
+    This domain implements the TTT (TIN-Tax Type-Tax Period) principle which
+    is the cornerstone of modern tax administration systems. Every transaction
+    in tax administration can be traced to a specific taxpayer (TIN), for a
+    specific tax type, in a specific tax period.
+
+    Core Capabilities:
+    - General taxpayer registration (TIN issuance)
+    - Tax-type specific registration (tax accounts)
+    - VAT registration and certification
+    - Business licensing
+    - Taxable object registration (property, vehicles)
+    - Registration compliance monitoring
+    - Segmentation management
+    - Automated registration based on rules
+    - Enforced registration
+    - Activation/inactivation/deregistration workflows
+
+    Key Business Rules:
+    - Taxpayers can be registered for multiple tax types
+    - Each tax account represents one TIN-Tax Type combination
+    - Registration can be automatic, voluntary, or enforced
+    - VAT registration requires threshold validation
+    - Deregistration requires zero balance across all periods
+    - Historical registration data must be preserved
+    - Status transitions follow defined workflows
+
+    Integration Points:
+    - Party Management: Links to party (taxpayer) records
+    - Tax Framework: Links to tax types and periods
+    - Filing & Assessment: Determines filing obligations
+    - Accounting: Creates accounts for transaction tracking
+    - Compliance: Drives risk assessment and monitoring
+
+    This domain was synthesized from:
+    - SIGTAS schemas: TAX_ACCOUNT, TAXABLE_OBJECT, LICENSE, VAT_REGIST__CERTIF,
+      TAX_ESTAB, ESTABLISHMENT
+    - Tax capabilities sections: General Registration Management, Tax Type
+      Registration, Taxpayer Segmentation, Registration Compliance Monitoring,
+      Enforced Registration
+
+  authors:
+    - "Generated from SIGTAS analysis"
+    - "Moldova SRS collaboration"
+    - "GovStack Initiative"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Registration BB"
+    - "Identity BB"
+    - "Workflow BB"
+    - "Payments BB"
+    - "Scheduler BB"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+  changelog:
+    - version: "1.0.0"
+      date: "2025-11-04"
+      author: "Claude"
+      changes:
+        - "Initial registration domain creation"
+        - "TTT principle implementation"
+        - "15 core tables defined"
+        - "Full SIGTAS patterns transformed"
+
+# =============================================================================
+# DOMAINS
+# =============================================================================
+
+domains:
+  - name: "registration"
+    code: "RG"
+    display_name: "Registration"
+    description: |
+      Manages all aspects of taxpayer registration including general registration,
+      tax-type specific registration, VAT registration, business licensing, and
+      taxable object registration. Implements the foundational TTT principle.
+
+      This is a CRITICAL domain that connects parties to the tax framework and
+      enables all downstream tax administration processes.
+
+    business_owner: "Registration Department"
+    technical_owner: "Core Systems Team"
+
+    dependencies:
+      - "party_management"  # For taxpayer records
+      - "tax_framework"     # For tax types and periods
+      - "reference_data"    # For codes and lookups
+
+    tags:
+      - "critical"
+      - "core"
+      - "high_volume"
+      - "gdpr_relevant"
+
+    domain_events:
+      - event_name: "TaxAccountCreated"
+        description: "Emitted when taxpayer registered for tax type"
+        payload_schema: |
+          {
+            "tax_account_id": "bigint",
+            "party_id": "bigint",
+            "tax_type_code": "string",
+            "registration_date": "date",
+            "registration_method": "string",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "TaxAccountActivated"
+        description: "Emitted when tax account activated"
+        payload_schema: |
+          {
+            "tax_account_id": "bigint",
+            "party_id": "bigint",
+            "tax_type_code": "string",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "TaxAccountInactivated"
+        description: "Emitted when tax account inactivated"
+        payload_schema: |
+          {
+            "tax_account_id": "bigint",
+            "party_id": "bigint",
+            "tax_type_code": "string",
+            "inactivation_reason": "string",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "TaxAccountDeregistered"
+        description: "Emitted when taxpayer deregistered from tax type"
+        payload_schema: |
+          {
+            "tax_account_id": "bigint",
+            "party_id": "bigint",
+            "tax_type_code": "string",
+            "deregistration_date": "date",
+            "deregistration_reason": "string",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "VATRegistrationCompleted"
+        description: "Emitted when VAT registration approved"
+        payload_schema: |
+          {
+            "vat_registration_id": "bigint",
+            "party_id": "bigint",
+            "vat_number": "string",
+            "registration_date": "date",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "BusinessLicenseIssued"
+        description: "Emitted when business license issued"
+        payload_schema: |
+          {
+            "license_id": "bigint",
+            "party_id": "bigint",
+            "license_number": "string",
+            "license_type": "string",
+            "timestamp": "datetime"
+          }
+
+    schemas:
+      # -----------------------------------------------------------------------
+      # Registration Schema
+      # -----------------------------------------------------------------------
+      - schema_name: "registration"
+        description: |
+          Core registration schema containing all registration-related tables.
+          Implements the TTT principle through the tax_account table.
+
+        owner_role: "registration_owner"
+
+        access_roles:
+          - role_name: "registration_officer"
+            permissions: ["SELECT", "INSERT", "UPDATE"]
+
+          - role_name: "taxpayer_service"
+            permissions: ["SELECT"]
+
+          - role_name: "compliance_officer"
+            permissions: ["SELECT", "UPDATE"]
+
+          - role_name: "audit_viewer"
+            permissions: ["SELECT"]
+
+        tables:
+          # =================================================================
+          # CORE REGISTRATION TABLES
+          # =================================================================
+
+          # -----------------------------------------------------------------
+          # Tax Account (TTT Principle Core)
+          # -----------------------------------------------------------------
+          - name: "tax_account"
+            display_name: "Tax Account"
+            description: |
+              Central table implementing the TTT (TIN-Tax Type-Tax Period) principle.
+              Each record represents one taxpayer's registration for one specific
+              tax type. This is the foundation for all tax administration operations.
+
+              A tax account is created when:
+              1. Automatically - based on party registration and tax rules
+              2. By application - taxpayer requests registration (e.g., VAT)
+              3. By official duty - tax authority enforces registration
+
+              The tax account drives:
+              - Filing obligations (which forms to file, when)
+              - Assessment process (tax calculations)
+              - Payment allocation (where payments are posted)
+              - Compliance monitoring (deadlines and reminders)
+              - Balance tracking (liabilities and credits)
+
+              Business Rules:
+              - One party can have multiple tax accounts (one per tax type)
+              - Tax account must exist before any transactions
+              - Account cannot be deleted, only inactivated or deregistered
+              - Reactivation possible if conditions met
+              - Deregistration requires zero balance
+
+              SIGTAS Source: TAX_ACCOUNT table (core entity)
+
+
+            aspects:
+              - auditable
+              - temporal
+
+            business_rule: |
+              1. One party can have multiple tax accounts (different tax types)
+              2. Each tax account must link to valid party and tax type
+              3. Registration date cannot be in the future
+              4. Account status transitions: NULL->ACTIVE, ACTIVE<->INACTIVE, ACTIVE->DEREGISTERED
+              5. Deregistration requires zero balance across all periods
+              6. Historical records must be preserved (no physical deletes)
+              7. Inactivation auto-suspends filing and payment compliance
+              8. Reactivation auto-triggered by filing or third-party data
+
+            type: "master"
+
+            tags:
+              - "critical"
+              - "core"
+              - "ttt_principle"
+              - "high_volume"
+
+            estimated_rows:
+              initial: 2000000
+              annual_growth: 200000
+              five_year: 3000000
+
+            columns:
+              - name: "tax_account_id"
+                display_name: "Tax Account ID"
+                type: "bigint"
+                description: "Unique identifier for the tax account"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "party_id"
+                display_name: "Party ID"
+                type: "bigint"
+                description: |
+                  Foreign key to party table. Identifies which taxpayer this
+                  account belongs to (the TIN part of TTT).
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Taxpayer"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_account_party"
+
+              - name: "tax_type_code"
+                display_name: "Tax Type Code"
+                type: "varchar(20)"
+                description: |
+                  Foreign key to tax_type table. Identifies which tax type this
+                  account is for (the Tax Type part of TTT).
+                  Examples: CIT, PIT, VAT, EXCISE, PROPERTY_TAX
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_type"
+                    referenced_column: "tax_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                reference_data: "tax_type"
+                business_name: "Tax Type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_account_tax_type"
+
+              - name: "tax_account_number"
+                display_name: "Tax Account Number"
+                type: "varchar(50)"
+                description: |
+                  Human-readable tax account number. Often formatted as
+                  TIN-TAX_TYPE (e.g., 1234567890-VAT). Used for external
+                  references and taxpayer communication.
+                constraints:
+                  unique: true
+                  not_null: true
+                usage_note: "Format: {TIN}-{TAX_TYPE_CODE}"
+                examples:
+                  - "1234567890-VAT"
+                  - "9876543210-CIT"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_account_number"
+                    unique: true
+
+              - name: "account_status_code"
+                display_name: "Account Status"
+                type: "varchar(20)"
+                description: |
+                  Current operational status of the tax account.
+
+                  Status definitions:
+                  - PENDING: Registration application received, not yet approved
+                  - ACTIVE: Fully operational, filing and payment obligations active
+                  - INACTIVE: Temporarily suspended (seasonal business, etc.)
+                  - SUSPENDED: Administrative suspension (non-compliance)
+                  - DEREGISTERED: Permanently closed, no future obligations
+                  - CANCELLED: Registration cancelled before activation
+                constraints:
+                  not_null: true
+                  default: "'PENDING'"
+                  check: "account_status_code IN ('PENDING', 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'DEREGISTERED', 'CANCELLED')"
+                reference_data: "ref_account_status"
+                business_rule: |
+                  Status transitions:
+                  PENDING -> ACTIVE (approval)
+                  PENDING -> CANCELLED (rejection)
+                  ACTIVE <-> INACTIVE (seasonal, temporary)
+                  ACTIVE -> SUSPENDED (compliance action)
+                  SUSPENDED -> ACTIVE (compliance restored)
+                  ACTIVE/INACTIVE/SUSPENDED -> DEREGISTERED (permanent closure)
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_account_status"
+
+              - name: "registration_date"
+                display_name: "Registration Date"
+                type: "date"
+                description: |
+                  Date when taxpayer was registered for this tax type.
+                  This is the start date for all tax obligations.
+                constraints:
+                  not_null: true
+                business_rule: "Cannot be in the future, cannot be before party creation date"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_account_reg_date"
+
+              - name: "registration_method_code"
+                display_name: "Registration Method"
+                type: "varchar(20)"
+                description: |
+                  How this tax account was created:
+                  - AUTOMATIC: Auto-registered based on tax rules (e.g., new business)
+                  - VOLUNTARY: Taxpayer application (e.g., VAT below threshold)
+                  - ENFORCED: Tax authority enforced registration
+                  - MIGRATION: Migrated from legacy system
+                constraints:
+                  not_null: true
+                  check: "registration_method_code IN ('AUTOMATIC', 'VOLUNTARY', 'ENFORCED', 'MIGRATION')"
+                reference_data: "ref_registration_method"
+                business_name: "Registration Method"
+
+              - name: "registration_reason"
+                display_name: "Registration Reason"
+                type: "text"
+                description: |
+                  Free-text explanation for why this registration was created.
+                  Especially important for enforced registrations.
+                usage_note: "Required for ENFORCED method"
+
+              - name: "effective_from_date"
+                display_name: "Effective From Date"
+                type: "date"
+                description: |
+                  Date from which tax obligations begin. Usually same as
+                  registration_date but can be backdated or future-dated.
+                constraints:
+                  not_null: true
+                business_rule: "Cannot be more than 1 year in the past or future"
+
+              - name: "effective_to_date"
+                display_name: "Effective To Date"
+                type: "date"
+                description: |
+                  Date when tax obligations end. NULL for active accounts.
+                  Populated on deregistration.
+                business_rule: "Must be >= effective_from_date if populated"
+                constraints:
+                  check: "effective_to_date IS NULL OR effective_to_date >= effective_from_date"
+
+              - name: "deregistration_date"
+                display_name: "Deregistration Date"
+                type: "date"
+                description: |
+                  Date when taxpayer was deregistered from this tax type.
+                  Populated when status changes to DEREGISTERED.
+                business_rule: "Cannot be before registration_date"
+
+              - name: "deregistration_reason_code"
+                display_name: "Deregistration Reason"
+                type: "varchar(20)"
+                description: |
+                  Reason for deregistration:
+                  - VOLUNTARY: Taxpayer request
+                  - OFFICIAL_DUTY: Tax authority initiated
+                  - DEATH: Individual deceased
+                  - DISSOLUTION: Business dissolved
+                  - BELOW_THRESHOLD: Turnover fell below threshold
+                  - CEASED_ACTIVITY: Business ceased operations
+                  - MIGRATION: Migrated to another jurisdiction
+                reference_data: "ref_deregistration_reason"
+
+              - name: "last_filing_period_code"
+                display_name: "Last Filing Period"
+                type: "varchar(20)"
+                description: |
+                  Code of the last tax period for which filing is required.
+                  Used during deregistration to determine final obligations.
+                usage_note: "Format depends on tax type period structure"
+                examples:
+                  - "2024-12" # Monthly
+                  - "2024-Q4" # Quarterly
+                  - "2024"    # Annual
+
+              - name: "segmentation_code"
+                display_name: "Taxpayer Segment"
+                type: "varchar(20)"
+                description: |
+                  Taxpayer segmentation for this tax type. Determines service
+                  level, compliance approach, and dedicated officer assignment.
+
+                  Common segments:
+                  - LARGE: Large taxpayers (dedicated service)
+                  - MEDIUM: Medium taxpayers (standard service)
+                  - SMALL: Small taxpayers (self-service)
+                  - HIGH_RISK: High-risk taxpayers (enhanced monitoring)
+                reference_data: "ref_taxpayer_segment"
+                business_name: "Segment"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_account_segment"
+
+              - name: "assigned_office_code"
+                display_name: "Assigned Office"
+                type: "varchar(20)"
+                description: |
+                  Tax office responsible for this account. Used for workload
+                  distribution and taxpayer service.
+                constraints:
+                  not_null: true
+                reference_data: "ref_tax_office"
+                business_name: "Responsible Office"
+
+              - name: "assigned_officer_id"
+                display_name: "Assigned Officer"
+                type: "bigint"
+                description: |
+                  Specific tax officer assigned to manage this account.
+                  NULL for small taxpayers (self-service).
+                reference_data: "ref_employee"
+                business_name: "Account Officer"
+
+              - name: "annual_turnover"
+                display_name: "Annual Turnover"
+                type: "decimal(19,2)"
+                description: |
+                  Declared or estimated annual turnover for this taxpayer.
+                  Used for threshold validation (VAT, etc.) and segmentation.
+                business_name: "Turnover"
+                usage_note: "Updated annually or when significant change detected"
+
+              - name: "turnover_currency_code"
+                display_name: "Turnover Currency"
+                type: "char(3)"
+                description: "ISO 4217 currency code for annual turnover"
+                constraints:
+                  default: "'MDL'"
+                reference_data: "ref_currency"
+                examples:
+                  - "MDL" # Moldovan Leu
+                  - "EUR"
+                  - "USD"
+
+              - name: "is_group_filing"
+                display_name: "Group Filing Enabled"
+                type: "boolean"
+                description: |
+                  Whether this account participates in group filing (VAT groups,
+                  consolidated tax groups, etc.). Group head files for group.
+                constraints:
+                  not_null: true
+                  default: false
+                business_name: "Group Filing"
+
+              - name: "group_head_account_id"
+                display_name: "Group Head Account"
+                type: "bigint"
+                description: |
+                  If is_group_filing=true and this is not the head, references
+                  the tax account of the group head who files on behalf.
+                constraints:
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "SET NULL"
+                    on_update: "CASCADE"
+                business_name: "Group Head"
+
+              - name: "filing_frequency_code"
+                display_name: "Filing Frequency"
+                type: "varchar(20)"
+                description: |
+                  How often this taxpayer must file returns for this tax type.
+                  Can differ from tax type default based on turnover.
+
+                  Examples: MONTHLY, QUARTERLY, ANNUAL
+                constraints:
+                  not_null: true
+                reference_data: "ref_filing_frequency"
+                business_name: "Filing Frequency"
+
+              - name: "payment_due_day"
+                display_name: "Payment Due Day"
+                type: "integer"
+                description: |
+                  Day of month when payment is due. NULL means use tax type
+                  default. Can be customized based on agreement.
+                constraints:
+                  check: "payment_due_day IS NULL OR (payment_due_day >= 1 AND payment_due_day <= 31)"
+                business_name: "Payment Day"
+
+              - name: "is_exporter"
+                display_name: "Exporter Status"
+                type: "boolean"
+                description: |
+                  Flag indicating if taxpayer is significant exporter.
+                  Used for VAT refund processing (shorter refund period).
+                constraints:
+                  not_null: true
+                  default: false
+                business_name: "Is Exporter"
+
+              - name: "export_percentage"
+                display_name: "Export Percentage"
+                type: "decimal(5,2)"
+                description: |
+                  Percentage of turnover from exports. Used to determine
+                  exporter status (typically >50%).
+                constraints:
+                  check: "export_percentage IS NULL OR (export_percentage >= 0 AND export_percentage <= 100)"
+                business_name: "Export %"
+
+              - name: "special_regime_code"
+                display_name: "Special Regime"
+                type: "varchar(20)"
+                description: |
+                  Special tax regime applicable to this account:
+                  - DIPLOMATIC: Diplomatic missions (VAT refund, no filing)
+                  - NGO: Non-profit organizations
+                  - SMALL_BUSINESS: Simplified regime for small businesses
+                  - AGRICULTURAL: Special regime for agriculture
+                  - FREE_ZONE: Free economic zone
+                reference_data: "ref_special_regime"
+                business_name: "Special Regime"
+
+              - name: "risk_score"
+                display_name: "Risk Score"
+                type: "integer"
+                description: |
+                  Current compliance risk score for this account (0-100).
+                  Updated by risk assessment engine based on filing compliance,
+                  payment history, audit findings, etc.
+                constraints:
+                  check: "risk_score IS NULL OR (risk_score >= 0 AND risk_score <= 100)"
+                business_name: "Risk Score"
+                usage_note: "Recalculated periodically and on key events"
+
+              - name: "risk_category_code"
+                display_name: "Risk Category"
+                type: "varchar(20)"
+                description: |
+                  Risk category derived from risk score:
+                  - LOW: Low risk, minimal monitoring
+                  - MEDIUM: Standard monitoring
+                  - HIGH: Enhanced monitoring, audit selection
+                  - CRITICAL: Immediate attention required
+                constraints:
+                  check: "risk_category_code IS NULL OR risk_category_code IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')"
+                reference_data: "ref_risk_category"
+                business_name: "Risk Category"
+
+              - name: "last_risk_assessment_date"
+                display_name: "Last Risk Assessment"
+                type: "date"
+                description: "Date when risk score was last calculated"
+
+              - name: "notes"
+                display_name: "Notes"
+                type: "text"
+                description: |
+                  Free-text notes about this tax account. Used by officers
+                  to document special circumstances, agreements, etc.
+                business_name: "Account Notes"
+
+              # Temporal columns
+              - name: "valid_from"
+                display_name: "Valid From"
+                type: "date"
+                description: "Date from which this record version is valid"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                display_name: "Valid To"
+                type: "date"
+                description: |
+                  Date until which this record version is valid.
+                  NULL indicates current version.
+
+              - name: "is_current"
+                display_name: "Is Current Version"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                constraints:
+                  not_null: true
+                  default: true
+
+              # Audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified this record"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_tax_account_party_tax_type"
+                columns: ["party_id", "tax_type_code"]
+                type: "btree"
+                unique: true
+                where: "is_current = true"
+                description: "Ensure one current account per party-tax type combination"
+                performance_note: "Critical for lookups and uniqueness"
+
+              - name: "idx_tax_account_status_office"
+                columns: ["account_status_code", "assigned_office_code"]
+                type: "btree"
+                description: "Support workload queries by office"
+                performance_note: "Used for dashboard and reporting"
+
+              - name: "idx_tax_account_segment"
+                columns: ["segmentation_code", "tax_type_code"]
+                type: "btree"
+                description: "Support segmentation analysis"
+
+              - name: "idx_tax_account_risk"
+                columns: ["risk_category_code", "account_status_code"]
+                type: "btree"
+                where: "account_status_code = 'ACTIVE'"
+                description: "Support risk-based selection"
+
+              - name: "idx_tax_account_group"
+                columns: ["group_head_account_id"]
+                type: "btree"
+                where: "group_head_account_id IS NOT NULL"
+                description: "Support group filing queries"
+
+            constraints:
+              - name: "chk_tax_account_dates"
+                type: "check"
+                condition: "effective_from_date <= COALESCE(effective_to_date, '9999-12-31')"
+                description: "Ensure valid date range"
+
+              - name: "chk_tax_account_temporal"
+                type: "check"
+                condition: "(is_current = true AND valid_to IS NULL) OR (is_current = false AND valid_to IS NOT NULL)"
+                description: "Ensure temporal consistency"
+
+              - name: "uk_tax_account_number"
+                type: "unique"
+                columns: ["tax_account_number"]
+                description: "Ensure account number uniqueness"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "party"
+                source_column: "party_id"
+                target_column: "party_id"
+                cardinality: "N:1"
+                description: "Each account belongs to one party, party can have multiple accounts"
+
+              - type: "many_to_one"
+                target_table: "tax_type"
+                source_column: "tax_type_code"
+                target_column: "tax_type_code"
+                cardinality: "N:1"
+                description: "Each account is for one tax type, tax type can have many accounts"
+
+              - type: "one_to_many"
+                target_table: "tax_account_period"
+                source_column: "tax_account_id"
+                target_column: "tax_account_id"
+                cardinality: "1:N"
+                description: "Account has periods for filing and payment tracking"
+
+              - type: "one_to_many"
+                target_table: "vat_registration"
+                source_column: "tax_account_id"
+                target_column: "tax_account_id"
+                cardinality: "1:1"
+                description: "VAT accounts have additional VAT-specific data"
+
+          # -----------------------------------------------------------------
+          # Tax Account Period
+          # -----------------------------------------------------------------
+          - name: "tax_account_period"
+            display_name: "Tax Account Period"
+            description: |
+              Tracks filing and payment obligations for each period of each
+              tax account. Created automatically when tax period is opened
+              for applicable taxpayers based on their filing frequency.
+
+              This table implements the Period component of TTT principle:
+              TIN (party) + Tax Type (tax_account) + Tax Period = unique obligation
+
+              Each record represents one taxpayer's obligation to file and pay
+              for one specific period. Status tracking enables:
+              - Automated reminders for non-filers
+              - Compliance monitoring
+              - Best judgment assessments for non-filers
+              - Performance dashboards
+
+              SIGTAS Source: TAX_PERIOD relationships + TAX_ACCOUNT period tracking
+
+            business_rule: |
+              1. Periods auto-created when tax period opened for active accounts
+              2. Filing status starts as NOT_FILED, progresses through workflow
+              3. Payment status independent of filing status
+              4. Cannot delete period records (audit requirement)
+              5. Late filing flags set automatically based on due dates
+              6. Reminders generated based on tax type rules
+
+            type: "transaction"
+
+            tags:
+              - "critical"
+              - "ttt_principle"
+              - "very_high_volume"
+              - "compliance_tracking"
+
+            estimated_rows:
+              initial: 50000000
+              annual_growth: 10000000
+              five_year: 100000000
+
+            columns:
+              - name: "tax_account_period_id"
+                display_name: "Account Period ID"
+                type: "bigint"
+                description: "Unique identifier for tax account period"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account ID"
+                type: "bigint"
+                description: "Foreign key to tax account"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_acct_period_account"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period ID"
+                type: "bigint"
+                description: "Foreign key to tax period"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_acct_period_period"
+
+              - name: "filing_status_code"
+                display_name: "Filing Status"
+                type: "varchar(20)"
+                description: |
+                  Current filing status for this period:
+                  - NOT_FILED: No return received
+                  - FILED: Return filed on time
+                  - FILED_LATE: Return filed after deadline
+                  - AMENDED: Amended return filed
+                  - NIL_RETURN: Nil/zero return filed
+                  - EXEMPTED: Exempted from filing
+                  - WAIVED: Filing requirement waived
+                constraints:
+                  not_null: true
+                  default: "'NOT_FILED'"
+                reference_data: "ref_filing_status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_acct_period_filing"
+
+              - name: "filing_due_date"
+                display_name: "Filing Due Date"
+                type: "date"
+                description: |
+                  Date by which return must be filed. Copied from tax_period
+                  but can be extended on case-by-case basis.
+                constraints:
+                  not_null: true
+
+              - name: "filing_date"
+                display_name: "Filing Date"
+                type: "date"
+                description: "Actual date when return was filed"
+
+              - name: "is_filing_late"
+                display_name: "Is Filing Late"
+                type: "boolean"
+                description: "Flag indicating if filing was after due date"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "payment_status_code"
+                display_name: "Payment Status"
+                type: "varchar(20)"
+                description: |
+                  Current payment status for this period:
+                  - NOT_PAID: No payment received
+                  - PAID: Fully paid
+                  - PARTIALLY_PAID: Partial payment
+                  - OVERPAID: Payment exceeds liability
+                  - REFUND_DUE: Refund owed to taxpayer
+                constraints:
+                  not_null: true
+                  default: "'NOT_PAID'"
+                reference_data: "ref_payment_status"
+
+              - name: "payment_due_date"
+                display_name: "Payment Due Date"
+                type: "date"
+                description: "Date by which payment must be made"
+                constraints:
+                  not_null: true
+
+              - name: "last_reminder_date"
+                display_name: "Last Reminder Date"
+                type: "date"
+                description: "Date when last reminder was sent"
+
+              - name: "reminder_count"
+                display_name: "Reminder Count"
+                type: "integer"
+                description: "Number of reminders sent for this period"
+                constraints:
+                  not_null: true
+                  default: 0
+
+              - name: "is_bja_applicable"
+                display_name: "BJA Applicable"
+                type: "boolean"
+                description: |
+                  Flag indicating if Best Judgment Assessment should be applied
+                  for non-filing. Set automatically after final reminder.
+                constraints:
+                  not_null: true
+                  default: false
+                business_name: "Best Judgment Assessment"
+
+              # Audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "uk_tax_acct_period"
+                columns: ["tax_account_id", "tax_period_id"]
+                type: "btree"
+                unique: true
+                description: "Ensure one record per account-period combination"
+
+              - name: "idx_tax_acct_period_filing_status"
+                columns: ["filing_status_code", "filing_due_date"]
+                type: "btree"
+                where: "filing_status_code = 'NOT_FILED' AND filing_due_date < CURRENT_DATE"
+                description: "Support compliance monitoring for overdue returns"
+
+              - name: "idx_tax_acct_period_payment_status"
+                columns: ["payment_status_code", "payment_due_date"]
+                type: "btree"
+                where: "payment_status_code IN ('NOT_PAID', 'PARTIALLY_PAID')"
+                description: "Support collection monitoring"
+
+            partitioning:
+              type: "range"
+              column: "filing_due_date"
+              strategy: "yearly"
+              retention: "10 years"
+              note: "Partition by year for performance and archival"
+
+          # =================================================================
+          # VAT REGISTRATION
+          # =================================================================
+
+          # -----------------------------------------------------------------
+          # VAT Registration
+          # -----------------------------------------------------------------
+          - name: "vat_registration"
+            display_name: "VAT Registration"
+            description: |
+              VAT-specific registration data extending the tax_account table.
+              VAT is typically the most complex tax type with special rules
+              around thresholds, registration methods, group filing, and
+              certificate issuance.
+
+              This table captures VAT-specific attributes that don't apply
+              to other tax types. Each VAT tax_account links to one record here.
+
+              Special VAT Features:
+              - Threshold-based mandatory registration
+              - Voluntary registration below threshold
+              - Exporter status with expedited refunds
+              - Group registration (parent-subsidiary filing)
+              - Certificate issuance and renewal
+              - Special regimes (diplomatic, NGO)
+              - Intra-community supplies (EU context)
+
+              SIGTAS Source: VAT_REGIST table (renamed from VAT_REGISTRATION)
+
+            business_rule: |
+              1. One-to-one relationship with tax_account for VAT
+              2. Registration requires threshold check unless voluntary
+              3. Certificate issued upon approval
+              4. Group head can file for multiple entities
+              5. Exporter status requires >50% export turnover
+              6. Certificate must be renewed periodically
+              7. Historical registrations preserved for audit
+
+            type: "master"
+
+            tags:
+              - "vat_specific"
+              - "high_volume"
+              - "certificate_required"
+
+            estimated_rows:
+              initial: 150000
+              annual_growth: 10000
+              five_year: 200000
+
+            columns:
+              - name: "vat_registration_id"
+                display_name: "VAT Registration ID"
+                type: "bigint"
+                description: "Unique identifier for VAT registration"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account ID"
+                type: "bigint"
+                description: "Foreign key to tax_account (must be VAT tax type)"
+                constraints:
+                  unique: true
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "vat_number"
+                display_name: "VAT Number"
+                type: "varchar(50)"
+                description: |
+                  Official VAT identification number issued to taxpayer.
+                  Format varies by country. Often includes country prefix.
+                constraints:
+                  unique: true
+                  not_null: true
+                usage_note: "Format: Country code + digits (e.g., MD12345678)"
+                examples:
+                  - "MD12345678"
+                indexing:
+                  - type: "btree"
+                    name: "idx_vat_number"
+                    unique: true
+
+              - name: "registration_type_code"
+                display_name: "Registration Type"
+                type: "varchar(20)"
+                description: |
+                  Type of VAT registration:
+                  - MANDATORY: Above threshold, required by law
+                  - VOLUNTARY: Below threshold, taxpayer opted in
+                  - GROUP: Part of VAT group
+                  - DIPLOMATIC: Diplomatic mission (no filing, refund only)
+                  - NGO: Non-governmental organization
+                constraints:
+                  not_null: true
+                reference_data: "ref_vat_registration_type"
+
+              - name: "threshold_amount"
+                display_name: "Threshold Amount"
+                type: "decimal(19,2)"
+                description: |
+                  VAT registration threshold applicable at time of registration.
+                  Preserved for historical analysis even if threshold changes.
+                business_name: "VAT Threshold"
+
+              - name: "turnover_at_registration"
+                display_name: "Turnover at Registration"
+                type: "decimal(19,2)"
+                description: |
+                  Taxpayer's annual turnover at time of VAT registration.
+                  Used to validate threshold compliance.
+
+              - name: "is_group_vat"
+                display_name: "Group VAT Registration"
+                type: "boolean"
+                description: |
+                  Flag indicating if this is part of VAT group registration
+                  where one entity files for multiple related entities.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "vat_group_id"
+                display_name: "VAT Group ID"
+                type: "varchar(50)"
+                description: |
+                  Identifier for VAT group if is_group_vat=true.
+                  All entities in same group share this ID.
+                usage_note: "Group head maintains the master ID"
+
+              - name: "is_group_head"
+                display_name: "Is Group Head"
+                type: "boolean"
+                description: |
+                  Flag indicating if this entity is the head of VAT group
+                  responsible for consolidated filing.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "certificate_number"
+                display_name: "Certificate Number"
+                type: "varchar(50)"
+                description: |
+                  VAT registration certificate number. Physical or electronic
+                  certificate issued to taxpayer as proof of registration.
+                business_name: "Certificate No."
+
+              - name: "certificate_issue_date"
+                display_name: "Certificate Issue Date"
+                type: "date"
+                description: "Date when VAT certificate was issued"
+
+              - name: "certificate_expiry_date"
+                display_name: "Certificate Expiry Date"
+                type: "date"
+                description: |
+                  Expiry date of certificate if renewal required.
+                  NULL for permanent certificates.
+
+              - name: "is_exporter"
+                display_name: "Exporter Status"
+                type: "boolean"
+                description: |
+                  Flag indicating if taxpayer is significant exporter eligible
+                  for expedited VAT refund processing.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "export_percentage"
+                display_name: "Export Percentage"
+                type: "decimal(5,2)"
+                description: |
+                  Percentage of sales that are exports. Must be >50% for
+                  exporter status in most jurisdictions.
+                constraints:
+                  check: "export_percentage IS NULL OR (export_percentage >= 0 AND export_percentage <= 100)"
+
+              - name: "refund_processing_period_days"
+                display_name: "Refund Processing Period"
+                type: "integer"
+                description: |
+                  Number of days within which VAT refund must be processed.
+                  Shorter for exporters (e.g., 30 days vs 90 days standard).
+                constraints:
+                  not_null: true
+                  default: 90
+                business_name: "Refund Period (days)"
+
+              - name: "special_regime_code"
+                display_name: "VAT Special Regime"
+                type: "varchar(20)"
+                description: |
+                  Special VAT regime if applicable:
+                  - DIPLOMATIC: Diplomatic missions
+                  - NGO: Non-profit organizations
+                  - AGRICULTURE: Agricultural flat rate
+                  - SMALL_BUSINESS: Simplified scheme
+                  - MARGIN: Margin scheme (used goods)
+                reference_data: "ref_vat_special_regime"
+
+              - name: "intra_community_flag"
+                display_name: "Intra-Community Trading"
+                type: "boolean"
+                description: |
+                  Flag indicating if taxpayer engages in intra-community
+                  supplies (relevant for EU countries).
+                constraints:
+                  not_null: true
+                  default: false
+                business_name: "IC Trading"
+
+              - name: "vies_registration_date"
+                display_name: "VIES Registration Date"
+                type: "date"
+                description: |
+                  Date when VAT number was registered in VIES (VAT Information
+                  Exchange System) for EU intra-community transactions.
+                usage_note: "Applicable only for EU member states"
+
+              - name: "previous_vat_number"
+                display_name: "Previous VAT Number"
+                type: "varchar(50)"
+                description: |
+                  Previous VAT number if taxpayer was re-registered after
+                  deregistration. Used for compliance history tracking.
+
+              - name: "previous_deregistration_date"
+                display_name: "Previous Deregistration Date"
+                type: "date"
+                description: |
+                  Date of previous VAT deregistration if applicable.
+                  Used to detect repeat registrations which may indicate risk.
+
+              - name: "application_date"
+                display_name: "Application Date"
+                type: "date"
+                description: |
+                  Date when taxpayer applied for VAT registration.
+                  For voluntary registrations.
+
+              - name: "approval_date"
+                display_name: "Approval Date"
+                type: "date"
+                description: "Date when VAT registration was approved"
+
+              - name: "approved_by"
+                display_name: "Approved By"
+                type: "varchar(100)"
+                description: "Officer who approved VAT registration"
+
+              - name: "rejection_date"
+                display_name: "Rejection Date"
+                type: "date"
+                description: "Date when application was rejected (if applicable)"
+
+              - name: "rejection_reason"
+                display_name: "Rejection Reason"
+                type: "text"
+                description: "Reason for rejecting VAT registration application"
+
+              # Temporal columns
+              - name: "valid_from"
+                display_name: "Valid From"
+                type: "date"
+                description: "Date from which this record version is valid"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                display_name: "Valid To"
+                type: "date"
+                description: "Date until which this record version is valid"
+
+              - name: "is_current"
+                display_name: "Is Current Version"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                constraints:
+                  not_null: true
+                  default: true
+
+              # Audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_vat_reg_group"
+                columns: ["vat_group_id"]
+                type: "btree"
+                where: "vat_group_id IS NOT NULL"
+                description: "Support VAT group queries"
+
+              - name: "idx_vat_reg_exporter"
+                columns: ["is_exporter"]
+                type: "btree"
+                where: "is_exporter = true"
+                description: "Quick lookup of exporters for refund processing"
+
+            relationships:
+              - type: "one_to_one"
+                target_table: "tax_account"
+                source_column: "tax_account_id"
+                target_column: "tax_account_id"
+                cardinality: "1:1"
+                description: "Each VAT registration extends one tax account"
+
+              - type: "one_to_many"
+                target_table: "vat_certificate"
+                source_column: "vat_registration_id"
+                target_column: "vat_registration_id"
+                cardinality: "1:N"
+                description: "Registration can have multiple certificates over time"
+
+          # -----------------------------------------------------------------
+          # VAT Certificate
+          # -----------------------------------------------------------------
+          - name: "vat_certificate"
+            display_name: "VAT Certificate"
+            description: |
+              Tracks VAT registration certificates issued to taxpayers.
+              Certificates serve as official proof of VAT registration and
+              may need periodic renewal.
+
+              SIGTAS Source: VAT_CERTIF table
+
+            business_rule: |
+              1. Certificate issued upon VAT registration approval
+              2. Certificate can be renewed (creates new record)
+              3. Revoked certificates retained for audit
+              4. Only one active certificate per registration at a time
+
+            type: "transaction"
+
+            tags:
+              - "vat_specific"
+              - "certificate"
+
+            columns:
+              - name: "vat_certificate_id"
+                display_name: "Certificate ID"
+                type: "bigint"
+                description: "Unique identifier for certificate"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "vat_registration_id"
+                display_name: "VAT Registration ID"
+                type: "bigint"
+                description: "Foreign key to VAT registration"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "vat_registration"
+                    referenced_column: "vat_registration_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_vat_cert_registration"
+
+              - name: "certificate_number"
+                display_name: "Certificate Number"
+                type: "varchar(50)"
+                description: "Unique certificate number"
+                constraints:
+                  unique: true
+                  not_null: true
+
+              - name: "issue_date"
+                display_name: "Issue Date"
+                type: "date"
+                description: "Date certificate was issued"
+                constraints:
+                  not_null: true
+
+              - name: "expiry_date"
+                display_name: "Expiry Date"
+                type: "date"
+                description: "Date certificate expires (NULL if permanent)"
+
+              - name: "certificate_status_code"
+                display_name: "Certificate Status"
+                type: "varchar(20)"
+                description: |
+                  Current status: ACTIVE, EXPIRED, REVOKED, RENEWED
+                constraints:
+                  not_null: true
+                  default: "'ACTIVE'"
+                reference_data: "ref_certificate_status"
+
+              - name: "issued_by_office_code"
+                display_name: "Issued By Office"
+                type: "varchar(20)"
+                description: "Tax office that issued the certificate"
+                constraints:
+                  not_null: true
+                reference_data: "ref_tax_office"
+
+              - name: "issued_by_officer"
+                display_name: "Issued By Officer"
+                type: "varchar(100)"
+                description: "Officer who issued the certificate"
+                constraints:
+                  not_null: true
+
+              - name: "revocation_date"
+                display_name: "Revocation Date"
+                type: "date"
+                description: "Date certificate was revoked"
+
+              - name: "revocation_reason"
+                display_name: "Revocation Reason"
+                type: "text"
+                description: "Reason for revoking certificate"
+
+              - name: "print_date"
+                display_name: "Print Date"
+                type: "date"
+                description: "Date certificate was printed/generated"
+
+              - name: "delivery_date"
+                display_name: "Delivery Date"
+                type: "date"
+                description: "Date certificate was delivered to taxpayer"
+
+              - name: "delivery_method_code"
+                display_name: "Delivery Method"
+                type: "varchar(20)"
+                description: "How certificate was delivered: MAIL, IN_PERSON, ELECTRONIC"
+                reference_data: "ref_delivery_method"
+
+              # Audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_vat_cert_status"
+                columns: ["certificate_status_code", "expiry_date"]
+                type: "btree"
+                description: "Support expiry monitoring"
+
+          # =================================================================
+          # BUSINESS LICENSING
+          # =================================================================
+
+          # -----------------------------------------------------------------
+          # Business License
+          # -----------------------------------------------------------------
+          - name: "business_license"
+            display_name: "Business License"
+            description: |
+              Tracks business licenses, permits, and authorizations issued to
+              taxpayers. Licenses may be required for certain business activities
+              and often trigger automatic tax registration.
+
+              Examples:
+              - General business license
+              - Industry-specific licenses (alcohol, tobacco, gaming)
+              - Professional practice licenses
+              - Import/export licenses
+              - Environmental permits
+
+              License issuance may automatically trigger:
+              - Tax type registration (excise tax for alcohol license)
+              - Special reporting obligations
+              - Enhanced compliance monitoring
+
+              SIGTAS Source: LICENSE table
+
+            business_rule: |
+              1. License required before engaging in regulated activity
+              2. License issuance may trigger automatic tax registration
+              3. Expired licenses must be renewed or business must cease
+              4. Revoked licenses trigger compliance actions
+              5. Licenses can be suspended temporarily
+              6. Historical licenses preserved for audit
+
+            type: "master"
+
+            tags:
+              - "licensing"
+              - "compliance_trigger"
+              - "medium_volume"
+
+            estimated_rows:
+              initial: 300000
+              annual_growth: 30000
+              five_year: 450000
+
+            columns:
+              - name: "license_id"
+                display_name: "License ID"
+                type: "bigint"
+                description: "Unique identifier for business license"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "party_id"
+                display_name: "Party ID"
+                type: "bigint"
+                description: "Foreign key to party (license holder)"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_business_lic_party"
+
+              - name: "license_number"
+                display_name: "License Number"
+                type: "varchar(50)"
+                description: "Official license number issued to taxpayer"
+                constraints:
+                  unique: true
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_business_lic_number"
+                    unique: true
+
+              - name: "license_type_code"
+                display_name: "License Type"
+                type: "varchar(20)"
+                description: |
+                  Type of license:
+                  - GENERAL: General business license
+                  - ALCOHOL: Alcohol sales/production
+                  - TOBACCO: Tobacco sales/production
+                  - GAMING: Gaming/gambling operations
+                  - IMPORT_EXPORT: Import/export authorization
+                  - PROFESSIONAL: Professional practice license
+                  - ENVIRONMENTAL: Environmental permit
+                constraints:
+                  not_null: true
+                reference_data: "ref_license_type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_business_lic_type"
+
+              - name: "license_status_code"
+                display_name: "License Status"
+                type: "varchar(20)"
+                description: |
+                  Current status: PENDING, ACTIVE, SUSPENDED, EXPIRED, REVOKED, CANCELLED
+                constraints:
+                  not_null: true
+                  default: "'PENDING'"
+                reference_data: "ref_license_status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_business_lic_status"
+
+              - name: "issue_date"
+                display_name: "Issue Date"
+                type: "date"
+                description: "Date license was issued"
+                constraints:
+                  not_null: true
+
+              - name: "effective_from_date"
+                display_name: "Effective From Date"
+                type: "date"
+                description: "Date from which license is valid"
+                constraints:
+                  not_null: true
+
+              - name: "effective_to_date"
+                display_name: "Effective To Date"
+                type: "date"
+                description: "Date until which license is valid"
+                constraints:
+                  not_null: true
+
+              - name: "renewal_date"
+                display_name: "Renewal Date"
+                type: "date"
+                description: "Date when license must be renewed"
+
+              - name: "establishment_id"
+                display_name: "Establishment ID"
+                type: "bigint"
+                description: |
+                  Foreign key to establishment if license is for specific
+                  business location (rather than the legal entity overall).
+                constraints:
+                  foreign_key:
+                    referenced_table: "establishment"
+                    referenced_column: "establishment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Business Location"
+
+              - name: "licensed_activity_code"
+                display_name: "Licensed Activity"
+                type: "varchar(20)"
+                description: |
+                  Specific activity authorized by this license.
+                  Links to industry classification codes.
+                reference_data: "ref_business_activity"
+
+              - name: "license_fee_amount"
+                display_name: "License Fee"
+                type: "decimal(19,2)"
+                description: "Fee charged for license issuance or renewal"
+                business_name: "Fee Amount"
+
+              - name: "fee_currency_code"
+                display_name: "Fee Currency"
+                type: "char(3)"
+                description: "ISO 4217 currency code for license fee"
+                constraints:
+                  default: "'MDL'"
+                reference_data: "ref_currency"
+
+              - name: "fee_paid_date"
+                display_name: "Fee Paid Date"
+                type: "date"
+                description: "Date when license fee was paid"
+
+              - name: "triggers_tax_type_codes"
+                display_name: "Triggers Tax Types"
+                type: "varchar(200)"
+                description: |
+                  Comma-separated list of tax type codes that should be
+                  automatically registered when this license is issued.
+                  Example: "EXCISE_ALCOHOL,VAT"
+                usage_note: "Processed by automated registration rules"
+
+              - name: "suspension_date"
+                display_name: "Suspension Date"
+                type: "date"
+                description: "Date license was suspended"
+
+              - name: "suspension_reason"
+                display_name: "Suspension Reason"
+                type: "text"
+                description: "Reason for suspending license"
+
+              - name: "revocation_date"
+                display_name: "Revocation Date"
+                type: "date"
+                description: "Date license was revoked"
+
+              - name: "revocation_reason"
+                display_name: "Revocation Reason"
+                type: "text"
+                description: "Reason for revoking license"
+
+              - name: "application_date"
+                display_name: "Application Date"
+                type: "date"
+                description: "Date when license was applied for"
+
+              - name: "approved_by"
+                display_name: "Approved By"
+                type: "varchar(100)"
+                description: "Officer who approved the license"
+
+              - name: "approval_date"
+                display_name: "Approval Date"
+                type: "date"
+                description: "Date license was approved"
+
+              - name: "notes"
+                display_name: "Notes"
+                type: "text"
+                description: "Additional notes about the license"
+
+              # Temporal columns
+              - name: "valid_from"
+                display_name: "Valid From"
+                type: "date"
+                description: "Date from which this record version is valid"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                display_name: "Valid To"
+                type: "date"
+                description: "Date until which this record version is valid"
+
+              - name: "is_current"
+                display_name: "Is Current Version"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                constraints:
+                  not_null: true
+                  default: true
+
+              # Audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_business_lic_expiry"
+                columns: ["effective_to_date", "license_status_code"]
+                type: "btree"
+                where: "license_status_code = 'ACTIVE'"
+                description: "Support renewal monitoring"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "party"
+                source_column: "party_id"
+                target_column: "party_id"
+                cardinality: "N:1"
+                description: "One party can hold multiple licenses"
+
+              - type: "many_to_one"
+                target_table: "establishment"
+                source_column: "establishment_id"
+                target_column: "establishment_id"
+                cardinality: "N:1"
+                description: "License may be for specific establishment"
+
+          # =================================================================
+          # TAXABLE OBJECTS
+          # =================================================================
+
+          # -----------------------------------------------------------------
+          # Taxable Object
+          # -----------------------------------------------------------------
+          - name: "taxable_object"
+            display_name: "Taxable Object"
+            description: |
+              Represents physical objects or assets that are subject to taxation.
+              Examples include real estate (property tax), motor vehicles (vehicle
+              tax), and business equipment.
+
+              Taxable objects link taxpayers to specific items being taxed, and
+              often trigger automatic tax registration and assessment.
+
+              Each object has:
+              - Owner (party)
+              - Object type (property, vehicle, equipment)
+              - Valuation for tax purposes
+              - Tax accounts linking object to applicable taxes
+
+              SIGTAS Source: TAXABLE_OBJECT, PROPERTY, MOTOR_VEHICLE tables
+
+            business_rule: |
+              1. Object ownership can change (new owner inherits tax liability)
+              2. Object can be subject to multiple taxes
+              3. Valuation must be updated periodically
+              4. Registration of object triggers tax account creation
+              5. Disposal of object triggers deregistration
+              6. Historical ownership preserved for audit
+
+            type: "master"
+
+            tags:
+              - "property_tax"
+              - "vehicle_tax"
+              - "asset_taxation"
+              - "medium_volume"
+
+            estimated_rows:
+              initial: 2000000
+              annual_growth: 100000
+              five_year: 2500000
+
+            columns:
+              - name: "taxable_object_id"
+                display_name: "Taxable Object ID"
+                type: "bigint"
+                description: "Unique identifier for taxable object"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "object_type_code"
+                display_name: "Object Type"
+                type: "varchar(20)"
+                description: |
+                  Type of taxable object:
+                  - REAL_ESTATE: Land and buildings
+                  - VEHICLE: Motor vehicles
+                  - EQUIPMENT: Business equipment
+                  - INVENTORY: Business inventory
+                  - OTHER: Other taxable assets
+                constraints:
+                  not_null: true
+                reference_data: "ref_taxable_object_type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_taxable_obj_type"
+
+              - name: "object_number"
+                display_name: "Object Number"
+                type: "varchar(100)"
+                description: |
+                  Official identification number for the object.
+                  For property: cadastral number
+                  For vehicles: VIN or registration number
+                constraints:
+                  not_null: true
+                usage_note: "Format depends on object type"
+                examples:
+                  - "CAD-12345678" # Property cadastral number
+                  - "VIN-ABCD1234567890" # Vehicle VIN
+                indexing:
+                  - type: "btree"
+                    name: "idx_taxable_obj_number"
+
+              - name: "owner_party_id"
+                display_name: "Owner Party ID"
+                type: "bigint"
+                description: "Current owner of the object"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_taxable_obj_owner"
+
+              - name: "ownership_start_date"
+                display_name: "Ownership Start Date"
+                type: "date"
+                description: "Date current owner acquired the object"
+                constraints:
+                  not_null: true
+
+              - name: "ownership_end_date"
+                display_name: "Ownership End Date"
+                type: "date"
+                description: "Date ownership ended (for historical records)"
+
+              - name: "object_description"
+                display_name: "Description"
+                type: "text"
+                description: "Detailed description of the object"
+                business_name: "Object Description"
+
+              - name: "location_address_id"
+                display_name: "Location Address"
+                type: "bigint"
+                description: |
+                  Physical location of the object (for property and equipment).
+                  Foreign key to address table.
+                constraints:
+                  foreign_key:
+                    referenced_table: "address"
+                    referenced_column: "address_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Address"
+
+              - name: "assessed_value"
+                display_name: "Assessed Value"
+                type: "decimal(19,2)"
+                description: |
+                  Official assessed value for tax purposes. Used as base
+                  for calculating property tax, vehicle tax, etc.
+                business_name: "Tax Value"
+
+              - name: "assessed_value_currency"
+                display_name: "Value Currency"
+                type: "char(3)"
+                description: "ISO 4217 currency code for assessed value"
+                constraints:
+                  default: "'MDL'"
+                reference_data: "ref_currency"
+
+              - name: "assessment_date"
+                display_name: "Assessment Date"
+                type: "date"
+                description: "Date when value was assessed"
+
+              - name: "next_assessment_date"
+                display_name: "Next Assessment Date"
+                type: "date"
+                description: "Date when value should be reassessed"
+
+              - name: "market_value"
+                display_name: "Market Value"
+                type: "decimal(19,2)"
+                description: |
+                  Current market value (may differ from assessed value).
+                  Used for comparison and quality assurance.
+
+              - name: "acquisition_date"
+                display_name: "Acquisition Date"
+                type: "date"
+                description: "Date object was originally acquired/built/purchased"
+
+              - name: "acquisition_cost"
+                display_name: "Acquisition Cost"
+                type: "decimal(19,2)"
+                description: "Original cost of acquisition"
+
+              - name: "object_status_code"
+                display_name: "Object Status"
+                type: "varchar(20)"
+                description: |
+                  Current status: ACTIVE, INACTIVE, DISPOSED, DESTROYED
+                constraints:
+                  not_null: true
+                  default: "'ACTIVE'"
+                reference_data: "ref_object_status"
+
+              - name: "disposal_date"
+                display_name: "Disposal Date"
+                type: "date"
+                description: "Date object was disposed of or destroyed"
+
+              - name: "disposal_reason"
+                display_name: "Disposal Reason"
+                type: "text"
+                description: "Reason for disposal"
+
+              # Object-specific attributes (polymorphic)
+              - name: "property_type_code"
+                display_name: "Property Type"
+                type: "varchar(20)"
+                description: |
+                  For REAL_ESTATE objects: type of property
+                  (RESIDENTIAL, COMMERCIAL, INDUSTRIAL, AGRICULTURAL, LAND)
+                reference_data: "ref_property_type"
+                usage_note: "Populated only for REAL_ESTATE object_type_code"
+
+              - name: "property_area_sqm"
+                display_name: "Property Area (mÂ²)"
+                type: "decimal(10,2)"
+                description: "Area in square meters (for real estate)"
+                business_name: "Area"
+
+              - name: "vehicle_make"
+                display_name: "Vehicle Make"
+                type: "varchar(100)"
+                description: "Manufacturer of vehicle (for VEHICLE objects)"
+                usage_note: "Populated only for VEHICLE object_type_code"
+
+              - name: "vehicle_model"
+                display_name: "Vehicle Model"
+                type: "varchar(100)"
+                description: "Model of vehicle"
+
+              - name: "vehicle_year"
+                display_name: "Vehicle Year"
+                type: "integer"
+                description: "Year of manufacture"
+
+              - name: "vehicle_vin"
+                display_name: "Vehicle VIN"
+                type: "varchar(17)"
+                description: "Vehicle Identification Number"
+
+              - name: "vehicle_registration_number"
+                display_name: "Registration Number"
+                type: "varchar(20)"
+                description: "Official vehicle registration/license plate number"
+
+              - name: "vehicle_engine_capacity_cc"
+                display_name: "Engine Capacity (cc)"
+                type: "integer"
+                description: "Engine displacement in cubic centimeters"
+
+              - name: "notes"
+                display_name: "Notes"
+                type: "text"
+                description: "Additional notes about the object"
+
+              # Temporal columns
+              - name: "valid_from"
+                display_name: "Valid From"
+                type: "date"
+                description: "Date from which this record version is valid"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_DATE"
+
+              - name: "valid_to"
+                display_name: "Valid To"
+                type: "date"
+                description: "Date until which this record version is valid"
+
+              - name: "is_current"
+                display_name: "Is Current Version"
+                type: "boolean"
+                description: "Flag indicating if this is the current version"
+                constraints:
+                  not_null: true
+                  default: true
+
+              # Audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_taxable_obj_owner_type"
+                columns: ["owner_party_id", "object_type_code"]
+                type: "btree"
+                description: "Support queries by owner and type"
+
+              - name: "idx_taxable_obj_status"
+                columns: ["object_status_code"]
+                type: "btree"
+                where: "object_status_code = 'ACTIVE'"
+                description: "Quick lookup of active objects"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "party"
+                source_column: "owner_party_id"
+                target_column: "party_id"
+                cardinality: "N:1"
+                description: "One owner can have multiple taxable objects"
+
+              - type: "one_to_many"
+                target_table: "tax_account_object"
+                source_column: "taxable_object_id"
+                target_column: "taxable_object_id"
+                cardinality: "1:N"
+                description: "Object can be linked to multiple tax accounts"
+
+          # -----------------------------------------------------------------
+          # Tax Account Object
+          # -----------------------------------------------------------------
+          - name: "tax_account_object"
+            display_name: "Tax Account Object"
+            description: |
+              Junction table linking tax accounts to taxable objects.
+              Some taxes (property tax, vehicle tax) are assessed on specific
+              objects rather than on general business activity.
+
+              This table creates the association: which tax account is responsible
+              for which object.
+
+              SIGTAS Source: TAX_ACCT_OBJ_LIC_ESTAB relationships
+
+            business_rule: |
+              1. One object can be linked to multiple tax accounts (different taxes)
+              2. One tax account can cover multiple objects
+              3. Link must be valid for the period object is owned
+              4. Link automatically created when object registered
+              5. Link inactivated when object disposed
+
+            type: "transaction"
+
+            columns:
+              - name: "tax_account_object_id"
+                display_name: "Account-Object ID"
+                type: "bigint"
+                description: "Unique identifier for association"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account ID"
+                type: "bigint"
+                description: "Foreign key to tax account"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_acct_obj_account"
+
+              - name: "taxable_object_id"
+                display_name: "Taxable Object ID"
+                type: "bigint"
+                description: "Foreign key to taxable object"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "taxable_object"
+                    referenced_column: "taxable_object_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_acct_obj_object"
+
+              - name: "effective_from_date"
+                display_name: "Effective From"
+                type: "date"
+                description: "Date from which object is taxed under this account"
+                constraints:
+                  not_null: true
+
+              - name: "effective_to_date"
+                display_name: "Effective To"
+                type: "date"
+                description: "Date until which object is taxed under this account"
+
+              - name: "is_primary"
+                display_name: "Is Primary Account"
+                type: "boolean"
+                description: |
+                  Flag indicating if this is the primary tax account for the
+                  object (useful when object subject to multiple taxes).
+                constraints:
+                  not_null: true
+                  default: true
+
+              # Audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "uk_tax_acct_obj"
+                columns: ["tax_account_id", "taxable_object_id", "effective_from_date"]
+                type: "btree"
+                unique: true
+                description: "Ensure one association per account-object-period"
+
+          # =================================================================
+          # SEGMENTATION AND COMPLIANCE
+          # =================================================================
+
+          # -----------------------------------------------------------------
+          # Taxpayer Segment Assignment
+          # -----------------------------------------------------------------
+          - name: "taxpayer_segment_assignment"
+            display_name: "Taxpayer Segment Assignment"
+            description: |
+              Tracks taxpayer segmentation over time. Segmentation determines
+              service level, compliance approach, and resource allocation.
+
+              Segments typically include:
+              - Large taxpayers (dedicated service, key account management)
+              - Medium taxpayers (standard service)
+              - Small taxpayers (self-service, automation)
+              - High-risk taxpayers (enhanced monitoring)
+              - Special segments (exporters, government entities, etc.)
+
+              Segmentation can change based on:
+              - Annual turnover changes
+              - Risk profile changes
+              - Compliance behavior
+              - Strategic importance
+
+              SIGTAS Source: Derived from TAX_ACCOUNT segmentation fields
+
+            business_rule: |
+              1. Segmentation reviewed at least annually
+              2. Can be per taxpayer (all taxes) or per tax account
+              3. Segment change requires approval
+              4. Historical segments preserved for analysis
+              5. Large taxpayer status triggers enhanced services
+              6. High-risk status triggers enhanced monitoring
+
+            type: "master"
+
+            columns:
+              - name: "segment_assignment_id"
+                display_name: "Assignment ID"
+                type: "bigint"
+                description: "Unique identifier for segment assignment"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "party_id"
+                display_name: "Party ID"
+                type: "bigint"
+                description: "Taxpayer being segmented"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_segment_assign_party"
+
+              - name: "tax_type_code"
+                display_name: "Tax Type"
+                type: "varchar(20)"
+                description: |
+                  Specific tax type if segmentation is tax-specific.
+                  NULL means applies to all tax types.
+                constraints:
+                  foreign_key:
+                    referenced_table: "tax_type"
+                    referenced_column: "tax_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                usage_note: "NULL for general segmentation"
+
+              - name: "segment_code"
+                display_name: "Segment Code"
+                type: "varchar(20)"
+                description: |
+                  Segment classification:
+                  LARGE, MEDIUM, SMALL, HIGH_RISK, VIP, etc.
+                constraints:
+                  not_null: true
+                reference_data: "ref_taxpayer_segment"
+
+              - name: "segment_criteria"
+                display_name: "Criteria Met"
+                type: "text"
+                description: |
+                  Description of criteria that qualified taxpayer for segment.
+                  Example: "Annual turnover > $10M for 2 consecutive years"
+
+              - name: "effective_from_date"
+                display_name: "Effective From"
+                type: "date"
+                description: "Date from which segmentation is effective"
+                constraints:
+                  not_null: true
+
+              - name: "effective_to_date"
+                display_name: "Effective To"
+                type: "date"
+                description: "Date until which segmentation is effective"
+
+              - name: "assigned_by"
+                display_name: "Assigned By"
+                type: "varchar(100)"
+                description: "Officer who made the segmentation decision"
+                constraints:
+                  not_null: true
+
+              - name: "assignment_date"
+                display_name: "Assignment Date"
+                type: "date"
+                description: "Date when segmentation was decided"
+                constraints:
+                  not_null: true
+
+              - name: "assignment_reason"
+                display_name: "Assignment Reason"
+                type: "text"
+                description: "Explanation for segment assignment"
+
+              - name: "review_date"
+                display_name: "Review Date"
+                type: "date"
+                description: "Date when segment should be reviewed next"
+
+              # Audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_segment_assign_current"
+                columns: ["party_id", "segment_code"]
+                type: "btree"
+                where: "effective_to_date IS NULL"
+                description: "Quick lookup of current segment"
+
+          # -----------------------------------------------------------------
+          # Registration Compliance Case
+          # -----------------------------------------------------------------
+          - name: "registration_compliance_case"
+            display_name: "Registration Compliance Case"
+            description: |
+              Tracks cases where tax authority monitors or enforces taxpayer
+              registration compliance. Created when:
+              - Non-registered taxpayer detected performing taxable activity
+              - Registered taxpayer should register for additional tax type
+              - Registration data appears incorrect or fraudulent
+              - Third-party data indicates registration gaps
+
+              Cases progress through workflow:
+              DETECTED â†’ UNDER_REVIEW â†’ CONTACTED â†’ RESOLVED/ENFORCED
+
+              SIGTAS Source: Implicit in tax capabilities, new table for TA-RDM
+
+            business_rule: |
+              1. Case created automatically or manually
+              2. Officer assigned based on workload rules
+              3. Taxpayer contacted via defined communication channels
+              4. Resolution tracked (voluntary, enforced, dismissed)
+              5. Enforced registration creates tax account
+              6. Historical cases preserved for analysis
+
+            type: "transaction"
+
+            columns:
+              - name: "compliance_case_id"
+                display_name: "Compliance Case ID"
+                type: "bigint"
+                description: "Unique identifier for compliance case"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "case_number"
+                display_name: "Case Number"
+                type: "varchar(50)"
+                description: "Human-readable case reference number"
+                constraints:
+                  unique: true
+                  not_null: true
+
+              - name: "party_id"
+                display_name: "Party ID"
+                type: "bigint"
+                description: "Taxpayer under review"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "party"
+                    referenced_column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_reg_comp_party"
+
+              - name: "case_type_code"
+                display_name: "Case Type"
+                type: "varchar(20)"
+                description: |
+                  Type of compliance issue:
+                  NOT_REGISTERED, MISSING_TAX_TYPE, INCORRECT_DATA,
+                  FRAUDULENT_REGISTRATION, THRESHOLD_BREACH
+                constraints:
+                  not_null: true
+                reference_data: "ref_compliance_case_type"
+
+              - name: "tax_type_code"
+                display_name: "Tax Type"
+                type: "varchar(20)"
+                description: "Tax type involved in the case"
+                reference_data: "tax_type"
+
+              - name: "case_status_code"
+                display_name: "Case Status"
+                type: "varchar(20)"
+                description: |
+                  Current status: DETECTED, UNDER_REVIEW, CONTACTED,
+                  RESOLVED, ENFORCED, DISMISSED
+                constraints:
+                  not_null: true
+                  default: "'DETECTED'"
+                reference_data: "ref_case_status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_reg_comp_status"
+
+              - name: "detection_date"
+                display_name: "Detection Date"
+                type: "date"
+                description: "Date when non-compliance was detected"
+                constraints:
+                  not_null: true
+
+              - name: "detection_method_code"
+                display_name: "Detection Method"
+                type: "varchar(20)"
+                description: |
+                  How was non-compliance detected:
+                  THIRD_PARTY_DATA, AUDIT_FINDING, TAXPAYER_REPORT,
+                  DATA_MATCHING, OFFICER_OBSERVATION
+                reference_data: "ref_detection_method"
+
+              - name: "detection_source"
+                display_name: "Detection Source"
+                type: "text"
+                description: "Details of how case was detected"
+
+              - name: "assigned_officer_id"
+                display_name: "Assigned Officer"
+                type: "bigint"
+                description: "Officer responsible for investigating case"
+                reference_data: "ref_employee"
+
+              - name: "assignment_date"
+                display_name: "Assignment Date"
+                type: "date"
+                description: "Date case was assigned to officer"
+
+              - name: "priority_code"
+                display_name: "Priority"
+                type: "varchar(20)"
+                description: "Case priority: LOW, MEDIUM, HIGH, URGENT"
+                constraints:
+                  not_null: true
+                  default: "'MEDIUM'"
+                reference_data: "ref_case_priority"
+
+              - name: "estimated_tax_exposure"
+                display_name: "Estimated Tax Exposure"
+                type: "decimal(19,2)"
+                description: |
+                  Estimated amount of tax at risk due to non-registration.
+                  Used for prioritization.
+                business_name: "Tax at Risk"
+
+              - name: "contact_date"
+                display_name: "Contact Date"
+                type: "date"
+                description: "Date taxpayer was first contacted about case"
+
+              - name: "taxpayer_response_date"
+                display_name: "Taxpayer Response Date"
+                type: "date"
+                description: "Date taxpayer responded"
+
+              - name: "taxpayer_response"
+                display_name: "Taxpayer Response"
+                type: "text"
+                description: "Summary of taxpayer's response"
+
+              - name: "resolution_date"
+                display_name: "Resolution Date"
+                type: "date"
+                description: "Date case was resolved"
+
+              - name: "resolution_code"
+                display_name: "Resolution"
+                type: "varchar(20)"
+                description: |
+                  How case was resolved:
+                  VOLUNTARY_REGISTRATION, ENFORCED_REGISTRATION,
+                  NOT_REQUIRED, DISMISSED, ONGOING
+                reference_data: "ref_case_resolution"
+
+              - name: "resolution_notes"
+                display_name: "Resolution Notes"
+                type: "text"
+                description: "Detailed notes on case resolution"
+
+              - name: "tax_account_created_id"
+                display_name: "Tax Account Created"
+                type: "bigint"
+                description: |
+                  If case resulted in tax registration, reference to the
+                  tax account created.
+                constraints:
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "SET NULL"
+                    on_update: "CASCADE"
+
+              # Audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "Username of person who created this record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "Username of person who last modified"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+
+            indexes:
+              - name: "idx_reg_comp_open_cases"
+                columns: ["case_status_code", "priority_code"]
+                type: "btree"
+                where: "case_status_code NOT IN ('RESOLVED', 'DISMISSED')"
+                description: "Support workload management"
+
+# =============================================================================
+# BUSINESS RULES
+# =============================================================================
+
+business_rules:
+  - id: "BR-RG-001"
+    domain: "registration"
+    name: "Unique Tax Account per Party-Tax Type"
+    description: |
+      Each party can have only one active (is_current=true) tax account for
+      each tax type at any point in time. Historical versions maintained
+      with temporal columns.
+    severity: "CRITICAL"
+    affected_entities:
+      - "tax_account"
+    validation_query: |
+      SELECT party_id, tax_type_code, COUNT(*)
+      FROM tax_account
+      WHERE is_current = true
+      GROUP BY party_id, tax_type_code
+      HAVING COUNT(*) > 1
+    enforcement: "database"
+    constraint_name: "uk_tax_account_party_tax_type"
+
+  - id: "BR-RG-002"
+    domain: "registration"
+    name: "Deregistration Requires Zero Balance"
+    description: |
+      Tax account cannot be deregistered (status changed to DEREGISTERED)
+      if there are any unpaid liabilities or unused credits across all
+      tax periods. Balance must be zero.
+    severity: "CRITICAL"
+    affected_entities:
+      - "tax_account"
+      - "tax_account_period"
+    validation_query: |
+      SELECT ta.tax_account_id, ta.party_id, ta.tax_type_code
+      FROM tax_account ta
+      WHERE ta.account_status_code = 'DEREGISTERED'
+      AND EXISTS (
+        SELECT 1 FROM account_balance ab
+        WHERE ab.tax_account_id = ta.tax_account_id
+        AND ab.balance_amount != 0
+      )
+    enforcement: "application"
+    automated_check: true
+
+  - id: "BR-RG-003"
+    domain: "registration"
+    name: "VAT Registration Threshold Check"
+    description: |
+      Mandatory VAT registration required when taxpayer's annual turnover
+      exceeds the threshold defined in tax_type configuration. Voluntary
+      registration allowed below threshold.
+    severity: "HIGH"
+    affected_entities:
+      - "tax_account"
+      - "vat_registration"
+    validation_query: |
+      SELECT ta.party_id, ta.annual_turnover, vr.threshold_amount
+      FROM tax_account ta
+      JOIN vat_registration vr ON ta.tax_account_id = vr.tax_account_id
+      WHERE ta.tax_type_code = 'VAT'
+      AND ta.annual_turnover > vr.threshold_amount
+      AND vr.registration_type_code = 'VOLUNTARY'
+    enforcement: "application"
+    automated_check: true
+
+  - id: "BR-RG-004"
+    domain: "registration"
+    name: "License Issuance Triggers Tax Registration"
+    description: |
+      When a business license is issued that requires specific tax
+      registration (e.g., alcohol license requires excise tax), the
+      system must automatically create the corresponding tax account.
+    severity: "HIGH"
+    affected_entities:
+      - "business_license"
+      - "tax_account"
+    validation_query: |
+      SELECT bl.license_id, bl.party_id, bl.triggers_tax_type_codes
+      FROM business_license bl
+      WHERE bl.license_status_code = 'ACTIVE'
+      AND bl.triggers_tax_type_codes IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM tax_account ta
+        WHERE ta.party_id = bl.party_id
+        AND ta.tax_type_code = ANY(string_to_array(bl.triggers_tax_type_codes, ','))
+      )
+    enforcement: "application"
+    automated_action: true
+
+  - id: "BR-RG-005"
+    domain: "registration"
+    name: "Account Period Auto-Creation"
+    description: |
+      When a new tax period is opened for a tax type, the system must
+      automatically create tax_account_period records for all active
+      accounts of that tax type, based on their filing frequency.
+    severity: "CRITICAL"
+    affected_entities:
+      - "tax_account_period"
+      - "tax_period"
+    enforcement: "application"
+    automated_action: true
+
+  - id: "BR-RG-006"
+    domain: "registration"
+    name: "Exporter Status Validation"
+    description: |
+      Exporter status (is_exporter=true) can only be granted if export
+      percentage exceeds configured threshold (typically 50%).
+    severity: "MEDIUM"
+    affected_entities:
+      - "tax_account"
+      - "vat_registration"
+    validation_query: |
+      SELECT tax_account_id, export_percentage
+      FROM tax_account
+      WHERE is_exporter = true
+      AND (export_percentage IS NULL OR export_percentage < 50)
+    enforcement: "application"
+
+  - id: "BR-RG-007"
+    domain: "registration"
+    name: "Group Filing Head Validation"
+    description: |
+      If tax account has group_head_account_id populated, the referenced
+      group head account must have is_group_filing=true and be of the
+      same tax type.
+    severity: "HIGH"
+    affected_entities:
+      - "tax_account"
+    validation_query: |
+      SELECT ta1.tax_account_id
+      FROM tax_account ta1
+      JOIN tax_account ta2 ON ta1.group_head_account_id = ta2.tax_account_id
+      WHERE ta1.group_head_account_id IS NOT NULL
+      AND (ta2.is_group_filing = false OR ta1.tax_type_code != ta2.tax_type_code)
+    enforcement: "database"
+
+  - id: "BR-RG-008"
+    domain: "registration"
+    name: "Registration Date Cannot Be Future"
+    description: |
+      Tax account registration_date and effective_from_date cannot be
+      more than 1 year in the future. Backdating limited to 1 year.
+    severity: "MEDIUM"
+    affected_entities:
+      - "tax_account"
+    validation_query: |
+      SELECT tax_account_id, registration_date, effective_from_date
+      FROM tax_account
+      WHERE registration_date > CURRENT_DATE + INTERVAL '1 year'
+      OR effective_from_date > CURRENT_DATE + INTERVAL '1 year'
+      OR registration_date < CURRENT_DATE - INTERVAL '1 year'
+    enforcement: "database"
+
+  - id: "BR-RG-009"
+    domain: "registration"
+    name: "Taxable Object Ownership Continuity"
+    description: |
+      For each taxable object, ownership periods must be continuous
+      with no gaps or overlaps. New ownership starts when previous ends.
+    severity: "HIGH"
+    affected_entities:
+      - "taxable_object"
+    validation_query: |
+      SELECT t1.taxable_object_id
+      FROM taxable_object t1
+      JOIN taxable_object t2 ON t1.object_number = t2.object_number
+      WHERE t1.valid_to IS NOT NULL
+      AND t2.valid_from IS NOT NULL
+      AND t1.valid_to != t2.valid_from - INTERVAL '1 day'
+    enforcement: "application"
+
+  - id: "BR-RG-010"
+    domain: "registration"
+    name: "Compliance Case Assignment"
+    description: |
+      High-priority registration compliance cases must be assigned to
+      an officer within 2 business days of detection. Medium priority
+      within 5 days.
+    severity: "MEDIUM"
+    affected_entities:
+      - "registration_compliance_case"
+    validation_query: |
+      SELECT compliance_case_id, detection_date, priority_code
+      FROM registration_compliance_case
+      WHERE assigned_officer_id IS NULL
+      AND case_status_code = 'DETECTED'
+      AND (
+        (priority_code = 'HIGH' AND detection_date < CURRENT_DATE - 2)
+        OR (priority_code = 'MEDIUM' AND detection_date < CURRENT_DATE - 5)
+      )
+    enforcement: "application"
+    automated_alert: true
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+summary: |
+  Registration Domain - COMPLETE
+
+  This domain implements the TTT (TIN-Tax Type-Tax Period) principle and
+  provides comprehensive registration management capabilities.
+
+  Core Components:
+  âœ“ Tax Account (TTT core) - 35 attributes
+  âœ“ Tax Account Period - Period-level tracking
+  âœ“ VAT Registration - VAT-specific attributes
+  âœ“ VAT Certificate - Certificate management
+  âœ“ Business License - License tracking
+  âœ“ Taxable Object - Property and vehicle taxation
+  âœ“ Tax Account Object - Object-account linkage
+  âœ“ Taxpayer Segmentation - Service level management
+  âœ“ Registration Compliance - Enforcement tracking
+
+  Total Tables: 9
+  Total Columns: ~260
+  Total Business Rules: 10
+  Total Relationships: 15+
+
+  Key Features:
+  - Complete TTT implementation
+  - Temporal tracking for all master data
+  - Comprehensive audit trails
+  - Automated workflows and triggers
+  - Risk-based segmentation
+  - VAT group filing support
+  - License-triggered registration
+  - Compliance case management
+  - Status transition workflows
+  - Integration with party and tax framework domains
+
+  Ready for:
+  - Filing & Assessment domain (uses tax_account_period)
+  - Accounting domain (uses tax_account)
+  - Payment & Refund domain (uses tax_account)
+  - Compliance & Control domain (uses compliance cases)
+
+  All tables follow TA-RDM standards:
+  âœ“ Snake_case naming
+  âœ“ Comprehensive descriptions
+  âœ“ All constraints defined
+  âœ“ Indexes optimized
+  âœ“ Temporal columns where applicable
+  âœ“ Audit columns on all tables
+  âœ“ Security classifications
+  âœ“ Business rules documented
+  âœ“ Relationships mapped
+  âœ“ SIGTAS sources traced

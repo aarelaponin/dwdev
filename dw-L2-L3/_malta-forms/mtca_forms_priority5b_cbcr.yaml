@@ -1,0 +1,2292 @@
+# ============================================================================
+# MTCA Forms - Priority 5B: Country-by-Country Reporting (CbCR)
+# Forms: CbCR Report, CbC Notification, Master File, Local File
+# Version: 1.0
+# Date: 2025-12-08
+# Purpose: ORS Database Schema Design and BEPS Action 13 Compliance
+# Standard: OECD XSD v2.0 for CbCR
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # CbCR Report: Country-by-Country Report (BEPS Action 13 / DAC4)
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "CBCR_REPORT"
+        form_name_en: "Country-by-Country Report"
+        form_name_mt: "Rapport PajjiÅ¼ b'PajjiÅ¼"
+        version: "2024"
+        effective_from: "2016-01-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive 2016/881/EU (DAC4)"
+        subsidiary_legislation:
+          - "S.L.123.127 - Cooperation with Other Jurisdictions on Tax Matters Regulations"
+          - "LN 216/2016 - CbCR Implementation Rules"
+        administering_authority: "CFR"
+        tax_type: "Exchange of Information"
+        taxpayer_category: "MNE Group (Ultimate Parent Entity / Surrogate Parent Entity / Constituent Entity)"
+        filing_frequency: "Annual"
+        filing_deadline: "12 months after MNE fiscal year end"
+        submission_method: "Mandatory XML"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: "urn:oecd:ties:cbc:v2"
+        schema_version: "2.0"
+        exchange_partner: "OECD/EU Member States"
+        source_url: "https://cfr.gov.mt/en/eoi/Pages/CbCR.aspx"
+        applicability_threshold: "Consolidated group revenue â‰¥â‚¬750 million"
+        notes: |
+          Country-by-Country Reporting per BEPS Action 13 and DAC4. Applicable 
+          to MNE groups with consolidated revenue â‰¥â‚¬750 million. Filed by UPE 
+          in Malta, or SPE designated in Malta, or CE with local filing obligation.
+          Three tables: Allocation of Income, List of Entities, Additional Info.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Message Header
+        # ----------------------------------------------------------------------
+        - section_id: "CBC_MESSAGE_HEADER"
+          section_name: "CbC Message Header"
+          section_description: "CbCR XML message identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "cbc:CBC_OECD/cbc:MessageSpec"
+          fields:
+            - field_id: "cbc_sending_entity"
+              field_code: "SendingEntityIN"
+              field_name_en: "Sending Entity Identification"
+              field_name_mt: "Identifikazzjoni tal-EntitÃ  li TibgÄ§at"
+              field_description: "TIN of the sending competent authority or entity"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:SendingEntityIN"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "SendingEntityIN"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_messages"
+                column: "sending_entity"
+              ors_mapping:
+                table: "mtca_ors.cbcr_messages"
+                column: "sending_entity"
+                data_type: "String"
+
+            - field_id: "cbc_transmitting_country"
+              field_code: "TransmittingCountry"
+              field_name_en: "Transmitting Country"
+              field_name_mt: "PajjiÅ¼ li JibgÄ§at"
+              field_description: "ISO country code of transmitting jurisdiction"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:TransmittingCountry"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "TransmittingCountry"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_messages"
+                column: "transmitting_country"
+              ors_mapping:
+                table: "mtca_ors.cbcr_messages"
+                column: "transmitting_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "cbc_receiving_country"
+              field_code: "ReceivingCountry"
+              field_name_en: "Receiving Country"
+              field_name_mt: "PajjiÅ¼ li JirÄ‹ievi"
+              field_description: "ISO country code of receiving jurisdiction"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ReceivingCountry"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "cbcr_partner_jurisdictions"
+              oecd_element_ref: "ReceivingCountry"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_messages"
+                column: "receiving_country"
+              ors_mapping:
+                table: "mtca_ors.cbcr_messages"
+                column: "receiving_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "cbc_message_type"
+              field_code: "MessageType"
+              field_name_en: "Message Type"
+              field_name_mt: "Tip ta' MessaÄ¡Ä¡"
+              field_description: "Type of CbCR message"
+              data_type: "CODE"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "CBC"
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:MessageType"
+              validation_rules: []
+              allowed_values:
+                - code: "CBC"
+                  description_en: "Country-by-Country Report"
+              reference_table: null
+              oecd_element_ref: "MessageType"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_messages"
+                column: "message_type"
+              ors_mapping:
+                table: "mtca_ors.cbcr_messages"
+                column: "message_type"
+                data_type: "String"
+
+            - field_id: "cbc_message_ref_id"
+              field_code: "MessageRefId"
+              field_name_en: "Message Reference ID"
+              field_name_mt: "ID ta' Referenza tal-MessaÄ¡Ä¡"
+              field_description: "Unique message identifier"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:MessageRefId"
+              validation_rules:
+                - rule_id: "CBC_001"
+                  rule_type: "uniqueness"
+                  rule_description: "Must be globally unique"
+                  rule_expression: "UNIQUE(message_ref_id)"
+                  error_message_en: "Duplicate message reference ID"
+                  error_message_mt: "ID ta' referenza duplikat"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "MessageRefId"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_messages"
+                column: "message_ref_id"
+              ors_mapping:
+                table: "mtca_ors.cbcr_messages"
+                column: "message_ref_id"
+                data_type: "String"
+
+            - field_id: "cbc_message_type_indic"
+              field_code: "MessageTypeIndic"
+              field_name_en: "Message Type Indicator"
+              field_name_mt: "Indikatur tat-Tip ta' MessaÄ¡Ä¡"
+              field_description: "Indicates new, corrected, or no data"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:MessageTypeIndic"
+              validation_rules: []
+              allowed_values:
+                - code: "CBC401"
+                  description_en: "New information"
+                - code: "CBC402"
+                  description_en: "Corrected information"
+                - code: "CBC403"
+                  description_en: "Deletion of previously sent information"
+                - code: "CBC404"
+                  description_en: "No data to report"
+              reference_table: "cbcr_message_type_indicators"
+              oecd_element_ref: "MessageTypeIndic"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_messages"
+                column: "message_type_indic"
+              ors_mapping:
+                table: "mtca_ors.cbcr_messages"
+                column: "message_type_indic"
+                data_type: "String"
+
+            - field_id: "cbc_reporting_period"
+              field_code: "ReportingPeriod"
+              field_name_en: "Reporting Period"
+              field_name_mt: "Perjodu ta' Rappurtar"
+              field_description: "MNE fiscal year end date"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ReportingPeriod"
+              validation_rules:
+                - rule_id: "CBC_002"
+                  rule_type: "date_range"
+                  rule_description: "Must be completed fiscal year"
+                  rule_expression: "ReportingPeriod < CURRENT_DATE()"
+                  error_message_en: "Reporting period must be completed"
+                  error_message_mt: "Il-perjodu ta' rappurtar irid ikun komplut"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "ReportingPeriod"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_messages"
+                column: "reporting_period"
+              ors_mapping:
+                table: "mtca_ors.cbcr_messages"
+                column: "reporting_period"
+                data_type: "Date"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Reporting Entity Information
+        # ----------------------------------------------------------------------
+        - section_id: "REPORTING_ENTITY"
+          section_name: "Reporting Entity"
+          section_description: "Information about the entity filing the CbCR"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "cbc:CbcBody/cbc:ReportingEntity"
+          fields:
+            - field_id: "re_entity_type"
+              field_code: "Entity"
+              field_name_en: "Reporting Entity Type"
+              field_name_mt: "Tip ta' EntitÃ  li Tirrapporta"
+              field_description: "Type of reporting entity (UPE, SPE, CE)"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ReportingEntity/cbc:Entity/cbc:ReportingRole"
+              validation_rules: []
+              allowed_values:
+                - code: "CBC801"
+                  description_en: "Ultimate Parent Entity"
+                - code: "CBC802"
+                  description_en: "Surrogate Parent Entity"
+                - code: "CBC803"
+                  description_en: "Constituent Entity (local filing)"
+              reference_table: "cbcr_entity_roles"
+              oecd_element_ref: "ReportingRole"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_reporting_entity"
+                column: "entity_type"
+              ors_mapping:
+                table: "mtca_ors.cbcr_reporting_entity"
+                column: "entity_type"
+                data_type: "String"
+
+            - field_id: "re_res_country"
+              field_code: "ResCountryCode"
+              field_name_en: "Residence Country"
+              field_name_mt: "PajjiÅ¼ ta' Residenza"
+              field_description: "Country of tax residence of reporting entity"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ReportingEntity/cbc:Entity/cbc:ResCountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "ResCountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_reporting_entity"
+                column: "res_country"
+              ors_mapping:
+                table: "mtca_ors.cbcr_reporting_entity"
+                column: "res_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "re_tin"
+              field_code: "TIN"
+              field_name_en: "Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa"
+              field_description: "TIN of reporting entity"
+              data_type: "TIN"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ReportingEntity/cbc:Entity/cbc:TIN"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TIN"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_reporting_entity"
+                column: "tin"
+              ors_mapping:
+                table: "mtca_ors.cbcr_reporting_entity"
+                column: "tin"
+                data_type: "String"
+
+            - field_id: "re_name"
+              field_code: "Name"
+              field_name_en: "Entity Name"
+              field_name_mt: "Isem tal-EntitÃ "
+              field_description: "Legal name of reporting entity"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ReportingEntity/cbc:Entity/cbc:Name"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Name"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_reporting_entity"
+                column: "entity_name"
+              ors_mapping:
+                table: "mtca_ors.cbcr_reporting_entity"
+                column: "entity_name"
+                data_type: "String"
+
+            - field_id: "mne_group_name"
+              field_code: "NameMNEGroup"
+              field_name_en: "MNE Group Name"
+              field_name_mt: "Isem tal-Grupp MNE"
+              field_description: "Name of the MNE group"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ReportingEntity/cbc:NameMNEGroup"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "NameMNEGroup"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_reporting_entity"
+                column: "mne_group_name"
+              ors_mapping:
+                table: "mtca_ors.cbcr_reporting_entity"
+                column: "mne_group_name"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Table 1 - Overview of Allocation of Income
+        # ----------------------------------------------------------------------
+        - section_id: "TABLE1_ALLOCATION"
+          section_name: "Table 1 - Overview of Allocation of Income, Taxes and Business Activities"
+          section_description: "Aggregate MNE data by tax jurisdiction"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "cbc:CbcBody/cbc:CbcReports/cbc:Summary"
+          fields:
+            - field_id: "t1_tax_jurisdiction"
+              field_code: "TaxJurisdiction"
+              field_name_en: "Tax Jurisdiction"
+              field_name_mt: "Ä urisdizzjoni tat-Taxxa"
+              field_description: "Country/jurisdiction for which data is reported"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:ResCountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "ResCountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "tax_jurisdiction"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "tax_jurisdiction"
+                data_type: "FixedString(2)"
+
+            - field_id: "t1_revenues_unrelated"
+              field_code: "Revenues/Unrelated"
+              field_name_en: "Revenues - Unrelated Party"
+              field_name_mt: "DÄ§ul - Parti Mhux Relatat"
+              field_description: "Sum of revenues from unrelated parties"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 0
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:Revenues/cbc:Unrelated"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Revenues/Unrelated"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "revenues_unrelated"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "revenues_unrelated"
+                data_type: "Decimal(18,0)"
+
+            - field_id: "t1_revenues_related"
+              field_code: "Revenues/Related"
+              field_name_en: "Revenues - Related Party"
+              field_name_mt: "DÄ§ul - Parti Relatat"
+              field_description: "Sum of revenues from related parties"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 0
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:Revenues/cbc:Related"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Revenues/Related"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "revenues_related"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "revenues_related"
+                data_type: "Decimal(18,0)"
+
+            - field_id: "t1_revenues_total"
+              field_code: "Revenues/Total"
+              field_name_en: "Revenues - Total"
+              field_name_mt: "DÄ§ul - Total"
+              field_description: "Total revenues (unrelated + related)"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 0
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "revenues_unrelated + revenues_related"
+              xml_element: "cbc:Summary/cbc:Revenues/cbc:Total"
+              validation_rules:
+                - rule_id: "CBC_010"
+                  rule_type: "calculation"
+                  rule_description: "Total must equal sum of unrelated and related"
+                  rule_expression: "t1_revenues_total = t1_revenues_unrelated + t1_revenues_related"
+                  error_message_en: "Total revenues does not equal sum of components"
+                  error_message_mt: "Id-dÄ§ul totali mhux ugwali gÄ§as-somma tal-komponenti"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Revenues/Total"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "revenues_total"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "revenues_total"
+                data_type: "Decimal(18,0)"
+
+            - field_id: "t1_profit_loss"
+              field_code: "ProfitOrLoss"
+              field_name_en: "Profit (Loss) Before Income Tax"
+              field_name_mt: "Profitt (Telf) Qabel it-Taxxa fuq l-Introjtu"
+              field_description: "Aggregate profit or loss before income tax"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 0
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:ProfitOrLoss"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "ProfitOrLoss"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "profit_loss"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "profit_loss"
+                data_type: "Decimal(18,0)"
+
+            - field_id: "t1_tax_paid"
+              field_code: "TaxPaid"
+              field_name_en: "Income Tax Paid (Cash Basis)"
+              field_name_mt: "Taxxa fuq l-Introjtu ImÄ§allsa (BaÅ¼i ta' Flus)"
+              field_description: "Total income tax paid during fiscal year"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 0
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:TaxPaid"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TaxPaid"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "tax_paid"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "tax_paid"
+                data_type: "Decimal(18,0)"
+
+            - field_id: "t1_tax_accrued"
+              field_code: "TaxAccrued"
+              field_name_en: "Income Tax Accrued - Current Year"
+              field_name_mt: "Taxxa fuq l-Introjtu Akkumulata - Sena Kurrenti"
+              field_description: "Current year tax expense"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 0
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:TaxAccrued"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TaxAccrued"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "tax_accrued"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "tax_accrued"
+                data_type: "Decimal(18,0)"
+
+            - field_id: "t1_stated_capital"
+              field_code: "Capital"
+              field_name_en: "Stated Capital"
+              field_name_mt: "Kapital Dikjarat"
+              field_description: "Sum of stated capital of all resident CEs"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 0
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:Capital"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Capital"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "stated_capital"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "stated_capital"
+                data_type: "Decimal(18,0)"
+
+            - field_id: "t1_accumulated_earnings"
+              field_code: "Earnings"
+              field_name_en: "Accumulated Earnings"
+              field_name_mt: "QligÄ§ Akkumulat"
+              field_description: "Sum of accumulated earnings (retained earnings)"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 0
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:Earnings"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Earnings"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "accumulated_earnings"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "accumulated_earnings"
+                data_type: "Decimal(18,0)"
+
+            - field_id: "t1_nb_employees"
+              field_code: "NbEmployees"
+              field_name_en: "Number of Employees"
+              field_name_mt: "Numru ta' Impjegati"
+              field_description: "Total number of full-time equivalent employees"
+              data_type: "INTEGER"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:NbEmployees"
+              validation_rules:
+                - rule_id: "CBC_011"
+                  rule_type: "range"
+                  rule_description: "Number of employees must be non-negative"
+                  rule_expression: "t1_nb_employees >= 0"
+                  error_message_en: "Number of employees cannot be negative"
+                  error_message_mt: "In-numru ta' impjegati ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "NbEmployees"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "nb_employees"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "nb_employees"
+                data_type: "UInt32"
+
+            - field_id: "t1_tangible_assets"
+              field_code: "Assets"
+              field_name_en: "Tangible Assets other than Cash"
+              field_name_mt: "Assi TanÄ¡ibbli gÄ§ajr il-Flus"
+              field_description: "Sum of net book value of tangible assets excluding cash"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 0
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:Summary/cbc:Assets"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Assets"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table1"
+                column: "tangible_assets"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table1"
+                column: "tangible_assets"
+                data_type: "Decimal(18,0)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Table 2 - List of Constituent Entities
+        # ----------------------------------------------------------------------
+        - section_id: "TABLE2_ENTITIES"
+          section_name: "Table 2 - List of All Constituent Entities"
+          section_description: "List of all MNE group constituent entities by jurisdiction"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "cbc:CbcBody/cbc:CbcReports/cbc:ConstEntities/cbc:ConstEntity"
+          fields:
+            - field_id: "t2_ce_res_country"
+              field_code: "ResCountryCode"
+              field_name_en: "Tax Jurisdiction of Residence"
+              field_name_mt: "Ä urisdizzjoni tat-Taxxa ta' Residenza"
+              field_description: "Country of tax residence of constituent entity"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ConstEntity/cbc:ResCountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "ResCountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table2"
+                column: "res_country"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table2"
+                column: "res_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "t2_ce_tin"
+              field_code: "TIN"
+              field_name_en: "Constituent Entity TIN"
+              field_name_mt: "TIN tal-EntitÃ  Kostitwenti"
+              field_description: "Tax identification number of constituent entity"
+              data_type: "TIN"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ConstEntity/cbc:TIN"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "TIN"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table2"
+                column: "ce_tin"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table2"
+                column: "ce_tin"
+                data_type: "Nullable(String)"
+
+            - field_id: "t2_ce_name"
+              field_code: "Name"
+              field_name_en: "Constituent Entity Name"
+              field_name_mt: "Isem tal-EntitÃ  Kostitwenti"
+              field_description: "Legal name of constituent entity"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ConstEntity/cbc:Name"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "Name"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table2"
+                column: "ce_name"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table2"
+                column: "ce_name"
+                data_type: "String"
+
+            - field_id: "t2_ce_inc_country"
+              field_code: "IncorpCountryCode"
+              field_name_en: "Tax Jurisdiction of Organisation"
+              field_name_mt: "Ä urisdizzjoni tat-Taxxa ta' Organizzazzjoni"
+              field_description: "Country of incorporation if different from residence"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: false
+              required_condition: "If different from residence country"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ConstEntity/cbc:IncorpCountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "IncorpCountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table2"
+                column: "inc_country"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table2"
+                column: "inc_country"
+                data_type: "Nullable(FixedString(2))"
+
+            - field_id: "t2_business_activity"
+              field_code: "BizActivities"
+              field_name_en: "Main Business Activity(ies)"
+              field_name_mt: "AttivitÃ /ijiet KummerÄ‹jali PrinÄ‹ipali"
+              field_description: "Nature of main business activities"
+              data_type: "ARRAY"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ConstEntity/cbc:BizActivities"
+              validation_rules:
+                - rule_id: "CBC_020"
+                  rule_type: "required"
+                  rule_description: "At least one business activity required"
+                  rule_expression: "LENGTH(t2_business_activity) >= 1"
+                  error_message_en: "At least one business activity required"
+                  error_message_mt: "Mill-inqas attivitÃ  kummerÄ‹jali waÄ§da meÄ§tieÄ¡a"
+                  severity: "error"
+              allowed_values:
+                - code: "CBC501"
+                  description_en: "Research and Development"
+                - code: "CBC502"
+                  description_en: "Holding or Managing intellectual property"
+                - code: "CBC503"
+                  description_en: "Purchasing or Procurement"
+                - code: "CBC504"
+                  description_en: "Manufacturing or Production"
+                - code: "CBC505"
+                  description_en: "Sales, Marketing or Distribution"
+                - code: "CBC506"
+                  description_en: "Administrative, Management or Support Services"
+                - code: "CBC507"
+                  description_en: "Provision of Services to unrelated parties"
+                - code: "CBC508"
+                  description_en: "Internal Group Finance"
+                - code: "CBC509"
+                  description_en: "Regulated Financial Services"
+                - code: "CBC510"
+                  description_en: "Insurance"
+                - code: "CBC511"
+                  description_en: "Holding shares or other equity instruments"
+                - code: "CBC512"
+                  description_en: "Dormant"
+                - code: "CBC513"
+                  description_en: "Other"
+              reference_table: "cbcr_business_activities"
+              oecd_element_ref: "BizActivities"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table2"
+                column: "business_activities"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table2"
+                column: "business_activities"
+                data_type: "Array(String)"
+
+            - field_id: "t2_other_activity"
+              field_code: "OtherEntityInfo"
+              field_name_en: "Other Activity Description"
+              field_name_mt: "Deskrizzjoni ta' AttivitÃ  OÄ§ra"
+              field_description: "Description if 'Other' business activity selected"
+              data_type: "STRING"
+              format: null
+              max_length: 500
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if CBC513 (Other) selected"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:ConstEntity/cbc:OtherEntityInfo"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "OtherEntityInfo"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table2"
+                column: "other_activity"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table2"
+                column: "other_activity"
+                data_type: "Nullable(String)"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Table 3 - Additional Information
+        # ----------------------------------------------------------------------
+        - section_id: "TABLE3_ADDITIONAL"
+          section_name: "Table 3 - Additional Information"
+          section_description: "Free-text explanations and clarifications"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "cbc:CbcBody/cbc:AdditionalInfo"
+          fields:
+            - field_id: "t3_info_type"
+              field_code: "OtherInfo"
+              field_name_en: "Additional Information"
+              field_name_mt: "Informazzjoni Addizzjonali"
+              field_description: "Free-text additional information"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:AdditionalInfo/cbc:OtherInfo"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "OtherInfo"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table3"
+                column: "other_info"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table3"
+                column: "other_info"
+                data_type: "String"
+
+            - field_id: "t3_res_country_code"
+              field_code: "ResCountryCode"
+              field_name_en: "Related Jurisdiction"
+              field_name_mt: "Ä urisdizzjoni Relatata"
+              field_description: "Jurisdiction to which additional info relates"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:AdditionalInfo/cbc:ResCountryCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: "ResCountryCode"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table3"
+                column: "res_country_code"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table3"
+                column: "res_country_code"
+                data_type: "Nullable(FixedString(2))"
+
+            - field_id: "t3_summary_ref"
+              field_code: "SummaryRef"
+              field_name_en: "Summary Reference"
+              field_name_mt: "Referenza tas-Sommarju"
+              field_description: "Reference to specific Table 1 data"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cbc:AdditionalInfo/cbc:SummaryRef"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: "SummaryRef"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbcr_table3"
+                column: "summary_ref"
+              ors_mapping:
+                table: "mtca_ors.cbcr_table3"
+                column: "summary_ref"
+                data_type: "Nullable(String)"
+
+      xml_schema:
+        namespace: "urn:oecd:ties:cbc:v2"
+        root_element: "CBC_OECD"
+        schema_version: "2.0"
+        schema_url: "https://www.oecd.org/tax/beps/country-by-country-reporting-xml-schema-v2.0.xsd"
+        supporting_types_namespace: "urn:oecd:ties:cbcstf:v5"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "CBC_NOTIFICATION"
+          relationship_type: "prerequisite"
+          relationship_description: "CbC Notification required before first CbCR"
+        - form_code: "TP_MASTER_FILE"
+          relationship_type: "related"
+          relationship_description: "Master File provides group-wide TP context"
+        - form_code: "TP_LOCAL_FILE"
+          relationship_type: "related"
+          relationship_description: "Local File provides Malta entity TP details"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Annual"
+        partner_authorities: "CbCR partner jurisdictions (MCAA signatories)"
+        encryption_required: true
+        transmission_protocol: "Common Transmission System (CTS)"
+
+      submission_workflow:
+        authentication_required: "CFR e-Services credentials"
+        signature_required: false
+        validation_type: "XML Schema validation + Business rules"
+        acknowledgment_type: "Submission receipt with validation status"
+
+  # ==========================================================================
+  # CbC Notification
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "CBC_NOTIFICATION"
+        form_name_en: "Country-by-Country Notification"
+        form_name_mt: "Notifika PajjiÅ¼ b'PajjiÅ¼"
+        version: "2024"
+        effective_from: "2016-01-01"
+        effective_to: "current"
+        legislative_basis: "S.L.123.127"
+        subsidiary_legislation:
+          - "LN 216/2016 - CbCR Implementation Rules"
+        administering_authority: "CFR"
+        tax_type: "Exchange of Information"
+        taxpayer_category: "MNE Constituent Entity in Malta"
+        filing_frequency: "Annual (within 12 months of fiscal year end)"
+        filing_deadline: "Last day of MNE fiscal year"
+        submission_method: "Electronic"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: null
+        source_url: "https://cfr.gov.mt/en/eoi/Pages/CbCR.aspx"
+        notes: |
+          Malta constituent entities must notify CFR of their MNE group membership 
+          and identify the entity that will file the CbCR. Must be filed annually 
+          by last day of the MNE's fiscal year.
+
+      sections:
+        - section_id: "NOTIFYING_ENTITY"
+          section_name: "Notifying Entity Information"
+          section_description: "Malta constituent entity details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "ne_tin"
+              field_code: "CE_TIN"
+              field_name_en: "Constituent Entity TIN"
+              field_name_mt: "TIN tal-EntitÃ  Kostitwenti"
+              field_description: "Malta TIN of notifying entity"
+              data_type: "TIN"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "CBCN_001"
+                  rule_type: "lookup"
+                  rule_description: "Must be registered Malta entity"
+                  rule_expression: "EXISTS(taxpayer_registry, tin)"
+                  error_message_en: "TIN not found"
+                  error_message_mt: "TIN ma nstabx"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbc_notifications"
+                column: "ce_tin"
+              ors_mapping:
+                table: "mtca_ors.cbc_notifications"
+                column: "ce_tin"
+                data_type: "String"
+
+            - field_id: "ne_name"
+              field_code: "CE_Name"
+              field_name_en: "Constituent Entity Name"
+              field_name_mt: "Isem tal-EntitÃ  Kostitwenti"
+              field_description: "Legal name of notifying entity"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbc_notifications"
+                column: "ce_name"
+              ors_mapping:
+                table: "mtca_ors.cbc_notifications"
+                column: "ce_name"
+                data_type: "String"
+
+        - section_id: "MNE_GROUP_INFO"
+          section_name: "MNE Group Information"
+          section_description: "Details of the MNE group"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "mne_name"
+              field_code: "MNE_Name"
+              field_name_en: "MNE Group Name"
+              field_name_mt: "Isem tal-Grupp MNE"
+              field_description: "Name of the MNE group"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbc_notifications"
+                column: "mne_name"
+              ors_mapping:
+                table: "mtca_ors.cbc_notifications"
+                column: "mne_name"
+                data_type: "String"
+
+            - field_id: "mne_fiscal_year_end"
+              field_code: "FYE"
+              field_name_en: "MNE Fiscal Year End"
+              field_name_mt: "Tmiem tas-Sena Fiskali tal-MNE"
+              field_description: "Date of MNE group's fiscal year end"
+              data_type: "DATE"
+              format: "MM-DD"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbc_notifications"
+                column: "mne_fiscal_year_end"
+              ors_mapping:
+                table: "mtca_ors.cbc_notifications"
+                column: "mne_fiscal_year_end"
+                data_type: "String"
+
+        - section_id: "REPORTING_ENTITY_INFO"
+          section_name: "Reporting Entity Information"
+          section_description: "Entity responsible for filing CbCR"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "re_role"
+              field_code: "RE_Role"
+              field_name_en: "Reporting Entity Role"
+              field_name_mt: "Rwol tal-EntitÃ  li Tirrapporta"
+              field_description: "Role of entity filing the CbCR"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values:
+                - code: "UPE"
+                  description_en: "Ultimate Parent Entity"
+                - code: "SPE"
+                  description_en: "Surrogate Parent Entity"
+                - code: "CE_LOCAL"
+                  description_en: "Local Filing by Constituent Entity"
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbc_notifications"
+                column: "re_role"
+              ors_mapping:
+                table: "mtca_ors.cbc_notifications"
+                column: "re_role"
+                data_type: "String"
+
+            - field_id: "re_name"
+              field_code: "RE_Name"
+              field_name_en: "Reporting Entity Name"
+              field_name_mt: "Isem tal-EntitÃ  li Tirrapporta"
+              field_description: "Name of entity filing the CbCR"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbc_notifications"
+                column: "re_name"
+              ors_mapping:
+                table: "mtca_ors.cbc_notifications"
+                column: "re_name"
+                data_type: "String"
+
+            - field_id: "re_country"
+              field_code: "RE_Country"
+              field_name_en: "Reporting Entity Country"
+              field_name_mt: "PajjiÅ¼ tal-EntitÃ  li Tirrapporta"
+              field_description: "Country where CbCR will be filed"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_country_codes"
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "cbc_notifications"
+                column: "re_country"
+              ors_mapping:
+                table: "mtca_ors.cbc_notifications"
+                column: "re_country"
+                data_type: "FixedString(2)"
+
+      xml_schema: null
+      attachments: []
+      related_forms:
+        - form_code: "CBCR_REPORT"
+          relationship_type: "enables"
+          relationship_description: "Notification enables CbCR filing"
+
+      submission_workflow:
+        authentication_required: "CFR e-Services credentials"
+        signature_required: true
+        validation_type: "Business rules"
+        acknowledgment_type: "Notification receipt"
+
+  # ==========================================================================
+  # Transfer Pricing Master File
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TP_MASTER_FILE"
+        form_name_en: "Transfer Pricing Master File"
+        form_name_mt: "Fajl PrinÄ‹ipali dwar Prezzijiet ta' Trasferiment"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "BEPS Action 13 / Article 8(1) S.L.123.127"
+        subsidiary_legislation:
+          - "LN 216/2016"
+        administering_authority: "CFR"
+        tax_type: "Transfer Pricing"
+        taxpayer_category: "MNE Constituent Entity"
+        filing_frequency: "Annual (upon request)"
+        filing_deadline: "Upon CFR request or with corporate tax return"
+        submission_method: "Electronic (PDF document)"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: null
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/Transfer-Pricing.aspx"
+        notes: |
+          Master File provides group-wide transfer pricing information per 
+          BEPS Action 13. Contains MNE group organizational structure, 
+          intangibles, intercompany financing, financial/tax positions.
+
+      sections:
+        - section_id: "MF_ORG_STRUCTURE"
+          section_name: "Organisational Structure"
+          section_description: "MNE group legal and ownership structure"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "mf_group_chart"
+              field_code: "OrgChart"
+              field_name_en: "Organisational Chart"
+              field_name_mt: "ÄŠart Organizzazzjonali"
+              field_description: "Chart illustrating MNE legal and ownership structure"
+              data_type: "DOCUMENT"
+              format: "PDF/Image"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_master_file"
+                column: "org_chart_ref"
+              ors_mapping:
+                table: "mtca_ors.tp_master_file"
+                column: "org_chart_ref"
+                data_type: "String"
+
+            - field_id: "mf_geographic_locations"
+              field_code: "GeoLocations"
+              field_name_en: "Geographic Location of Operating Entities"
+              field_name_mt: "Post Ä eografiku ta' Entitajiet Operattivi"
+              field_description: "Description of where operating entities are located"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_master_file"
+                column: "geo_locations"
+              ors_mapping:
+                table: "mtca_ors.tp_master_file"
+                column: "geo_locations"
+                data_type: "String"
+
+        - section_id: "MF_BUSINESS_DESCRIPTION"
+          section_name: "Description of MNE Business"
+          section_description: "Business drivers, supply chain, major transactions"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "mf_business_drivers"
+              field_code: "BizDrivers"
+              field_name_en: "Important Drivers of Business Profit"
+              field_name_mt: "Drivers Importanti tal-Profitt tan-Negozju"
+              field_description: "General description of important business profit drivers"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_master_file"
+                column: "business_drivers"
+              ors_mapping:
+                table: "mtca_ors.tp_master_file"
+                column: "business_drivers"
+                data_type: "String"
+
+            - field_id: "mf_supply_chain"
+              field_code: "SupplyChain"
+              field_name_en: "Supply Chain Description"
+              field_name_mt: "Deskrizzjoni tal-Katina ta' Provvista"
+              field_description: "Description of supply chain for top 5 products/services"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_master_file"
+                column: "supply_chain"
+              ors_mapping:
+                table: "mtca_ors.tp_master_file"
+                column: "supply_chain"
+                data_type: "String"
+
+            - field_id: "mf_service_arrangements"
+              field_code: "ServiceArrangements"
+              field_name_en: "Important Service Arrangements"
+              field_name_mt: "ArranÄ¡amenti ta' Servizz Importanti"
+              field_description: "List and description of important service arrangements"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_master_file"
+                column: "service_arrangements"
+              ors_mapping:
+                table: "mtca_ors.tp_master_file"
+                column: "service_arrangements"
+                data_type: "String"
+
+        - section_id: "MF_INTANGIBLES"
+          section_name: "MNE Intangibles"
+          section_description: "Intangible assets and transfer pricing policies"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "mf_intangibles_strategy"
+              field_code: "IntangiblesStrategy"
+              field_name_en: "Intangibles Development Strategy"
+              field_name_mt: "StrateÄ¡ija gÄ§all-IÅ¼vilupp ta' IntanÄ¡ibbli"
+              field_description: "General description of MNE's strategy for intangibles"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_master_file"
+                column: "intangibles_strategy"
+              ors_mapping:
+                table: "mtca_ors.tp_master_file"
+                column: "intangibles_strategy"
+                data_type: "String"
+
+            - field_id: "mf_intangibles_list"
+              field_code: "IntangiblesList"
+              field_name_en: "List of Important Intangibles"
+              field_name_mt: "Lista ta' IntanÄ¡ibbli Importanti"
+              field_description: "List of intangibles important to transfer pricing"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_master_file"
+                column: "intangibles_list"
+              ors_mapping:
+                table: "mtca_ors.tp_master_file"
+                column: "intangibles_list"
+                data_type: "String"
+
+        - section_id: "MF_FINANCING"
+          section_name: "MNE Intercompany Financing"
+          section_description: "Group financing arrangements and TP policies"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "mf_financing_description"
+              field_code: "FinancingDesc"
+              field_name_en: "MNE Financing Arrangements"
+              field_name_mt: "ArranÄ¡amenti ta' Finanzjament tal-MNE"
+              field_description: "How MNE is financed (related vs unrelated party)"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_master_file"
+                column: "financing_desc"
+              ors_mapping:
+                table: "mtca_ors.tp_master_file"
+                column: "financing_desc"
+                data_type: "String"
+
+            - field_id: "mf_group_entities_financing"
+              field_code: "FinancingEntities"
+              field_name_en: "Group Entities Providing Central Financing"
+              field_name_mt: "Entitajiet tal-Grupp li Jipprovdu Finanzjament ÄŠentrali"
+              field_description: "Entities in MNE providing central financing functions"
+              data_type: "TEXT"
+              format: null
+              max_length: 2000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_master_file"
+                column: "financing_entities"
+              ors_mapping:
+                table: "mtca_ors.tp_master_file"
+                column: "financing_entities"
+                data_type: "String"
+
+      xml_schema: null
+      attachments:
+        - attachment_type: "Master File Document"
+          format: "PDF"
+          required: true
+          description: "Complete Master File document per BEPS Action 13"
+
+      related_forms:
+        - form_code: "CBCR_REPORT"
+          relationship_type: "related"
+          relationship_description: "Part of BEPS Action 13 documentation"
+        - form_code: "TP_LOCAL_FILE"
+          relationship_type: "related"
+          relationship_description: "Local File complements Master File"
+        - form_code: "e-CO"
+          relationship_type: "submitted_with"
+          relationship_description: "May be submitted with corporate tax return"
+
+      submission_workflow:
+        authentication_required: "CFR e-Services credentials"
+        signature_required: true
+        validation_type: "Document completeness check"
+        acknowledgment_type: "Submission receipt"
+
+  # ==========================================================================
+  # Transfer Pricing Local File
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TP_LOCAL_FILE"
+        form_name_en: "Transfer Pricing Local File"
+        form_name_mt: "Fajl Lokali dwar Prezzijiet ta' Trasferiment"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "BEPS Action 13 / Article 8(1) S.L.123.127"
+        subsidiary_legislation:
+          - "LN 216/2016"
+        administering_authority: "CFR"
+        tax_type: "Transfer Pricing"
+        taxpayer_category: "Malta Constituent Entity of MNE"
+        filing_frequency: "Annual (upon request)"
+        filing_deadline: "Upon CFR request or with corporate tax return"
+        submission_method: "Electronic (PDF document)"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: null
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/Transfer-Pricing.aspx"
+        notes: |
+          Local File focuses on transfer pricing for the Malta entity's 
+          material controlled transactions. Contains detailed transactional 
+          analysis, comparability study, and TP method selection.
+
+      sections:
+        - section_id: "LF_LOCAL_ENTITY"
+          section_name: "Local Entity"
+          section_description: "Malta entity description and management structure"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "lf_entity_description"
+              field_code: "EntityDesc"
+              field_name_en: "Description of Local Entity"
+              field_name_mt: "Deskrizzjoni tal-EntitÃ  Lokali"
+              field_description: "Description of management structure and org chart"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_local_file"
+                column: "entity_desc"
+              ors_mapping:
+                table: "mtca_ors.tp_local_file"
+                column: "entity_desc"
+                data_type: "String"
+
+            - field_id: "lf_business_strategy"
+              field_code: "BizStrategy"
+              field_name_en: "Business Strategy"
+              field_name_mt: "StrateÄ¡ija tan-Negozju"
+              field_description: "Description of business strategy and restructurings"
+              data_type: "TEXT"
+              format: null
+              max_length: 4000
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_local_file"
+                column: "biz_strategy"
+              ors_mapping:
+                table: "mtca_ors.tp_local_file"
+                column: "biz_strategy"
+                data_type: "String"
+
+        - section_id: "LF_CONTROLLED_TRANSACTIONS"
+          section_name: "Controlled Transactions"
+          section_description: "Material related party transactions"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "lf_transaction_type"
+              field_code: "TransType"
+              field_name_en: "Transaction Type"
+              field_name_mt: "Tip ta' TranÅ¼azzjoni"
+              field_description: "Category of controlled transaction"
+              data_type: "CODE"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values:
+                - code: "GOODS"
+                  description_en: "Purchase/Sale of Goods"
+                - code: "SERVICES"
+                  description_en: "Services"
+                - code: "ROYALTIES"
+                  description_en: "Royalties/License Fees"
+                - code: "INTEREST"
+                  description_en: "Interest/Financing"
+                - code: "COST_CONTRIB"
+                  description_en: "Cost Contribution Arrangements"
+                - code: "OTHER"
+                  description_en: "Other Transactions"
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_local_file_transactions"
+                column: "trans_type"
+              ors_mapping:
+                table: "mtca_ors.tp_local_file_transactions"
+                column: "trans_type"
+                data_type: "String"
+
+            - field_id: "lf_transaction_value"
+              field_code: "TransValue"
+              field_name_en: "Transaction Value"
+              field_name_mt: "Valur tat-TranÅ¼azzjoni"
+              field_description: "Total value of transaction during fiscal year"
+              data_type: "DECIMAL"
+              format: null
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_local_file_transactions"
+                column: "trans_value"
+              ors_mapping:
+                table: "mtca_ors.tp_local_file_transactions"
+                column: "trans_value"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "lf_counterparty"
+              field_code: "Counterparty"
+              field_name_en: "Counterparty Name"
+              field_name_mt: "Isem tal-Kontroparti"
+              field_description: "Name of related party counterparty"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_local_file_transactions"
+                column: "counterparty"
+              ors_mapping:
+                table: "mtca_ors.tp_local_file_transactions"
+                column: "counterparty"
+                data_type: "String"
+
+            - field_id: "lf_tp_method"
+              field_code: "TPMethod"
+              field_name_en: "Transfer Pricing Method"
+              field_name_mt: "Metodu ta' Prezzijiet ta' Trasferiment"
+              field_description: "TP method applied to this transaction"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values:
+                - code: "CUP"
+                  description_en: "Comparable Uncontrolled Price"
+                - code: "RPM"
+                  description_en: "Resale Price Method"
+                - code: "CPM"
+                  description_en: "Cost Plus Method"
+                - code: "TNMM"
+                  description_en: "Transactional Net Margin Method"
+                - code: "PSM"
+                  description_en: "Profit Split Method"
+                - code: "OTHER"
+                  description_en: "Other Method"
+              reference_table: "tp_methods"
+              oecd_element_ref: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "exchange_db"
+                table: "tp_local_file_transactions"
+                column: "tp_method"
+              ors_mapping:
+                table: "mtca_ors.tp_local_file_transactions"
+                column: "tp_method"
+                data_type: "String"
+
+      xml_schema: null
+      attachments:
+        - attachment_type: "Local File Document"
+          format: "PDF"
+          required: true
+          description: "Complete Local File document per BEPS Action 13"
+        - attachment_type: "Comparability Study"
+          format: "PDF/Excel"
+          required: true
+          description: "Benchmark study supporting TP analysis"
+
+      related_forms:
+        - form_code: "TP_MASTER_FILE"
+          relationship_type: "related"
+          relationship_description: "Master File provides group-wide context"
+        - form_code: "e-CO"
+          relationship_type: "submitted_with"
+          relationship_description: "May be submitted with corporate tax return"
+        - form_code: "TRA_TRANSFER_PRICING"
+          relationship_type: "supports"
+          relationship_description: "Supports TP disclosure in tax return"
+
+      submission_workflow:
+        authentication_required: "CFR e-Services credentials"
+        signature_required: true
+        validation_type: "Document completeness check"
+        acknowledgment_type: "Submission receipt"
+
+# ============================================================================
+# Reference Tables for Priority 5B Forms
+# ============================================================================
+reference_tables:
+  cbcr_entity_roles:
+    - code: "CBC801"
+      description_en: "Ultimate Parent Entity"
+    - code: "CBC802"
+      description_en: "Surrogate Parent Entity"
+    - code: "CBC803"
+      description_en: "Constituent Entity (local filing obligation)"
+
+  cbcr_message_type_indicators:
+    - code: "CBC401"
+      description_en: "New information"
+    - code: "CBC402"
+      description_en: "Corrected information"
+    - code: "CBC403"
+      description_en: "Deletion of previously sent information"
+    - code: "CBC404"
+      description_en: "No data to report (nil return)"
+
+  cbcr_business_activities:
+    - code: "CBC501"
+      description_en: "Research and Development"
+    - code: "CBC502"
+      description_en: "Holding or Managing Intellectual Property"
+    - code: "CBC503"
+      description_en: "Purchasing or Procurement"
+    - code: "CBC504"
+      description_en: "Manufacturing or Production"
+    - code: "CBC505"
+      description_en: "Sales, Marketing or Distribution"
+    - code: "CBC506"
+      description_en: "Administrative, Management or Support Services"
+    - code: "CBC507"
+      description_en: "Provision of Services to Unrelated Parties"
+    - code: "CBC508"
+      description_en: "Internal Group Finance"
+    - code: "CBC509"
+      description_en: "Regulated Financial Services"
+    - code: "CBC510"
+      description_en: "Insurance"
+    - code: "CBC511"
+      description_en: "Holding Shares or Other Equity Instruments"
+    - code: "CBC512"
+      description_en: "Dormant"
+    - code: "CBC513"
+      description_en: "Other"
+
+  tp_methods:
+    - code: "CUP"
+      description_en: "Comparable Uncontrolled Price Method"
+      oecd_guidelines_ref: "Chapter II, Section B"
+    - code: "RPM"
+      description_en: "Resale Price Method"
+      oecd_guidelines_ref: "Chapter II, Section C"
+    - code: "CPM"
+      description_en: "Cost Plus Method"
+      oecd_guidelines_ref: "Chapter II, Section D"
+    - code: "TNMM"
+      description_en: "Transactional Net Margin Method"
+      oecd_guidelines_ref: "Chapter II, Section E"
+    - code: "PSM"
+      description_en: "Profit Split Method"
+      oecd_guidelines_ref: "Chapter II, Section F"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  exchange_db:
+    tables:
+      - legacy_table: "cbcr_messages"
+        ors_table: "mtca_ors.cbcr_messages"
+        description: "CbCR message header records"
+        key_columns:
+          - legacy: "message_id"
+            ors: "message_id"
+
+      - legacy_table: "cbcr_reporting_entity"
+        ors_table: "mtca_ors.cbcr_reporting_entity"
+        description: "CbCR reporting entity records"
+        key_columns:
+          - legacy: "entity_id"
+            ors: "entity_id"
+
+      - legacy_table: "cbcr_table1"
+        ors_table: "mtca_ors.cbcr_table1"
+        description: "CbCR Table 1 - Allocation data"
+        key_columns:
+          - legacy: "record_id"
+            ors: "record_id"
+
+      - legacy_table: "cbcr_table2"
+        ors_table: "mtca_ors.cbcr_table2"
+        description: "CbCR Table 2 - Constituent entities"
+        key_columns:
+          - legacy: "entity_id"
+            ors: "entity_id"
+
+      - legacy_table: "cbcr_table3"
+        ors_table: "mtca_ors.cbcr_table3"
+        description: "CbCR Table 3 - Additional information"
+        key_columns:
+          - legacy: "info_id"
+            ors: "info_id"
+
+      - legacy_table: "cbc_notifications"
+        ors_table: "mtca_ors.cbc_notifications"
+        description: "CbC notification records"
+        key_columns:
+          - legacy: "notification_id"
+            ors: "notification_id"
+
+      - legacy_table: "tp_master_file"
+        ors_table: "mtca_ors.tp_master_file"
+        description: "Transfer pricing master file metadata"
+        key_columns:
+          - legacy: "file_id"
+            ors: "file_id"
+
+      - legacy_table: "tp_local_file"
+        ors_table: "mtca_ors.tp_local_file"
+        description: "Transfer pricing local file metadata"
+        key_columns:
+          - legacy: "file_id"
+            ors: "file_id"
+
+# ============================================================================
+# Cross-Form Relationships Summary
+# ============================================================================
+form_relationships:
+  beps_action_13_chain:
+    description: "BEPS Action 13 documentation workflow"
+    flow:
+      - source: "CBC_NOTIFICATION"
+        target: "CBCR_REPORT"
+        relationship: "Notification precedes CbCR filing"
+      - source: "TP_MASTER_FILE"
+        target: "TP_LOCAL_FILE"
+        relationship: "Master File provides group context for Local File"
+      - source: "CBCR_REPORT"
+        target: "TP_MASTER_FILE"
+        relationship: "Both part of BEPS Action 13 package"
+      - source: "TP_LOCAL_FILE"
+        target: "e-CO"
+        relationship: "Supports corporate tax return TP disclosure"

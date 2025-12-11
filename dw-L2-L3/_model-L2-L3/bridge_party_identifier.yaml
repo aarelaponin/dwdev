@@ -1,0 +1,938 @@
+# =============================================================================
+# TA-RDM L3 - Party Identifier Bridge Table
+# =============================================================================
+# Purpose: Link parties to all their identifiers (TIN, VAT, EORI, etc.)
+# Pattern: P2 (Multi-Identifier Party) from L3 Generalization Patterns Catalog
+# L2 Source: party.party_identifier
+# Priority: HIGH
+# Version: 1.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4c of L3 Generalization Implementation
+# =============================================================================
+#
+# This bridge table enables the multi-identifier pattern that allows each party
+# to have multiple identifiers of different types. This replaces the old pattern
+# of having separate columns for each identifier type (tin, vat_number, eori_number)
+# in the party dimension.
+#
+# Design Principles:
+# - One row per party per identifier (many-to-many bridge pattern)
+# - Links to current dim_party version via party_key
+# - Includes historical/superseded identifiers via validity dates
+# - Country context for identifier format validation
+# - Supports temporal queries (find party by identifier at point in time)
+#
+# Key Benefits:
+# - Unlimited identifier types without schema changes
+# - Historical identifier tracking (replacements, expirations)
+# - Country-agnostic design (format varies by identifier_type + country)
+# - Efficient lookups via multiple indexes
+# - Supports verification status tracking
+#
+# =============================================================================
+
+metadata:
+  table_name: bridge_party_identifier
+  schema: warehouse
+  version: "1.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P2 - Multi-Identifier Party (Bridge Component)"
+  l2_source_table: "party.party_identifier"
+  description: |
+    Bridge table linking parties to all their identifiers.
+    Enables queries like "find all identifiers for a party" or
+    "find party by any identifier type".
+    
+    This table complements dim_party which contains only the primary
+    and secondary identifiers for convenience. For full identifier
+    history and multi-identifier lookups, use this bridge table.
+
+# =============================================================================
+# Bridge Table Specification
+# =============================================================================
+
+bridge:
+  name: bridge_party_identifier
+  schema: warehouse
+  type: bridge
+  
+  grain: "One row per party per identifier"
+  
+  description: |
+    Bridge table implementing the multi-identifier party pattern.
+    Each row links a party_key to a single identifier with its type,
+    country of issue, and validity period.
+    
+    Key use cases:
+    - Find party by any identifier (TIN, VAT, EORI, passport, etc.)
+    - Get all identifiers for a party (for display or audit)
+    - Track identifier changes over time (replacements)
+    - Support identifier verification workflows
+  
+  business_context:
+    domain: "Party Management"
+    usage: |
+      Used for identifier lookups, compliance reporting, and audit trails.
+      Not typically used in regular fact table queries (use dim_party
+      primary_tax_id for standard joins).
+    refresh: "DAILY (in sync with dim_party)"
+    priority: "HIGH"
+  
+  estimated_volume:
+    avg_identifiers_per_party: 3
+    with_history: "parties × avg_identifiers × 1.2 (history factor)"
+    notes: "Most parties have 1-5 identifiers; some have 10+"
+  
+  columns:
+    # ==========================================================================
+    # Keys
+    # ==========================================================================
+    - name: party_key
+      data_type: Int64
+      nullable: false
+      foreign_key: warehouse.dim_party(party_key)
+      description: |
+        Link to party dimension (current version).
+        Note: This references the CURRENT party_key. For historical
+        queries across SCD Type 2 versions, join on party_source_id.
+    
+    - name: party_source_id
+      data_type: Int64
+      nullable: false
+      description: |
+        L2 party_id from party.party table.
+        Stable identifier across SCD Type 2 versions.
+        Use for ETL joins and historical queries.
+    
+    # ==========================================================================
+    # Identifier Definition
+    # ==========================================================================
+    - name: identifier_type_code
+      data_type: String
+      length: 20
+      nullable: false
+      description: |
+        Identifier type code from ref_identifier_type:
+        - TIN: Tax Identification Number (primary tax ID)
+        - VAT: VAT Registration Number
+        - EORI: Economic Operators Registration and Identification
+        - NATID: National Identity Card/Document
+        - PASSPORT: Passport number
+        - BRN: Business Registration Number
+        - ROC: Registrar of Companies number
+        - SSC: Social Security Card
+        - IDNO: Moldova enterprise fiscal code
+        - IDNP: Moldova individual identification
+        - EDRPOU: Ukraine enterprise registry code
+        - IPN: Ukraine individual tax number
+        - NIC: Sri Lanka National Identity Card
+      source: "party.party_identifier.identifier_type_code"
+    
+    - name: identifier_type_name
+      data_type: String
+      length: 100
+      description: "Human-readable name for identifier type (e.g., 'Tax Identification Number')"
+      source: "ref_identifier_type.identifier_name"
+    
+    - name: country_code
+      data_type: String
+      length: 3
+      nullable: false
+      description: |
+        ISO 3166-1 alpha-3 country code that issued this identifier.
+        Used for format validation lookup in ref_identifier_type.
+        May differ from party's tax jurisdiction for foreign IDs.
+      source: "party.party_identifier.country_code"
+    
+    # ==========================================================================
+    # Identifier Value
+    # ==========================================================================
+    - name: identifier_value
+      data_type: String
+      length: 50
+      nullable: false
+      description: |
+        The identifier value as entered/stored.
+        Format varies by identifier_type_code and country_code.
+        See ref_identifier_type.format_description for format rules.
+      source: "party.party_identifier.identifier_value"
+    
+    - name: identifier_value_normalized
+      data_type: String
+      length: 50
+      description: |
+        Normalized value for matching (uppercase, no spaces/dashes).
+        Used for duplicate detection and fuzzy matching.
+        Computed by trigger/ETL from identifier_value.
+      source: "party.party_identifier.identifier_value_normalized"
+      derived: "UPPER(REPLACE(REPLACE(identifier_value, ' ', ''), '-', ''))"
+    
+    # ==========================================================================
+    # Identifier Flags
+    # ==========================================================================
+    - name: is_primary
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: |
+        Is this the primary identifier of this type for this party (1=Yes)?
+        Only one identifier per (party_id, identifier_type_code, country_code)
+        combination should have is_primary = 1 at any time.
+      source: "party.party_identifier.is_primary"
+    
+    - name: is_tax_identifier
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: |
+        Is this a tax identifier (1=Yes)?
+        Tax identifiers are used for tax account matching.
+        Typically TIN, IDNO, EDRPOU are tax identifiers.
+      source: "ref_identifier_type.is_tax_identifier"
+    
+    - name: is_verified
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: |
+        Has this identifier been verified against issuing authority (1=Yes)?
+        Verified identifiers are trusted for compliance purposes.
+      source: "party.party_identifier.is_verified"
+    
+    # ==========================================================================
+    # Verification Details
+    # ==========================================================================
+    - name: verification_status_code
+      data_type: String
+      length: 20
+      description: |
+        Verification status:
+        - UNVERIFIED: Not yet verified
+        - PENDING: Verification in progress
+        - VERIFIED: Successfully verified
+        - FAILED: Verification failed
+        - EXPIRED: Verification expired (needs re-verification)
+      source: "party.party_identifier.verification_status"
+      allowed_values:
+        - UNVERIFIED
+        - PENDING
+        - VERIFIED
+        - FAILED
+        - EXPIRED
+    
+    - name: verification_date
+      data_type: DateTime
+      description: "Date/time when last verification was performed"
+      source: "party.party_identifier.verification_date"
+    
+    - name: verification_source
+      data_type: String
+      length: 100
+      description: |
+        How the identifier was verified:
+        - ONLINE_API: Automated API verification
+        - DOCUMENT: Document review
+        - MANUAL: Manual verification
+        - THIRD_PARTY: Third-party verification service
+      source: "party.party_identifier.verification_source"
+    
+    - name: verification_reference
+      data_type: String
+      length: 200
+      description: "Reference ID from verification (API response ID, ticket number)"
+      source: "party.party_identifier.verification_reference"
+    
+    # ==========================================================================
+    # Identifier Lifecycle
+    # ==========================================================================
+    - name: issued_date
+      data_type: Date
+      description: "Date the identifier was issued by authority"
+      source: "party.party_identifier.issued_date"
+    
+    - name: expiry_date
+      data_type: Date
+      description: |
+        Date the identifier expires (for passports, licenses, etc.).
+        NULL for non-expiring identifiers like TIN.
+      source: "party.party_identifier.expiry_date"
+    
+    - name: issued_by
+      data_type: String
+      length: 200
+      description: "Issuing authority name"
+      source: "party.party_identifier.issued_by"
+    
+    # ==========================================================================
+    # Validity Period
+    # ==========================================================================
+    - name: valid_from_date
+      data_type: Date
+      nullable: false
+      description: |
+        Date this identifier became valid for this party.
+        Start of the identifier's association with the party.
+      source: "party.party_identifier.valid_from"
+    
+    - name: valid_to_date
+      data_type: Date
+      description: |
+        Date this identifier ceased to be valid for this party (NULL = current).
+        End of identifier association (replaced, revoked, or error correction).
+      source: "party.party_identifier.valid_to"
+    
+    - name: is_current
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: |
+        Is currently valid for this party (1=Yes)?
+        Should match: valid_to_date IS NULL
+      derived: "CASE WHEN valid_to_date IS NULL THEN 1 ELSE 0 END"
+    
+    - name: replacement_identifier_id
+      data_type: Int64
+      description: |
+        If this identifier was replaced, reference to the new identifier.
+        Supports identifier chain tracking (old TIN → new TIN).
+      source: "party.party_identifier.replacement_identifier_id"
+    
+    # ==========================================================================
+    # ETL Metadata
+    # ==========================================================================
+    - name: etl_batch_id
+      data_type: Int64
+      nullable: false
+      description: "ETL batch that loaded this record"
+    
+    - name: etl_load_timestamp
+      data_type: DateTime
+      nullable: false
+      description: "Timestamp when record was loaded to warehouse"
+    
+    - name: l2_source_id
+      data_type: Int64
+      description: "party_identifier_id from L2 party.party_identifier"
+      source: "party.party_identifier.party_identifier_id"
+
+  # ============================================================================
+  # Indexes
+  # ============================================================================
+  indexes:
+    - name: idx_bpi_party
+      columns: [party_key]
+      description: "Get all identifiers for a party"
+    
+    - name: idx_bpi_identifier
+      columns: [identifier_type_code, country_code, identifier_value]
+      description: "Find party by specific identifier value"
+    
+    - name: idx_bpi_normalized
+      columns: [identifier_type_code, country_code, identifier_value_normalized]
+      description: "Find party by normalized identifier (for matching)"
+    
+    - name: idx_bpi_primary
+      columns: [party_key, identifier_type_code, is_primary]
+      where: "is_primary = 1 AND is_current = 1"
+      description: "Find primary identifier of a type"
+    
+    - name: idx_bpi_tax_id
+      columns: [country_code, identifier_value]
+      where: "is_tax_identifier = 1 AND is_current = 1"
+      description: "Find party by tax identifier"
+    
+    - name: idx_bpi_verification
+      columns: [verification_status_code, verification_date]
+      where: "verification_status_code IN ('PENDING', 'EXPIRED')"
+      description: "Find identifiers needing verification"
+    
+    - name: idx_bpi_expiry
+      columns: [expiry_date]
+      where: "expiry_date IS NOT NULL AND is_current = 1"
+      description: "Find expiring identifiers for alerts"
+
+  # ============================================================================
+  # Business Rules
+  # ============================================================================
+  business_rules:
+    - rule_id: BR_BPI_001
+      description: "Each party should have at least one tax identifier"
+      severity: WARNING
+      validation_query: |
+        SELECT p.party_key
+        FROM warehouse.dim_party p
+        LEFT JOIN warehouse.bridge_party_identifier b 
+            ON p.party_key = b.party_key
+            AND b.is_tax_identifier = 1
+            AND b.is_current = 1
+        WHERE p.is_current = 1
+          AND b.party_key IS NULL
+    
+    - rule_id: BR_BPI_002
+      description: "Only one primary identifier per type/country per party"
+      severity: ERROR
+      validation_query: |
+        SELECT party_key, identifier_type_code, country_code, COUNT(*) as cnt
+        FROM warehouse.bridge_party_identifier
+        WHERE is_primary = 1 AND is_current = 1
+        GROUP BY party_key, identifier_type_code, country_code
+        HAVING COUNT(*) > 1
+    
+    - rule_id: BR_BPI_003
+      description: "is_current must match valid_to_date"
+      severity: ERROR
+      validation: "(is_current = 1 AND valid_to_date IS NULL) OR (is_current = 0 AND valid_to_date IS NOT NULL)"
+    
+    - rule_id: BR_BPI_004
+      description: "Identifier value must match format regex"
+      severity: WARNING
+      validation_query: |
+        SELECT b.party_key, b.identifier_type_code, b.identifier_value
+        FROM warehouse.bridge_party_identifier b
+        JOIN reference.ref_identifier_type r 
+            ON b.identifier_type_code = r.identifier_type_code
+            AND (b.country_code = r.country_code OR r.country_code IS NULL)
+        WHERE r.format_regex IS NOT NULL
+          AND b.identifier_value NOT REGEXP r.format_regex
+    
+    - rule_id: BR_BPI_005
+      description: "Verified identifiers should have verification_date"
+      severity: WARNING
+      validation: "is_verified = 0 OR verification_date IS NOT NULL"
+    
+    - rule_id: BR_BPI_006
+      description: "Expiring identifiers should have expiry_date"
+      severity: INFO
+      validation: |
+        identifier_type_code NOT IN ('PASSPORT', 'NATID') OR expiry_date IS NOT NULL
+
+# ==============================================================================
+# ETL Source Mapping
+# ==============================================================================
+etl_source:
+  source_system: "L2_CANONICAL"
+  source_table: "party.party_identifier"
+  
+  load_strategy: "INCREMENTAL"
+  load_frequency: "DAILY"
+  
+  key_mappings:
+    - source: "party_identifier.party_id"
+      target: "party_source_id"
+      transformation: "Direct mapping"
+    
+    - source: "party_identifier.party_id"
+      target: "party_key"
+      transformation: "Lookup current party_key from dim_party WHERE party_source_id AND is_current = 1"
+    
+    - source: "party_identifier.identifier_type_code"
+      target: "identifier_type_code"
+      transformation: "Direct mapping"
+    
+    - source: "party_identifier.country_code"
+      target: "country_code"
+      transformation: "Direct mapping"
+    
+    - source: "party_identifier.identifier_value"
+      target: "identifier_value"
+      transformation: "Direct mapping"
+    
+    - source: "party_identifier.identifier_value_normalized"
+      target: "identifier_value_normalized"
+      transformation: "Use source if populated, else compute UPPER(REPLACE(...))"
+    
+    - source: "ref_identifier_type.identifier_name"
+      target: "identifier_type_name"
+      transformation: "Lookup from ref_identifier_type"
+    
+    - source: "ref_identifier_type.is_tax_identifier"
+      target: "is_tax_identifier"
+      transformation: "Lookup from ref_identifier_type"
+
+# ==============================================================================
+# Sample Data
+# ==============================================================================
+sample_data:
+  # Malta individual - TIN
+  - party_key: 1001
+    party_source_id: 1001
+    identifier_type_code: "TIN"
+    identifier_type_name: "Tax Identification Number"
+    country_code: "MLT"
+    identifier_value: "123456789"
+    identifier_value_normalized: "123456789"
+    is_primary: 1
+    is_tax_identifier: 1
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    verification_date: "2024-01-15 10:30:00"
+    verification_source: "ONLINE_API"
+    valid_from_date: "2020-01-01"
+    is_current: 1
+    etl_batch_id: 1
+    etl_load_timestamp: "2025-01-01 00:00:00"
+    l2_source_id: 10001
+  
+  # Malta individual - National ID Card
+  - party_key: 1001
+    party_source_id: 1001
+    identifier_type_code: "NATID"
+    identifier_type_name: "Malta ID Card"
+    country_code: "MLT"
+    identifier_value: "123456M"
+    identifier_value_normalized: "123456M"
+    is_primary: 1
+    is_tax_identifier: 0
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2020-01-01"
+    is_current: 1
+    etl_batch_id: 1
+    etl_load_timestamp: "2025-01-01 00:00:00"
+    l2_source_id: 10002
+  
+  # Malta enterprise - TIN
+  - party_key: 2001
+    party_source_id: 2001
+    identifier_type_code: "TIN"
+    identifier_type_name: "Tax Identification Number"
+    country_code: "MLT"
+    identifier_value: "987654321"
+    identifier_value_normalized: "987654321"
+    is_primary: 1
+    is_tax_identifier: 1
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2015-03-01"
+    is_current: 1
+    etl_batch_id: 50
+    etl_load_timestamp: "2025-06-01 00:00:00"
+    l2_source_id: 20001
+  
+  # Malta enterprise - VAT
+  - party_key: 2001
+    party_source_id: 2001
+    identifier_type_code: "VAT"
+    identifier_type_name: "VAT Registration Number"
+    country_code: "MLT"
+    identifier_value: "MT98765432"
+    identifier_value_normalized: "MT98765432"
+    is_primary: 1
+    is_tax_identifier: 0
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2015-03-01"
+    is_current: 1
+    etl_batch_id: 50
+    etl_load_timestamp: "2025-06-01 00:00:00"
+    l2_source_id: 20002
+  
+  # Malta enterprise - EORI
+  - party_key: 2001
+    party_source_id: 2001
+    identifier_type_code: "EORI"
+    identifier_type_name: "Economic Operators Registration and Identification"
+    country_code: "MLT"
+    identifier_value: "MT987654321000"
+    identifier_value_normalized: "MT987654321000"
+    is_primary: 1
+    is_tax_identifier: 0
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2015-03-01"
+    is_current: 1
+    etl_batch_id: 50
+    etl_load_timestamp: "2025-06-01 00:00:00"
+    l2_source_id: 20003
+  
+  # Malta enterprise - Company Registration
+  - party_key: 2001
+    party_source_id: 2001
+    identifier_type_code: "ROC"
+    identifier_type_name: "Company Registration Number"
+    country_code: "MLT"
+    identifier_value: "C12345"
+    identifier_value_normalized: "C12345"
+    is_primary: 1
+    is_tax_identifier: 0
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    issued_date: "2010-03-15"
+    issued_by: "Malta Business Registry"
+    valid_from_date: "2010-03-15"
+    is_current: 1
+    etl_batch_id: 50
+    etl_load_timestamp: "2025-06-01 00:00:00"
+    l2_source_id: 20004
+  
+  # Sri Lanka individual - TIN
+  - party_key: 3001
+    party_source_id: 3001
+    identifier_type_code: "TIN"
+    identifier_type_name: "Tax Identification Number"
+    country_code: "LKA"
+    identifier_value: "123456789"
+    identifier_value_normalized: "123456789"
+    is_primary: 1
+    is_tax_identifier: 1
+    is_verified: 0
+    verification_status_code: "UNVERIFIED"
+    valid_from_date: "2023-01-01"
+    is_current: 1
+    etl_batch_id: 100
+    etl_load_timestamp: "2025-03-01 00:00:00"
+    l2_source_id: 30001
+  
+  # Sri Lanka individual - NIC (new format)
+  - party_key: 3001
+    party_source_id: 3001
+    identifier_type_code: "NIC"
+    identifier_type_name: "National Identity Card"
+    country_code: "LKA"
+    identifier_value: "199012345678"
+    identifier_value_normalized: "199012345678"
+    is_primary: 1
+    is_tax_identifier: 0
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2023-01-01"
+    is_current: 1
+    etl_batch_id: 100
+    etl_load_timestamp: "2025-03-01 00:00:00"
+    l2_source_id: 30002
+  
+  # Moldova enterprise - IDNO
+  - party_key: 4001
+    party_source_id: 4001
+    identifier_type_code: "IDNO"
+    identifier_type_name: "Fiscal Code (Enterprise)"
+    country_code: "MDA"
+    identifier_value: "1234567890123"
+    identifier_value_normalized: "1234567890123"
+    is_primary: 1
+    is_tax_identifier: 1
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2018-06-15"
+    is_current: 1
+    etl_batch_id: 150
+    etl_load_timestamp: "2025-04-01 00:00:00"
+    l2_source_id: 40001
+  
+  # Moldova enterprise - VAT
+  - party_key: 4001
+    party_source_id: 4001
+    identifier_type_code: "VAT"
+    identifier_type_name: "VAT Registration Number"
+    country_code: "MDA"
+    identifier_value: "1234567890123"
+    identifier_value_normalized: "1234567890123"
+    is_primary: 1
+    is_tax_identifier: 0
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2018-06-15"
+    is_current: 1
+    etl_batch_id: 150
+    etl_load_timestamp: "2025-04-01 00:00:00"
+    l2_source_id: 40002
+  
+  # Ukraine individual - IPN
+  - party_key: 5001
+    party_source_id: 5001
+    identifier_type_code: "IPN"
+    identifier_type_name: "Individual Tax Number"
+    country_code: "UKR"
+    identifier_value: "1234567890"
+    identifier_value_normalized: "1234567890"
+    is_primary: 1
+    is_tax_identifier: 1
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2022-01-01"
+    is_current: 1
+    etl_batch_id: 200
+    etl_load_timestamp: "2025-05-01 00:00:00"
+    l2_source_id: 50001
+  
+  # Lebanon enterprise - TIN
+  - party_key: 6001
+    party_source_id: 6001
+    identifier_type_code: "TIN"
+    identifier_type_name: "Tax Identification Number"
+    country_code: "LBN"
+    identifier_value: "12345678"
+    identifier_value_normalized: "12345678"
+    is_primary: 1
+    is_tax_identifier: 1
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2019-01-01"
+    is_current: 1
+    etl_batch_id: 250
+    etl_load_timestamp: "2025-06-01 00:00:00"
+    l2_source_id: 60001
+  
+  # Lebanon enterprise - VAT
+  - party_key: 6001
+    party_source_id: 6001
+    identifier_type_code: "VAT"
+    identifier_type_name: "VAT Registration Number"
+    country_code: "LBN"
+    identifier_value: "12345678-001"
+    identifier_value_normalized: "12345678001"
+    is_primary: 1
+    is_tax_identifier: 0
+    is_verified: 1
+    verification_status_code: "VERIFIED"
+    valid_from_date: "2019-01-01"
+    is_current: 1
+    etl_batch_id: 250
+    etl_load_timestamp: "2025-06-01 00:00:00"
+    l2_source_id: 60002
+
+# ==============================================================================
+# ClickHouse DDL
+# ==============================================================================
+clickhouse_ddl:
+  database: ta_rdm_warehouse
+  engine: MergeTree()
+  order_by: [party_key, identifier_type_code, country_code, valid_from_date]
+  primary_key: [party_key, identifier_type_code]
+  
+  ddl: |
+    -- ============================================================================
+    -- TA-RDM L3: bridge_party_identifier (Multi-Identifier Bridge)
+    -- ============================================================================
+    -- Version: 1.0.0
+    -- Pattern: P2 (Multi-Identifier Party)
+    -- Engine: MergeTree()
+    -- ============================================================================
+    
+    CREATE TABLE IF NOT EXISTS ta_rdm_warehouse.bridge_party_identifier
+    (
+        -- Keys
+        party_key Int64 COMMENT 'FK to dim_party (current version)',
+        party_source_id Int64 COMMENT 'L2 party.party.party_id',
+        
+        -- Identifier Definition
+        identifier_type_code LowCardinality(String) COMMENT 'TIN, VAT, EORI, NATID, etc.',
+        identifier_type_name Nullable(String) COMMENT 'Human-readable type name',
+        country_code FixedString(3) COMMENT 'ISO 3166-1 alpha-3 issuing country',
+        
+        -- Identifier Value
+        identifier_value String COMMENT 'The identifier value',
+        identifier_value_normalized Nullable(String) COMMENT 'Normalized for matching',
+        
+        -- Flags
+        is_primary UInt8 DEFAULT 0 COMMENT 'Primary of this type (1=Yes)',
+        is_tax_identifier UInt8 DEFAULT 0 COMMENT 'Is tax identifier (1=Yes)',
+        is_verified UInt8 DEFAULT 0 COMMENT 'Has been verified (1=Yes)',
+        
+        -- Verification
+        verification_status_code Nullable(LowCardinality(String)) COMMENT 'UNVERIFIED, PENDING, VERIFIED, FAILED, EXPIRED',
+        verification_date Nullable(DateTime64(3)) COMMENT 'When last verified',
+        verification_source Nullable(String) COMMENT 'ONLINE_API, DOCUMENT, MANUAL, THIRD_PARTY',
+        verification_reference Nullable(String) COMMENT 'Reference from verification',
+        
+        -- Lifecycle
+        issued_date Nullable(Date32) COMMENT 'Date identifier was issued',
+        expiry_date Nullable(Date32) COMMENT 'Date identifier expires',
+        issued_by Nullable(String) COMMENT 'Issuing authority',
+        
+        -- Validity
+        valid_from_date Date32 COMMENT 'When identifier became valid for party',
+        valid_to_date Nullable(Date32) COMMENT 'When identifier ceased to be valid',
+        is_current UInt8 DEFAULT 1 COMMENT 'Currently valid (1=Yes)',
+        replacement_identifier_id Nullable(Int64) COMMENT 'FK to replacement identifier',
+        
+        -- ETL Metadata
+        etl_batch_id Int64,
+        etl_load_timestamp DateTime64(3) DEFAULT now64(),
+        l2_source_id Nullable(Int64) COMMENT 'party_identifier_id from L2'
+    )
+    ENGINE = MergeTree()
+    ORDER BY (party_key, identifier_type_code, country_code, valid_from_date)
+    SETTINGS index_granularity = 8192;
+    
+    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_bpi_identifier_lookup 
+        ON ta_rdm_warehouse.bridge_party_identifier (identifier_type_code, country_code, identifier_value) 
+        TYPE bloom_filter GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_bpi_normalized_lookup 
+        ON ta_rdm_warehouse.bridge_party_identifier (identifier_type_code, country_code, identifier_value_normalized) 
+        TYPE bloom_filter GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_bpi_tax_id 
+        ON ta_rdm_warehouse.bridge_party_identifier (country_code, identifier_value) 
+        TYPE bloom_filter GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_bpi_verification 
+        ON ta_rdm_warehouse.bridge_party_identifier (verification_status_code) 
+        TYPE set(0) GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_bpi_current 
+        ON ta_rdm_warehouse.bridge_party_identifier (is_current) 
+        TYPE minmax GRANULARITY 1;
+
+# ==============================================================================
+# Query Patterns
+# ==============================================================================
+query_patterns:
+  - name: "Get all identifiers for a party"
+    description: "Return all current identifiers for a specific party"
+    sql: |
+      SELECT 
+          identifier_type_code,
+          identifier_type_name,
+          country_code,
+          identifier_value,
+          is_primary,
+          is_tax_identifier,
+          is_verified
+      FROM ta_rdm_warehouse.bridge_party_identifier
+      WHERE party_key = :party_key 
+        AND is_current = 1
+      ORDER BY is_tax_identifier DESC, is_primary DESC, identifier_type_code
+  
+  - name: "Find party by VAT number"
+    description: "Look up party by VAT registration number"
+    sql: |
+      SELECT p.* 
+      FROM ta_rdm_warehouse.dim_party p
+      JOIN ta_rdm_warehouse.bridge_party_identifier b 
+          ON p.party_key = b.party_key
+      WHERE b.identifier_type_code = 'VAT' 
+        AND b.identifier_value = :vat_number
+        AND b.is_current = 1
+        AND p.is_current = 1
+  
+  - name: "Find party by any identifier"
+    description: "Look up party by any identifier type and value"
+    sql: |
+      SELECT p.*, b.identifier_type_code, b.identifier_value
+      FROM ta_rdm_warehouse.dim_party p
+      JOIN ta_rdm_warehouse.bridge_party_identifier b 
+          ON p.party_key = b.party_key
+      WHERE b.identifier_type_code = :type_code
+        AND b.country_code = :country_code
+        AND b.identifier_value_normalized = UPPER(REPLACE(:value, ' ', ''))
+        AND b.is_current = 1
+        AND p.is_current = 1
+  
+  - name: "Get primary tax ID for each party"
+    description: "Return primary tax identifier for all parties"
+    sql: |
+      SELECT 
+          p.party_key, 
+          p.display_name, 
+          p.country_code,
+          b.identifier_type_code,
+          b.identifier_value as tax_id
+      FROM ta_rdm_warehouse.dim_party p
+      JOIN ta_rdm_warehouse.bridge_party_identifier b 
+          ON p.party_key = b.party_key
+      WHERE b.is_tax_identifier = 1 
+        AND b.is_primary = 1 
+        AND b.is_current = 1
+        AND p.is_current = 1
+  
+  - name: "Find identifiers expiring soon"
+    description: "Alert for expiring identifiers"
+    sql: |
+      SELECT 
+          p.display_name,
+          b.identifier_type_code,
+          b.identifier_value,
+          b.expiry_date
+      FROM ta_rdm_warehouse.dim_party p
+      JOIN ta_rdm_warehouse.bridge_party_identifier b 
+          ON p.party_key = b.party_key
+      WHERE b.expiry_date IS NOT NULL
+        AND b.expiry_date BETWEEN today() AND today() + INTERVAL 30 DAY
+        AND b.is_current = 1
+        AND p.is_current = 1
+      ORDER BY b.expiry_date
+  
+  - name: "Find unverified identifiers"
+    description: "Compliance check for unverified identifiers"
+    sql: |
+      SELECT 
+          p.display_name,
+          b.identifier_type_code,
+          b.identifier_value,
+          b.verification_status_code,
+          b.valid_from_date
+      FROM ta_rdm_warehouse.dim_party p
+      JOIN ta_rdm_warehouse.bridge_party_identifier b 
+          ON p.party_key = b.party_key
+      WHERE b.verification_status_code IN ('UNVERIFIED', 'PENDING', 'FAILED')
+        AND b.is_current = 1
+        AND p.is_current = 1
+      ORDER BY b.valid_from_date
+  
+  - name: "Identifier history for audit"
+    description: "Full identifier history for a party (including superseded)"
+    sql: |
+      SELECT 
+          identifier_type_code,
+          identifier_value,
+          valid_from_date,
+          valid_to_date,
+          is_current,
+          verification_status_code,
+          verification_date
+      FROM ta_rdm_warehouse.bridge_party_identifier
+      WHERE party_source_id = :party_source_id
+      ORDER BY identifier_type_code, valid_from_date DESC
+
+# ==============================================================================
+# Integration Guide
+# ==============================================================================
+integration:
+  description: |
+    bridge_party_identifier implements the multi-identifier party pattern.
+    Use this table when:
+    - Looking up party by any identifier type
+    - Displaying all identifiers for a party
+    - Tracking identifier verification status
+    - Auditing identifier changes over time
+    
+    For standard fact table joins, use dim_party.primary_tax_id directly.
+    The bridge table is for more complex identifier scenarios.
+  
+  relationship_to_dim_party: |
+    dim_party contains denormalized primary_tax_id and secondary_id for
+    query convenience. bridge_party_identifier contains the full history
+    of all identifiers.
+    
+    When dim_party is updated:
+    - primary_tax_id → pulled from bridge where is_tax_identifier=1, is_primary=1
+    - secondary_id → pulled from bridge where identifier_type_code='VAT', is_primary=1
+  
+  etl_notes: |
+    Load bridge_party_identifier BEFORE updating dim_party primary/secondary IDs.
+    Use party_source_id for stable joins across SCD Type 2 versions.
+    Update party_key when dim_party version changes.
+
+# ==============================================================================
+# Validation Criteria
+# ==============================================================================
+# | Check                        | Expected                                    |
+# |------------------------------|---------------------------------------------|
+# | Bridge type                  | Many-to-many party-identifier link          |
+# | Grain                        | One row per party per identifier            |
+# | party_key FK                 | References dim_party                        |
+# | Country context              | country_code for issuing country            |
+# | Identifier types             | TIN, VAT, EORI, NATID, PASSPORT, BRN, etc.  |
+# | Normalization                | identifier_value_normalized for matching    |
+# | Verification tracking        | Status, date, source, reference             |
+# | Validity tracking            | valid_from_date, valid_to_date, is_current  |
+# | Sample data                  | 14 identifiers across 6 parties, 5 countries|
+# | Business rules               | 6 rules defined                             |
+# | Query patterns               | 7 patterns documented                       |
+# | ClickHouse DDL               | Included with 5 indexes                     |
+# ==============================================================================

@@ -1,0 +1,2135 @@
+# ============================================================================
+# MTCA Forms - Priority 5E: Payment Data Reporting (CESOP) & Cross-Border VAT Refunds
+# Forms: CESOP Report, PSP Registration, VAT Refund Claim (8th/13th Directive)
+# Version: 1.0
+# Date: 2025-12-08
+# Purpose: ORS Database Schema Design and EU Payment/VAT Refund Compliance
+# Standards: Council Directive 2020/284/EU (CESOP), 2008/9/EC (VAT Refunds)
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # CESOP_REPORT: Central Electronic System of Payment Information
+  # Council Directive 2020/284/EU
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "CESOP_REPORT"
+        form_name_en: "CESOP Payment Data Report"
+        form_name_mt: "Rapport tad-Data tal-Ä¦las CESOP"
+        version: "1.0"
+        effective_from: "2024-01-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive 2020/284/EU"
+        subsidiary_legislation:
+          - "S.L.406.01 - VAT Regulations"
+          - "Financial Institutions Act Cap. 376"
+        administering_authority: "CFR"
+        tax_type: "VAT / Payment Information"
+        taxpayer_category: "Payment Service Provider"
+        filing_frequency: "Quarterly"
+        filing_deadline: "End of month following quarter"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "CFR CESOP Portal"
+        xml_schema_ref: "urn:eu:taxud:cesop:v1"
+        exchange_partner: "EU Member States (via CESOP Central System)"
+        source_url: "https://cfr.gov.mt/en/vat/Pages/CESOP.aspx"
+        notes: |
+          The Central Electronic System of Payment Information (CESOP) requires
+          payment service providers (PSPs) to report cross-border payment data
+          to help tax authorities detect VAT fraud in e-commerce. PSPs must report
+          when they process more than 25 cross-border payments to the same payee
+          per quarter. Data is aggregated at EU level to identify undeclared
+          e-commerce activities. Effective from 1 January 2024.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section: Report Header
+        # ----------------------------------------------------------------------
+        - section_id: "REPORT_HEADER"
+          section_name: "Report Header"
+          section_description: "CESOP report identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "cesop:CESOP_Report/cesop:Header"
+          fields:
+            - field_id: "message_ref_id"
+              field_code: "MessageRefId"
+              field_name_en: "Message Reference ID"
+              field_name_mt: "ID ta' Referenza tal-MessaÄ¡Ä¡"
+              field_description: "Unique identifier for this CESOP message"
+              data_type: "STRING"
+              format: null
+              max_length: 170
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "GENERATE_UUID()"
+              xml_element: "cesop:MessageSpec/cesop:MessageRefId"
+              validation_rules:
+                - rule_id: "CESOP_HDR_001"
+                  rule_type: "uniqueness"
+                  rule_description: "Must be unique per PSP"
+                  rule_expression: "UNIQUE(message_ref_id, psp_id)"
+                  error_message_en: "Message reference ID already exists"
+                  error_message_mt: "L-ID ta' referenza tal-messaÄ¡Ä¡ diÄ¡Ã  jeÅ¼isti"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_reports"
+                column: "message_ref_id"
+              ors_mapping:
+                table: "mtca_ors.cesop_reports"
+                column: "message_ref_id"
+                data_type: "String"
+
+            - field_id: "message_type"
+              field_code: "MessageType"
+              field_name_en: "Message Type"
+              field_name_mt: "Tip tal-MessaÄ¡Ä¡"
+              field_description: "Type of CESOP message"
+              data_type: "CODE"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "PMT"
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:MessageSpec/cesop:MessageType"
+              validation_rules: []
+              allowed_values:
+                - code: "PMT"
+                  description_en: "Payment data report"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_reports"
+                column: "message_type"
+              ors_mapping:
+                table: "mtca_ors.cesop_reports"
+                column: "message_type"
+                data_type: "String"
+
+            - field_id: "message_type_indic"
+              field_code: "MessageTypeIndic"
+              field_name_en: "Message Type Indicator"
+              field_name_mt: "Indikatur tat-Tip tal-MessaÄ¡Ä¡"
+              field_description: "Indicates if new, corrected, or deletion"
+              data_type: "CODE"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:MessageSpec/cesop:MessageTypeIndic"
+              validation_rules: []
+              allowed_values:
+                - code: "CESOP1"
+                  description_en: "New data"
+                - code: "CESOP2"
+                  description_en: "Corrected data"
+                - code: "CESOP3"
+                  description_en: "Deletion"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_reports"
+                column: "message_type_indic"
+              ors_mapping:
+                table: "mtca_ors.cesop_reports"
+                column: "message_type_indic"
+                data_type: "Enum8('CESOP1'=1,'CESOP2'=2,'CESOP3'=3)"
+
+            - field_id: "reporting_period"
+              field_code: "ReportingPeriod"
+              field_name_en: "Reporting Period"
+              field_name_mt: "Perjodu ta' Rappurtar"
+              field_description: "Quarter being reported (YYYY-QN)"
+              data_type: "STRING"
+              format: "YYYY-QN"
+              max_length: 7
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:MessageSpec/cesop:ReportingPeriod"
+              validation_rules:
+                - rule_id: "CESOP_HDR_002"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid quarter format"
+                  rule_expression: "^[0-9]{4}-Q[1-4]$"
+                  error_message_en: "Invalid reporting period format"
+                  error_message_mt: "Format tal-perjodu ta' rappurtar mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_reports"
+                column: "reporting_period"
+              ors_mapping:
+                table: "mtca_ors.cesop_reports"
+                column: "reporting_period"
+                data_type: "String"
+
+            - field_id: "timestamp"
+              field_code: "Timestamp"
+              field_name_en: "Transmission Timestamp"
+              field_name_mt: "Timestamp tat-Trasmissjoni"
+              field_description: "Date and time of message creation"
+              data_type: "DATETIME"
+              format: "YYYY-MM-DDTHH:MM:SS"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "CURRENT_TIMESTAMP()"
+              xml_element: "cesop:MessageSpec/cesop:Timestamp"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_reports"
+                column: "created_timestamp"
+              ors_mapping:
+                table: "mtca_ors.cesop_reports"
+                column: "created_timestamp"
+                data_type: "DateTime"
+
+        # ----------------------------------------------------------------------
+        # Section: Payment Service Provider
+        # ----------------------------------------------------------------------
+        - section_id: "PSP_INFO"
+          section_name: "Payment Service Provider"
+          section_description: "Information about the reporting PSP"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "cesop:CESOP_Report/cesop:PSPBody/cesop:ReportingPSP"
+          fields:
+            - field_id: "psp_id"
+              field_code: "PSPId"
+              field_name_en: "PSP Identifier"
+              field_name_mt: "Identifikatur tal-PSP"
+              field_description: "Unique identifier of the PSP (BIC or national ID)"
+              data_type: "STRING"
+              format: null
+              max_length: 35
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:PSPId/cesop:PSPIdType"
+              validation_rules:
+                - rule_id: "CESOP_PSP_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid BIC or national identifier"
+                  rule_expression: "^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$|^[A-Z0-9]{1,35}$"
+                  error_message_en: "Invalid PSP identifier format"
+                  error_message_mt: "Format tal-identifikatur tal-PSP mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "PSP_REGISTRATION.psp_id"
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_reports"
+                column: "psp_id"
+              ors_mapping:
+                table: "mtca_ors.cesop_reports"
+                column: "psp_id"
+                data_type: "String"
+
+            - field_id: "psp_id_type"
+              field_code: "PSPIdType"
+              field_name_en: "PSP Identifier Type"
+              field_name_mt: "Tip tal-Identifikatur tal-PSP"
+              field_description: "Type of PSP identifier"
+              data_type: "CODE"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:PSPId/@PSPIdType"
+              validation_rules: []
+              allowed_values:
+                - code: "BIC"
+                  description_en: "Bank Identifier Code (ISO 9362)"
+                - code: "OTHER"
+                  description_en: "Other national identifier"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_reports"
+                column: "psp_id_type"
+              ors_mapping:
+                table: "mtca_ors.cesop_reports"
+                column: "psp_id_type"
+                data_type: "Enum8('BIC'=1,'OTHER'=2)"
+
+            - field_id: "psp_name"
+              field_code: "PSPName"
+              field_name_en: "PSP Name"
+              field_name_mt: "Isem tal-PSP"
+              field_description: "Legal name of the payment service provider"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:Name"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_reports"
+                column: "psp_name"
+              ors_mapping:
+                table: "mtca_ors.cesop_reports"
+                column: "psp_name"
+                data_type: "String"
+
+            - field_id: "psp_country"
+              field_code: "PSPCountry"
+              field_name_en: "PSP Country"
+              field_name_mt: "PajjiÅ¼ tal-PSP"
+              field_description: "Country where PSP is located"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "MT"
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:Address/cesop:CountryCode"
+              validation_rules:
+                - rule_id: "CESOP_PSP_002"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid EU Member State"
+                  rule_expression: "IN(eu_member_states)"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_member_states"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_reports"
+                column: "psp_country"
+              ors_mapping:
+                table: "mtca_ors.cesop_reports"
+                column: "psp_country"
+                data_type: "FixedString(2)"
+
+        # ----------------------------------------------------------------------
+        # Section: Reported Payee
+        # ----------------------------------------------------------------------
+        - section_id: "REPORTED_PAYEE"
+          section_name: "Reported Payee"
+          section_description: "Payee information (when threshold exceeded)"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "cesop:CESOP_Report/cesop:PSPBody/cesop:ReportedPayee"
+          fields:
+            - field_id: "payee_doc_ref_id"
+              field_code: "DocRefId"
+              field_name_en: "Document Reference ID"
+              field_name_mt: "ID ta' Referenza tad-Dokument"
+              field_description: "Unique identifier for this payee record"
+              data_type: "STRING"
+              format: null
+              max_length: 170
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "GENERATE_UUID()"
+              xml_element: "cesop:DocSpec/cesop:DocRefId"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "doc_ref_id"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "doc_ref_id"
+                data_type: "String"
+
+            - field_id: "payee_name"
+              field_code: "PayeeName"
+              field_name_en: "Payee Name"
+              field_name_mt: "Isem tal-BenefiÄ‹jarju"
+              field_description: "Name of the payee (individual or business)"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:Name"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "payee_name"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "payee_name"
+                data_type: "String"
+
+            - field_id: "payee_vat_id"
+              field_code: "VATId"
+              field_name_en: "Payee VAT Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tal-VAT tal-BenefiÄ‹jarju"
+              field_description: "VAT number of the payee if known"
+              data_type: "STRING"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:TAXId/cesop:VATId"
+              validation_rules:
+                - rule_id: "CESOP_PAY_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid EU VAT number format if provided"
+                  rule_expression: "^[A-Z]{2}[A-Za-z0-9]{2,13}$|^$"
+                  error_message_en: "Invalid VAT number format"
+                  error_message_mt: "Format tan-numru tal-VAT mhux validu"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "vat_id"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "vat_id"
+                data_type: "Nullable(String)"
+
+            - field_id: "payee_tax_id"
+              field_code: "TaxId"
+              field_name_en: "Payee Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa tal-BenefiÄ‹jarju"
+              field_description: "National tax ID of the payee if VAT not available"
+              data_type: "STRING"
+              format: null
+              max_length: 30
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:TAXId/cesop:TaxId"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "tax_id"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "tax_id"
+                data_type: "Nullable(String)"
+
+            - field_id: "payee_address_street"
+              field_code: "Street"
+              field_name_en: "Street Address"
+              field_name_mt: "Indirizz tat-Triq"
+              field_description: "Street address of the payee"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:Address/cesop:Street"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "address_street"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "address_street"
+                data_type: "Nullable(String)"
+
+            - field_id: "payee_address_city"
+              field_code: "City"
+              field_name_en: "City"
+              field_name_mt: "Belt"
+              field_description: "City of the payee"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:Address/cesop:City"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "address_city"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "address_city"
+                data_type: "Nullable(String)"
+
+            - field_id: "payee_address_postcode"
+              field_code: "PostCode"
+              field_name_en: "Postal Code"
+              field_name_mt: "KodiÄ‹i Postali"
+              field_description: "Postal code of the payee"
+              data_type: "STRING"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:Address/cesop:PostCode"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "address_postcode"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "address_postcode"
+                data_type: "Nullable(String)"
+
+            - field_id: "payee_address_country"
+              field_code: "CountryCode"
+              field_name_en: "Country"
+              field_name_mt: "PajjiÅ¼"
+              field_description: "Country code of the payee"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:Address/cesop:CountryCode"
+              validation_rules:
+                - rule_id: "CESOP_PAY_002"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO country code"
+                  rule_expression: "IN(iso_3166_1_alpha2)"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_3166_1_alpha2"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "address_country"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "address_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "payee_account_id"
+              field_code: "AccountId"
+              field_name_en: "Payee Account Identifier"
+              field_name_mt: "Identifikatur tal-Kont tal-BenefiÄ‹jarju"
+              field_description: "IBAN or other account identifier of the payee"
+              data_type: "STRING"
+              format: null
+              max_length: 34
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:AccountIdentifier/cesop:Identifier"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "account_id"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "account_id"
+                data_type: "String"
+
+            - field_id: "payee_account_type"
+              field_code: "AccountType"
+              field_name_en: "Account Type"
+              field_name_mt: "Tip tal-Kont"
+              field_description: "Type of account identifier"
+              data_type: "CODE"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:AccountIdentifier/@Type"
+              validation_rules: []
+              allowed_values:
+                - code: "IBAN"
+                  description_en: "International Bank Account Number"
+                - code: "OBAN"
+                  description_en: "Other Bank Account Number"
+                - code: "Other"
+                  description_en: "Other identifier (e.g., e-wallet)"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_payees"
+                column: "account_type"
+              ors_mapping:
+                table: "mtca_ors.cesop_payees"
+                column: "account_type"
+                data_type: "Enum8('IBAN'=1,'OBAN'=2,'Other'=3)"
+
+        # ----------------------------------------------------------------------
+        # Section: Reported Transactions
+        # ----------------------------------------------------------------------
+        - section_id: "REPORTED_TRANSACTIONS"
+          section_name: "Reported Transactions"
+          section_description: "Cross-border payment transaction details"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "cesop:CESOP_Report/cesop:PSPBody/cesop:ReportedPayee/cesop:ReportedTransaction"
+          fields:
+            - field_id: "transaction_id"
+              field_code: "TransactionId"
+              field_name_en: "Transaction Identifier"
+              field_name_mt: "Identifikatur tat-TranÅ¼azzjoni"
+              field_description: "Unique identifier for this transaction"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:TransactionIdentifier"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_transactions"
+                column: "transaction_id"
+              ors_mapping:
+                table: "mtca_ors.cesop_transactions"
+                column: "transaction_id"
+                data_type: "String"
+
+            - field_id: "transaction_datetime"
+              field_code: "DateTime"
+              field_name_en: "Transaction Date and Time"
+              field_name_mt: "Data u Ä¦in tat-TranÅ¼azzjoni"
+              field_description: "Date and time of the payment"
+              data_type: "DATETIME"
+              format: "YYYY-MM-DDTHH:MM:SS"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:DateTime"
+              validation_rules:
+                - rule_id: "CESOP_TXN_001"
+                  rule_type: "range"
+                  rule_description: "Must be within reporting quarter"
+                  rule_expression: "WITHIN_REPORTING_PERIOD(transaction_datetime, reporting_period)"
+                  error_message_en: "Transaction date outside reporting period"
+                  error_message_mt: "Id-data tat-tranÅ¼azzjoni barra mill-perjodu ta' rappurtar"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_transactions"
+                column: "transaction_datetime"
+              ors_mapping:
+                table: "mtca_ors.cesop_transactions"
+                column: "transaction_datetime"
+                data_type: "DateTime"
+
+            - field_id: "amount"
+              field_code: "Amount"
+              field_name_en: "Transaction Amount"
+              field_name_mt: "Ammont tat-TranÅ¼azzjoni"
+              field_description: "Amount of the payment"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:Amount"
+              validation_rules:
+                - rule_id: "CESOP_TXN_002"
+                  rule_type: "range"
+                  rule_description: "Amount must be positive"
+                  rule_expression: "amount > 0"
+                  error_message_en: "Transaction amount must be positive"
+                  error_message_mt: "L-ammont tat-tranÅ¼azzjoni irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_transactions"
+                column: "amount"
+              ors_mapping:
+                table: "mtca_ors.cesop_transactions"
+                column: "amount"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "currency"
+              field_code: "Currency"
+              field_name_en: "Currency"
+              field_name_mt: "Munita"
+              field_description: "Currency code of the transaction"
+              data_type: "CODE"
+              format: "AAA"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:Amount/@currCode"
+              validation_rules:
+                - rule_id: "CESOP_TXN_003"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO 4217 currency"
+                  rule_expression: "IN(iso_4217)"
+                  error_message_en: "Invalid currency code"
+                  error_message_mt: "KodiÄ‹i tal-munita mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_4217"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_transactions"
+                column: "currency"
+              ors_mapping:
+                table: "mtca_ors.cesop_transactions"
+                column: "currency"
+                data_type: "FixedString(3)"
+
+            - field_id: "payer_ms"
+              field_code: "PayerMS"
+              field_name_en: "Payer Member State"
+              field_name_mt: "Stat Membru tal-Pagatur"
+              field_description: "Member State where payer is located"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:PayerMS"
+              validation_rules:
+                - rule_id: "CESOP_TXN_004"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid EU Member State"
+                  rule_expression: "IN(eu_member_states)"
+                  error_message_en: "Invalid Member State code"
+                  error_message_mt: "KodiÄ‹i tal-Istat Membru mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_member_states"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_transactions"
+                column: "payer_ms"
+              ors_mapping:
+                table: "mtca_ors.cesop_transactions"
+                column: "payer_ms"
+                data_type: "FixedString(2)"
+
+            - field_id: "is_refund"
+              field_code: "IsRefund"
+              field_name_en: "Refund Indicator"
+              field_name_mt: "Indikatur ta' RifuÅ¼joni"
+              field_description: "Indicates if this is a refund transaction"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:IsRefund"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_transactions"
+                column: "is_refund"
+              ors_mapping:
+                table: "mtca_ors.cesop_transactions"
+                column: "is_refund"
+                data_type: "UInt8"
+
+            - field_id: "initial_transaction_id"
+              field_code: "InitialTransactionId"
+              field_name_en: "Initial Transaction ID"
+              field_name_mt: "ID tat-TranÅ¼azzjoni Inizjali"
+              field_description: "Reference to original transaction (for refunds)"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: false
+              required_condition: "is_refund = true"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "cesop:TransactionIdentifier/@InitialTransactionIdentifier"
+              validation_rules:
+                - rule_id: "CESOP_TXN_005"
+                  rule_type: "conditional_required"
+                  rule_description: "Required if transaction is a refund"
+                  rule_expression: "IF is_refund = true THEN initial_transaction_id IS NOT NULL"
+                  error_message_en: "Initial transaction ID required for refunds"
+                  error_message_mt: "L-ID tat-tranÅ¼azzjoni inizjali meÄ§tieÄ¡ gÄ§ar-rifuÅ¼jonijiet"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "cesop_transactions"
+                column: "initial_transaction_id"
+              ors_mapping:
+                table: "mtca_ors.cesop_transactions"
+                column: "initial_transaction_id"
+                data_type: "Nullable(String)"
+
+      xml_schema:
+        namespace: "urn:eu:taxud:cesop:v1"
+        root_element: "CESOP_Report"
+        schema_version: "1.0"
+        schema_url: "https://ec.europa.eu/taxation_customs/cesop/schema/cesop_v1.xsd"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "PSP_REGISTRATION"
+          relationship_type: "prerequisite"
+          relationship_description: "PSP must be registered before submitting CESOP reports"
+
+      exchange_mechanism:
+        exchange_type: "Automatic"
+        exchange_frequency: "Quarterly"
+        partner_authorities: "EU Member States (via CESOP Central System)"
+        encryption_required: true
+        transmission_protocol: "CESOP Portal"
+
+      submission_workflow:
+        authentication_required: "CFR e-ID credentials"
+        signature_required: true
+        validation_type: "XSD schema and business rules"
+        acknowledgment_type: "Submission receipt"
+
+  # ==========================================================================
+  # PSP_REGISTRATION: Payment Service Provider Registration
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "PSP_REGISTRATION"
+        form_name_en: "Payment Service Provider CESOP Registration"
+        form_name_mt: "ReÄ¡istrazzjoni tal-PSP gÄ§al CESOP"
+        version: "1.0"
+        effective_from: "2024-01-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive 2020/284/EU"
+        subsidiary_legislation:
+          - "S.L.406.01 - VAT Regulations"
+        administering_authority: "CFR"
+        tax_type: "VAT / Payment Information"
+        taxpayer_category: "Payment Service Provider"
+        filing_frequency: "Once (initial registration)"
+        filing_deadline: "Before first CESOP report submission"
+        submission_method: "Electronic Portal"
+        electronic_portal: "CFR e-Services"
+        xml_schema_ref: null
+        exchange_partner: null
+        source_url: "https://cfr.gov.mt/en/vat/Pages/CESOP.aspx"
+        notes: |
+          Payment service providers licensed in Malta must register with CFR
+          before submitting quarterly CESOP reports. Registration provides
+          access to the CESOP submission portal and assigns necessary credentials.
+
+      sections:
+        - section_id: "PSP_DETAILS"
+          section_name: "PSP Details"
+          section_description: "Payment service provider identification"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: null
+          fields:
+            - field_id: "psp_id"
+              field_code: "PSPId"
+              field_name_en: "PSP Identifier (BIC)"
+              field_name_mt: "Identifikatur tal-PSP (BIC)"
+              field_description: "Bank Identifier Code or other unique identifier"
+              data_type: "STRING"
+              format: null
+              max_length: 35
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "PSP_REG_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid BIC format or other identifier"
+                  rule_expression: "^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$|^[A-Z0-9]{1,35}$"
+                  error_message_en: "Invalid PSP identifier format"
+                  error_message_mt: "Format tal-identifikatur tal-PSP mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "psp_registrations"
+                column: "psp_id"
+              ors_mapping:
+                table: "mtca_ors.psp_registrations"
+                column: "psp_id"
+                data_type: "String"
+
+            - field_id: "legal_name"
+              field_code: "LegalName"
+              field_name_en: "Legal Name"
+              field_name_mt: "Isem Legali"
+              field_description: "Full legal name of the PSP"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "psp_registrations"
+                column: "legal_name"
+              ors_mapping:
+                table: "mtca_ors.psp_registrations"
+                column: "legal_name"
+                data_type: "String"
+
+            - field_id: "license_number"
+              field_code: "LicenseNumber"
+              field_name_en: "MFSA License Number"
+              field_name_mt: "Numru tal-LiÄ‹enzja tal-MFSA"
+              field_description: "Malta Financial Services Authority license number"
+              data_type: "STRING"
+              format: null
+              max_length: 30
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "psp_registrations"
+                column: "license_number"
+              ors_mapping:
+                table: "mtca_ors.psp_registrations"
+                column: "license_number"
+                data_type: "String"
+
+            - field_id: "psp_type"
+              field_code: "PSPType"
+              field_name_en: "PSP Type"
+              field_name_mt: "Tip tal-PSP"
+              field_description: "Type of payment service provider"
+              data_type: "CODE"
+              format: null
+              max_length: 30
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules: []
+              allowed_values:
+                - code: "CREDIT_INST"
+                  description_en: "Credit institution"
+                - code: "E_MONEY"
+                  description_en: "Electronic money institution"
+                - code: "PAYMENT_INST"
+                  description_en: "Payment institution"
+                - code: "POST_OFFICE"
+                  description_en: "Post office giro institution"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "psp_registrations"
+                column: "psp_type"
+              ors_mapping:
+                table: "mtca_ors.psp_registrations"
+                column: "psp_type"
+                data_type: "String"
+
+            - field_id: "contact_email"
+              field_code: "ContactEmail"
+              field_name_en: "Contact Email"
+              field_name_mt: "Email ta' Kuntatt"
+              field_description: "Email for CESOP communications"
+              data_type: "EMAIL"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: null
+              validation_rules:
+                - rule_id: "PSP_REG_002"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid email format"
+                  rule_expression: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                  error_message_en: "Invalid email format"
+                  error_message_mt: "Format tal-email mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "payment_db"
+                table: "psp_registrations"
+                column: "contact_email"
+              ors_mapping:
+                table: "mtca_ors.psp_registrations"
+                column: "contact_email"
+                data_type: "String"
+
+      xml_schema: null
+
+      attachments:
+        - attachment_type: "License Copy"
+          required: true
+          accepted_formats: ["PDF"]
+          max_size_mb: 5
+
+      related_forms:
+        - form_code: "CESOP_REPORT"
+          relationship_type: "enables"
+          relationship_description: "Registration enables CESOP report submission"
+
+      exchange_mechanism: null
+
+      submission_workflow:
+        authentication_required: "CFR e-ID credentials"
+        signature_required: false
+        validation_type: "Business rules"
+        acknowledgment_type: "Registration confirmation"
+
+  # ==========================================================================
+  # VAT_REFUND_CLAIM: Cross-Border VAT Refund (8th Directive)
+  # Council Directive 2008/9/EC
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "VAT_REFUND_CLAIM"
+        form_name_en: "Cross-Border VAT Refund Claim"
+        form_name_mt: "Talba gÄ§ar-RifuÅ¼joni tal-VAT Transkonfinali"
+        version: "2024"
+        effective_from: "2010-01-01"
+        effective_to: "current"
+        legislative_basis: "Council Directive 2008/9/EC"
+        subsidiary_legislation:
+          - "VAT Act Cap. 406"
+          - "S.L.406.01 - VAT Regulations"
+        administering_authority: "CFR"
+        tax_type: "VAT"
+        taxpayer_category: "EU Taxable Person"
+        filing_frequency: "Annual or Quarterly (optional)"
+        filing_deadline: "September 30 following the refund year"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "CFR VAT Refund Portal"
+        xml_schema_ref: "EU VAT Refund Schema"
+        exchange_partner: "EU Member State of refund"
+        source_url: "https://cfr.gov.mt/en/vat/Pages/VAT-Refund.aspx"
+        notes: |
+          EU-established businesses can claim VAT refunds for expenses incurred
+          in other EU Member States through their home Member State's electronic
+          portal. Malta-registered businesses submit claims through CFR's portal,
+          which transmits to the refund Member State. Minimum claim is â‚¬50 for
+          annual claims or â‚¬400 for quarterly claims. Decision within 4 months,
+          extendable to 8 months. Known as "8th Directive refunds" for EU businesses.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section: Claimant Information
+        # ----------------------------------------------------------------------
+        - section_id: "CLAIMANT"
+          section_name: "Claimant Information"
+          section_description: "Information about the VAT refund claimant"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "vatrefund:VATRefundClaim/vatrefund:Claimant"
+          fields:
+            - field_id: "vat_number"
+              field_code: "VATNumber"
+              field_name_en: "Malta VAT Number"
+              field_name_mt: "Numru tal-VAT ta' Malta"
+              field_description: "VAT number of the claimant in Malta"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:VATNumber"
+              validation_rules:
+                - rule_id: "REFUND_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid Malta VAT number"
+                  rule_expression: "^MT[0-9]{8}$"
+                  error_message_en: "Invalid Malta VAT number"
+                  error_message_mt: "Numru tal-VAT ta' Malta mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "VAT_REGISTRATION.vat_number"
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "vat_number"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "vat_number"
+                data_type: "FixedString(10)"
+
+            - field_id: "legal_name"
+              field_code: "LegalName"
+              field_name_en: "Legal Name"
+              field_name_mt: "Isem Legali"
+              field_description: "Full legal name of the claimant"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:Name"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "legal_name"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "legal_name"
+                data_type: "String"
+
+            - field_id: "business_activity"
+              field_code: "BusinessActivity"
+              field_name_en: "Business Activity"
+              field_name_mt: "AttivitÃ  KummerÄ‹jali"
+              field_description: "NACE code of main business activity"
+              data_type: "STRING"
+              format: "##.##"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:BusinessActivity"
+              validation_rules:
+                - rule_id: "REFUND_002"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid NACE code"
+                  rule_expression: "IN(nace_codes)"
+                  error_message_en: "Invalid NACE code"
+                  error_message_mt: "KodiÄ‹i NACE mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "nace_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "business_activity"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "business_activity"
+                data_type: "String"
+
+            - field_id: "iban"
+              field_code: "IBAN"
+              field_name_en: "Bank Account (IBAN)"
+              field_name_mt: "Kont Bankarju (IBAN)"
+              field_description: "IBAN for refund payment"
+              data_type: "STRING"
+              format: null
+              max_length: 34
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:BankAccount/vatrefund:IBAN"
+              validation_rules:
+                - rule_id: "REFUND_003"
+                  rule_type: "iban"
+                  rule_description: "Must be valid IBAN"
+                  rule_expression: "VALID_IBAN(iban)"
+                  error_message_en: "Invalid IBAN"
+                  error_message_mt: "IBAN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "iban"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "iban"
+                data_type: "String"
+
+            - field_id: "bic"
+              field_code: "BIC"
+              field_name_en: "Bank Identifier Code (BIC)"
+              field_name_mt: "KodiÄ‹i ta' Identifikazzjoni Bankarja (BIC)"
+              field_description: "SWIFT/BIC code of the bank"
+              data_type: "STRING"
+              format: null
+              max_length: 11
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:BankAccount/vatrefund:BIC"
+              validation_rules:
+                - rule_id: "REFUND_004"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid BIC format"
+                  rule_expression: "^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$"
+                  error_message_en: "Invalid BIC format"
+                  error_message_mt: "Format tal-BIC mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "bic"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "bic"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section: Claim Details
+        # ----------------------------------------------------------------------
+        - section_id: "CLAIM_DETAILS"
+          section_name: "Claim Details"
+          section_description: "Details of the refund claim"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "vatrefund:VATRefundClaim/vatrefund:ClaimDetails"
+          fields:
+            - field_id: "refund_ms"
+              field_code: "RefundMS"
+              field_name_en: "Member State of Refund"
+              field_name_mt: "Stat Membru tar-RifuÅ¼joni"
+              field_description: "EU Member State where VAT was incurred"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:RefundMS"
+              validation_rules:
+                - rule_id: "REFUND_005"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid EU MS (not Malta)"
+                  rule_expression: "IN(eu_member_states) AND != 'MT'"
+                  error_message_en: "Invalid refund Member State"
+                  error_message_mt: "Stat Membru tar-rifuÅ¼joni mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_member_states"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "refund_ms"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "refund_ms"
+                data_type: "FixedString(2)"
+
+            - field_id: "refund_period_start"
+              field_code: "RefundPeriodStart"
+              field_name_en: "Refund Period Start"
+              field_name_mt: "Bidu tal-Perjodu tar-RifuÅ¼joni"
+              field_description: "Start date of the refund period"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:RefundPeriod/vatrefund:Start"
+              validation_rules:
+                - rule_id: "REFUND_006"
+                  rule_type: "range"
+                  rule_description: "Must be first day of month"
+                  rule_expression: "DAY(refund_period_start) = 1"
+                  error_message_en: "Period must start on first day of month"
+                  error_message_mt: "Il-perjodu irid jibda fl-ewwel jum tax-xahar"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "refund_period_start"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "refund_period_start"
+                data_type: "Date"
+
+            - field_id: "refund_period_end"
+              field_code: "RefundPeriodEnd"
+              field_name_en: "Refund Period End"
+              field_name_mt: "Tmiem tal-Perjodu tar-RifuÅ¼joni"
+              field_description: "End date of the refund period"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:RefundPeriod/vatrefund:End"
+              validation_rules:
+                - rule_id: "REFUND_007"
+                  rule_type: "range"
+                  rule_description: "Must be last day of month"
+                  rule_expression: "DAY(refund_period_end) = LAST_DAY_OF_MONTH(refund_period_end)"
+                  error_message_en: "Period must end on last day of month"
+                  error_message_mt: "Il-perjodu irid jintemm fl-aÄ§Ä§ar jum tax-xahar"
+                  severity: "error"
+                - rule_id: "REFUND_008"
+                  rule_type: "comparison"
+                  rule_description: "End must be after start"
+                  rule_expression: "refund_period_end > refund_period_start"
+                  error_message_en: "End date must be after start date"
+                  error_message_mt: "Id-data tat-tmiem trid tkun wara d-data tal-bidu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "refund_period_end"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "refund_period_end"
+                data_type: "Date"
+
+            - field_id: "claim_type"
+              field_code: "ClaimType"
+              field_name_en: "Claim Type"
+              field_name_mt: "Tip tat-Talba"
+              field_description: "Annual or quarterly claim"
+              data_type: "CODE"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:ClaimType"
+              validation_rules: []
+              allowed_values:
+                - code: "ANNUAL"
+                  description_en: "Annual claim (minimum â‚¬50)"
+                - code: "QUARTERLY"
+                  description_en: "Quarterly claim (minimum â‚¬400)"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "claim_type"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "claim_type"
+                data_type: "Enum8('ANNUAL'=1,'QUARTERLY'=2)"
+
+        # ----------------------------------------------------------------------
+        # Section: Invoice Details
+        # ----------------------------------------------------------------------
+        - section_id: "INVOICES"
+          section_name: "Invoice Details"
+          section_description: "Details of invoices for which refund is claimed"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          xml_element: "vatrefund:VATRefundClaim/vatrefund:Invoices/vatrefund:Invoice"
+          fields:
+            - field_id: "supplier_vat"
+              field_code: "SupplierVAT"
+              field_name_en: "Supplier VAT Number"
+              field_name_mt: "Numru tal-VAT tal-Fornitur"
+              field_description: "VAT number of the supplier in refund MS"
+              data_type: "STRING"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:SupplierVAT"
+              validation_rules:
+                - rule_id: "REFUND_INV_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid EU VAT number"
+                  rule_expression: "^[A-Z]{2}[A-Za-z0-9]{2,13}$"
+                  error_message_en: "Invalid supplier VAT number"
+                  error_message_mt: "Numru tal-VAT tal-fornitur mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_invoices"
+                column: "supplier_vat"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_invoices"
+                column: "supplier_vat"
+                data_type: "String"
+
+            - field_id: "supplier_name"
+              field_code: "SupplierName"
+              field_name_en: "Supplier Name"
+              field_name_mt: "Isem tal-Fornitur"
+              field_description: "Name of the supplier"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:SupplierName"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_invoices"
+                column: "supplier_name"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_invoices"
+                column: "supplier_name"
+                data_type: "String"
+
+            - field_id: "invoice_number"
+              field_code: "InvoiceNumber"
+              field_name_en: "Invoice Number"
+              field_name_mt: "Numru tal-Fattura"
+              field_description: "Invoice reference number"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:InvoiceNumber"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_invoices"
+                column: "invoice_number"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_invoices"
+                column: "invoice_number"
+                data_type: "String"
+
+            - field_id: "invoice_date"
+              field_code: "InvoiceDate"
+              field_name_en: "Invoice Date"
+              field_name_mt: "Data tal-Fattura"
+              field_description: "Date of the invoice"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:InvoiceDate"
+              validation_rules:
+                - rule_id: "REFUND_INV_002"
+                  rule_type: "range"
+                  rule_description: "Must be within refund period"
+                  rule_expression: "invoice_date >= refund_period_start AND invoice_date <= refund_period_end"
+                  error_message_en: "Invoice date outside refund period"
+                  error_message_mt: "Id-data tal-fattura barra mill-perjodu tar-rifuÅ¼joni"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_invoices"
+                column: "invoice_date"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_invoices"
+                column: "invoice_date"
+                data_type: "Date"
+
+            - field_id: "expense_type"
+              field_code: "ExpenseType"
+              field_name_en: "Type of Expense"
+              field_name_mt: "Tip ta' SpiÅ¼a"
+              field_description: "Category of goods or services"
+              data_type: "CODE"
+              format: null
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:ExpenseType"
+              validation_rules:
+                - rule_id: "REFUND_INV_003"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid expense code"
+                  rule_expression: "IN(vat_refund_expense_codes)"
+                  error_message_en: "Invalid expense type code"
+                  error_message_mt: "KodiÄ‹i tat-tip ta' spiÅ¼a mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "1"
+                  description_en: "Fuel"
+                - code: "2"
+                  description_en: "Hiring of means of transport"
+                - code: "3"
+                  description_en: "Expenditure relating to means of transport (other than 1 and 2)"
+                - code: "4"
+                  description_en: "Road tolls and road user charges"
+                - code: "5"
+                  description_en: "Travel expenses (taxi fares, public transport)"
+                - code: "6"
+                  description_en: "Accommodation"
+                - code: "7"
+                  description_en: "Food, drink and restaurant services"
+                - code: "8"
+                  description_en: "Admissions to fairs and exhibitions"
+                - code: "9"
+                  description_en: "Expenditure on luxuries, amusements and entertainment"
+                - code: "10"
+                  description_en: "Other"
+              reference_table: "vat_refund_expense_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_invoices"
+                column: "expense_type"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_invoices"
+                column: "expense_type"
+                data_type: "String"
+
+            - field_id: "taxable_amount"
+              field_code: "TaxableAmount"
+              field_name_en: "Taxable Amount"
+              field_name_mt: "Ammont Taxxabbli"
+              field_description: "Invoice amount excluding VAT"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:TaxableAmount"
+              validation_rules:
+                - rule_id: "REFUND_INV_004"
+                  rule_type: "range"
+                  rule_description: "Amount must be positive"
+                  rule_expression: "taxable_amount > 0"
+                  error_message_en: "Taxable amount must be positive"
+                  error_message_mt: "L-ammont taxxabbli irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_invoices"
+                column: "taxable_amount"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_invoices"
+                column: "taxable_amount"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "vat_amount"
+              field_code: "VATAmount"
+              field_name_en: "VAT Amount Claimed"
+              field_name_mt: "Ammont tal-VAT Mitlub"
+              field_description: "VAT amount being claimed for refund"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:VATAmount"
+              validation_rules:
+                - rule_id: "REFUND_INV_005"
+                  rule_type: "range"
+                  rule_description: "Amount must be positive"
+                  rule_expression: "vat_amount > 0"
+                  error_message_en: "VAT amount must be positive"
+                  error_message_mt: "L-ammont tal-VAT irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_invoices"
+                column: "vat_amount"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_invoices"
+                column: "vat_amount"
+                data_type: "Decimal(18,2)"
+
+            - field_id: "currency"
+              field_code: "Currency"
+              field_name_en: "Currency"
+              field_name_mt: "Munita"
+              field_description: "Currency of the invoice"
+              data_type: "CODE"
+              format: "AAA"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "EUR"
+              calculated: false
+              calculation_formula: null
+              xml_element: "vatrefund:Currency"
+              validation_rules:
+                - rule_id: "REFUND_INV_006"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid ISO currency"
+                  rule_expression: "IN(iso_4217)"
+                  error_message_en: "Invalid currency code"
+                  error_message_mt: "KodiÄ‹i tal-munita mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_4217"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_invoices"
+                column: "currency"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_invoices"
+                column: "currency"
+                data_type: "FixedString(3)"
+
+        # ----------------------------------------------------------------------
+        # Section: Totals
+        # ----------------------------------------------------------------------
+        - section_id: "TOTALS"
+          section_name: "Claim Totals"
+          section_description: "Total amounts for the refund claim"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          xml_element: "vatrefund:VATRefundClaim/vatrefund:Totals"
+          fields:
+            - field_id: "total_vat_claimed"
+              field_code: "TotalVATClaimed"
+              field_name_en: "Total VAT Claimed"
+              field_name_mt: "Total VAT Mitlub"
+              field_description: "Total VAT amount being claimed"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 18
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(vat_amount)"
+              xml_element: "vatrefund:TotalVATClaimed"
+              validation_rules:
+                - rule_id: "REFUND_TOT_001"
+                  rule_type: "minimum"
+                  rule_description: "Minimum claim amount check"
+                  rule_expression: "(claim_type = 'ANNUAL' AND total_vat_claimed >= 50) OR (claim_type = 'QUARTERLY' AND total_vat_claimed >= 400)"
+                  error_message_en: "Total claim below minimum (â‚¬50 annual, â‚¬400 quarterly)"
+                  error_message_mt: "It-total tat-talba taÄ§t il-minimu (â‚¬50 annwali, â‚¬400 kull tliet xhur)"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vat_db"
+                table: "refund_claims"
+                column: "total_vat_claimed"
+              ors_mapping:
+                table: "mtca_ors.vat_refund_claims"
+                column: "total_vat_claimed"
+                data_type: "Decimal(18,2)"
+
+      xml_schema:
+        namespace: "urn:eu:taxud:vatrefund:v1"
+        root_element: "VATRefundClaim"
+        schema_version: "1.0"
+        schema_url: "https://ec.europa.eu/taxation_customs/vatrefund/schema/vatrefund_v1.xsd"
+
+      attachments:
+        - attachment_type: "Invoice Copy"
+          required: true
+          accepted_formats: ["PDF", "JPG", "PNG"]
+          max_size_mb: 5
+          description: "Copy of invoice (required for amounts â‰¥â‚¬1,000 or fuel â‰¥â‚¬250)"
+
+      related_forms:
+        - form_code: "VAT_RETURN"
+          relationship_type: "cross_reference"
+          relationship_description: "Refund claims relate to VAT not reclaimed domestically"
+
+      exchange_mechanism:
+        exchange_type: "Request/Response"
+        exchange_frequency: "On demand"
+        partner_authorities: "EU Member State of refund"
+        encryption_required: true
+        transmission_protocol: "EU VAT Refund Portal"
+
+      submission_workflow:
+        authentication_required: "CFR e-ID credentials"
+        signature_required: true
+        validation_type: "Business rules and amount validation"
+        acknowledgment_type: "Submission receipt and tracking number"
+
+# ============================================================================
+# Reference Tables
+# ============================================================================
+reference_tables:
+  cesop_psp_types:
+    - code: "CREDIT_INST"
+      description_en: "Credit institution"
+    - code: "E_MONEY"
+      description_en: "Electronic money institution"
+    - code: "PAYMENT_INST"
+      description_en: "Payment institution"
+    - code: "POST_OFFICE"
+      description_en: "Post office giro institution"
+
+  vat_refund_expense_codes:
+    - code: "1"
+      description_en: "Fuel"
+      invoice_threshold: 250
+    - code: "2"
+      description_en: "Hiring of means of transport"
+      invoice_threshold: 1000
+    - code: "3"
+      description_en: "Expenditure relating to means of transport"
+      invoice_threshold: 1000
+    - code: "4"
+      description_en: "Road tolls and road user charges"
+      invoice_threshold: 1000
+    - code: "5"
+      description_en: "Travel expenses"
+      invoice_threshold: 1000
+    - code: "6"
+      description_en: "Accommodation"
+      invoice_threshold: 1000
+    - code: "7"
+      description_en: "Food, drink and restaurant services"
+      invoice_threshold: 1000
+    - code: "8"
+      description_en: "Admissions to fairs and exhibitions"
+      invoice_threshold: 1000
+    - code: "9"
+      description_en: "Expenditure on luxuries, amusements and entertainment"
+      invoice_threshold: 1000
+    - code: "10"
+      description_en: "Other"
+      invoice_threshold: 1000
+
+  vat_refund_processing_times:
+    initial_decision: "4 months"
+    extended_decision: "8 months (if additional info requested)"
+    payment: "10 business days after decision"
+    interest_applies_after: "4 months + 10 days"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  payment_db:
+    tables:
+      - legacy_table: "cesop_reports"
+        ors_table: "mtca_ors.cesop_reports"
+        description: "CESOP report headers"
+        key_columns:
+          - legacy: "report_id"
+            ors: "report_id"
+
+      - legacy_table: "cesop_payees"
+        ors_table: "mtca_ors.cesop_payees"
+        description: "CESOP reported payees"
+        key_columns:
+          - legacy: "payee_id"
+            ors: "payee_id"
+
+      - legacy_table: "cesop_transactions"
+        ors_table: "mtca_ors.cesop_transactions"
+        description: "CESOP payment transactions"
+        key_columns:
+          - legacy: "transaction_id"
+            ors: "transaction_id"
+
+      - legacy_table: "psp_registrations"
+        ors_table: "mtca_ors.psp_registrations"
+        description: "PSP CESOP registrations"
+        key_columns:
+          - legacy: "registration_id"
+            ors: "registration_id"
+
+  vat_db:
+    tables:
+      - legacy_table: "refund_claims"
+        ors_table: "mtca_ors.vat_refund_claims"
+        description: "VAT refund claim headers"
+        key_columns:
+          - legacy: "claim_id"
+            ors: "claim_id"
+
+      - legacy_table: "refund_invoices"
+        ors_table: "mtca_ors.vat_refund_invoices"
+        description: "VAT refund invoice details"
+        key_columns:
+          - legacy: "invoice_id"
+            ors: "invoice_id"
+
+# ============================================================================
+# Form Relationships
+# ============================================================================
+form_relationships:
+  cesop_workflow:
+    - step: 1
+      form: "PSP_REGISTRATION"
+      description: "Register as payment service provider"
+    - step: 2
+      form: "CESOP_REPORT"
+      description: "Submit quarterly payment data reports"
+
+  vat_refund_workflow:
+    - step: 1
+      form: "VAT_REFUND_CLAIM"
+      description: "Submit refund claim through Malta portal"
+    - step: 2
+      description: "CFR transmits to refund Member State"
+    - step: 3
+      description: "Refund MS processes and responds"
+    - step: 4
+      description: "Refund paid or rejected"
+
+  cross_form_relationships:
+    - source: "CESOP_REPORT"
+      target: "VAT_RETURN"
+      relationship: "Payment data helps identify unreported e-commerce VAT"
+    - source: "VAT_REFUND_CLAIM"
+      target: "VAT_RETURN"
+      relationship: "Refunds relate to VAT not deducted domestically"
+    - source: "CESOP_REPORT"
+      target: "DAC7_REPORT"
+      relationship: "Payment data may correlate with platform seller income"

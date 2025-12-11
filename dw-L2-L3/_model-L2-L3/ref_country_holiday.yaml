@@ -1,0 +1,1155 @@
+# =============================================================================
+# TA-RDM L3 - Country Holiday Reference Table
+# =============================================================================
+# Purpose: Country-specific public holidays (externalized from dim_date)
+# Pattern: P7 (Externalized Holidays)
+# Priority: HIGH - Required for generalized date dimension
+# Version: 1.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4f of L3 Generalization Implementation
+# =============================================================================
+#
+# This reference table stores country-specific public holidays, replacing
+# hardcoded Malta holidays that were embedded in dim_date.
+#
+# Design Principles:
+# - Holidays stored by country_code + holiday_date for efficient lookup
+# - Support for both fixed-date and variable-date holidays
+# - Holiday calculation rules stored for ETL automation
+# - Multi-language support via holiday_name_local
+# - Year-specific storage to handle calculated holidays (Easter, etc.)
+#
+# Usage:
+# - JOIN to dim_date at query time to determine if a date is a holiday
+# - Use for business day calculations
+# - Use for tax filing deadline adjustments
+#
+# =============================================================================
+
+metadata:
+  table_name: ref_country_holiday
+  schema: reference
+  version: "1.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P7 - Externalized Holidays"
+  description: |
+    Reference table for country-specific public holidays.
+    Replaces hardcoded Malta holidays that were in dim_date.
+    
+    Holidays are stored per year to accommodate:
+    - Variable-date holidays (Easter, Vesak, Eid, etc.)
+    - Holiday reforms and changes
+    - Observed dates when holiday falls on weekend
+    
+    For tax administrations, public holidays affect:
+    - Filing deadline adjustments
+    - Business day calculations
+    - Payment due date extensions
+
+# =============================================================================
+# Table Specification
+# =============================================================================
+
+table:
+  name: ref_country_holiday
+  schema: reference
+  type: reference
+  
+  grain: "One row per country per holiday per year"
+  natural_key: [country_code, holiday_year, holiday_code]
+  surrogate_key: holiday_id
+  
+  business_context:
+    domain: "Reference Data"
+    usage: |
+      Joined to dim_date for holiday determination.
+      Used for business day calculations and deadline adjustments.
+    refresh: "ANNUAL"  # Load new year's holidays annually
+    priority: "HIGH"
+  
+  description: |
+    Country-specific public holidays reference table.
+    
+    Key features:
+    - Supports all country holiday calendars
+    - Handles fixed and variable-date holidays
+    - Stores calculation rules for automated ETL
+    - Supports multi-language holiday names
+    - Tracks observed dates for weekend adjustments
+  
+  columns:
+    # ==========================================================================
+    # Keys
+    # ==========================================================================
+    - name: holiday_id
+      data_type: Int32
+      nullable: false
+      description: "Surrogate primary key"
+      role: SURROGATE_KEY
+      constraints:
+        primary_key: true
+        auto_increment: true
+    
+    - name: country_code
+      data_type: String
+      length: 3
+      nullable: false
+      description: "ISO 3166-1 alpha-3 country code"
+      foreign_key: warehouse.dim_country(country_code)
+      standard: "ISO 3166-1 alpha-3"
+    
+    # ==========================================================================
+    # Holiday Identification
+    # ==========================================================================
+    - name: holiday_year
+      data_type: Int16
+      nullable: false
+      description: "Year this holiday occurs"
+      example: 2024
+    
+    - name: holiday_date
+      data_type: Date
+      nullable: false
+      description: "Actual date of holiday"
+      example: "2024-12-25"
+      note: "For observed holidays, this is the observed date, not the actual date"
+    
+    - name: holiday_code
+      data_type: String
+      length: 30
+      nullable: false
+      description: |
+        Stable identifier for the holiday type.
+        Standard codes: NEW_YEAR, GOOD_FRIDAY, EASTER_SUNDAY, CHRISTMAS, etc.
+        Country-specific codes: REPUBLIC_DAY, INDEPENDENCE_DAY, etc.
+      example: "CHRISTMAS"
+    
+    - name: holiday_name
+      data_type: String
+      length: 100
+      nullable: false
+      description: "Holiday name in English"
+      example: "Christmas Day"
+    
+    - name: holiday_name_local
+      data_type: String
+      length: 100
+      description: "Holiday name in primary local language"
+      example: "Il-Milied"  # Maltese
+    
+    - name: holiday_description
+      data_type: String
+      length: 500
+      description: "Additional description or notes about the holiday"
+    
+    # ==========================================================================
+    # Holiday Classification
+    # ==========================================================================
+    - name: holiday_type
+      data_type: String
+      length: 20
+      nullable: false
+      description: |
+        Category of holiday:
+        - NATIONAL: Public national holiday
+        - RELIGIOUS: Religious observance (may not be public)
+        - REGIONAL: Regional/state holiday
+        - BANK: Bank holiday only
+        - OPTIONAL: Optional/restricted holiday
+      constraints:
+        check: "holiday_type IN ('NATIONAL', 'RELIGIOUS', 'REGIONAL', 'BANK', 'OPTIONAL')"
+      example: "NATIONAL"
+    
+    - name: is_public_holiday
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Is this a public holiday (1=Yes, 0=No)"
+      note: "Some religious holidays may not be public holidays"
+    
+    - name: is_bank_holiday
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Is this a bank holiday (1=Yes, 0=No)"
+      note: "Banks closed on this day"
+    
+    - name: is_government_holiday
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Are government offices closed (1=Yes, 0=No)"
+      note: "Tax offices closed on this day"
+    
+    # ==========================================================================
+    # Date Calculation Rules
+    # ==========================================================================
+    - name: is_fixed_date
+      data_type: UInt8
+      nullable: false
+      description: "Same date every year (1=Yes, 0=Variable like Easter)"
+      example: 1  # Christmas is fixed
+    
+    - name: fixed_month
+      data_type: UInt8
+      description: "For fixed holidays: month (1-12)"
+      constraints:
+        check: "fixed_month IS NULL OR fixed_month BETWEEN 1 AND 12"
+      example: 12  # December
+    
+    - name: fixed_day
+      data_type: UInt8
+      description: "For fixed holidays: day (1-31)"
+      constraints:
+        check: "fixed_day IS NULL OR fixed_day BETWEEN 1 AND 31"
+      example: 25  # 25th
+    
+    - name: calculation_rule
+      data_type: String
+      length: 100
+      description: |
+        For variable holidays: calculation formula.
+        Formats:
+        - EASTER-n: n days before Easter Sunday
+        - EASTER+n: n days after Easter Sunday
+        - LUNAR:NEW_YEAR: Lunar New Year calculation
+        - LUNAR:VESAK: Buddhist Vesak calculation
+        - ISLAMIC:EID_FITR: Islamic Eid al-Fitr
+        - ISLAMIC:EID_ADHA: Islamic Eid al-Adha
+        - NTH_WEEKDAY:M:W:N: Nth weekday W of month M
+      example: "EASTER-2"  # Good Friday
+    
+    - name: calculation_reference
+      data_type: String
+      length: 200
+      description: "Reference for calculation (e.g., external API or table)"
+    
+    # ==========================================================================
+    # Observed Date Handling
+    # ==========================================================================
+    - name: actual_date
+      data_type: Date
+      description: |
+        The actual date of the holiday (when different from observed).
+        For example, if July 4th falls on Saturday, actual_date is July 4th
+        but holiday_date might be July 3rd (observed).
+      note: "NULL if same as holiday_date or if holiday is always observed on its date"
+    
+    - name: is_observed_date
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is this an observed date (moved from weekend) (1=Yes, 0=No)"
+    
+    - name: observation_rule
+      data_type: String
+      length: 50
+      description: |
+        Rule for weekend observation:
+        - NONE: No observation (holiday always on actual date)
+        - FRIDAY_IF_SAT: Observe on Friday if Saturday
+        - MONDAY_IF_SUN: Observe on Monday if Sunday
+        - NEAREST_WEEKDAY: Observe on nearest weekday
+        - MONDAY_ALWAYS: Always observe on Monday
+      constraints:
+        check: "observation_rule IS NULL OR observation_rule IN ('NONE', 'FRIDAY_IF_SAT', 'MONDAY_IF_SUN', 'NEAREST_WEEKDAY', 'MONDAY_ALWAYS')"
+    
+    # ==========================================================================
+    # Administrative Attributes
+    # ==========================================================================
+    - name: region_code
+      data_type: String
+      length: 20
+      description: "For regional holidays: specific region/state code"
+      note: "NULL for national holidays, populated for regional"
+    
+    - name: region_name
+      data_type: String
+      length: 100
+      description: "For regional holidays: region name"
+    
+    - name: applies_to_sectors
+      data_type: String
+      length: 200
+      description: "Sectors this holiday applies to (comma-separated)"
+      example: "PUBLIC_SECTOR,BANKING,RETAIL"
+      note: "NULL means applies to all sectors"
+    
+    - name: effective_from_year
+      data_type: Int16
+      description: "Year this holiday was established (for historical tracking)"
+    
+    - name: effective_to_year
+      data_type: Int16
+      description: "Last year this holiday was observed (for discontinued holidays)"
+    
+    # ==========================================================================
+    # Status and Audit
+    # ==========================================================================
+    - name: is_active
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Is this holiday record active (1=Yes, 0=No)"
+    
+    - name: data_source
+      data_type: String
+      length: 100
+      description: "Source of holiday data (e.g., government gazette, official calendar)"
+    
+    - name: source_url
+      data_type: String
+      length: 500
+      description: "URL to official source documentation"
+    
+    - name: notes
+      data_type: String
+      length: 500
+      description: "Additional notes about this holiday record"
+    
+    # ==========================================================================
+    # ETL Metadata
+    # ==========================================================================
+    - name: created_date
+      data_type: DateTime
+      nullable: false
+      default: "CURRENT_TIMESTAMP"
+      description: "Record creation timestamp"
+    
+    - name: created_by
+      data_type: String
+      length: 100
+      nullable: false
+      description: "User/process that created the record"
+    
+    - name: modified_date
+      data_type: DateTime
+      description: "Last modification timestamp"
+    
+    - name: modified_by
+      data_type: String
+      length: 100
+      description: "User/process that last modified the record"
+
+  # ============================================================================
+  # Indexes
+  # ============================================================================
+  indexes:
+    - name: pk_ref_country_holiday
+      columns: [holiday_id]
+      type: PRIMARY
+    
+    - name: uk_country_holiday
+      columns: [country_code, holiday_year, holiday_code]
+      type: UNIQUE
+      description: "Unique holiday per country per year"
+    
+    - name: idx_holiday_date
+      columns: [holiday_date, country_code]
+      description: "Primary lookup: date + country"
+    
+    - name: idx_holiday_country_year
+      columns: [country_code, holiday_year]
+      description: "All holidays for a country in a year"
+    
+    - name: idx_holiday_code
+      columns: [holiday_code]
+      description: "Find all occurrences of a holiday type"
+    
+    - name: idx_holiday_fixed
+      columns: [is_fixed_date, fixed_month, fixed_day]
+      description: "Find fixed-date holidays for ETL"
+
+  # ============================================================================
+  # Constraints
+  # ============================================================================
+  constraints:
+    - name: chk_fixed_holiday_attrs
+      type: check
+      condition: |
+        (is_fixed_date = 0) OR 
+        (is_fixed_date = 1 AND fixed_month IS NOT NULL AND fixed_day IS NOT NULL)
+      description: "Fixed holidays must have month and day"
+    
+    - name: chk_variable_holiday_rule
+      type: check
+      condition: |
+        (is_fixed_date = 1) OR 
+        (is_fixed_date = 0 AND calculation_rule IS NOT NULL)
+      description: "Variable holidays must have calculation rule"
+    
+    - name: chk_holiday_year_date
+      type: check
+      condition: "EXTRACT(YEAR FROM holiday_date) = holiday_year"
+      description: "Holiday date must match holiday year"
+
+# =============================================================================
+# Sample Data
+# =============================================================================
+
+sample_data:
+  # ============================================================================
+  # Malta 2024-2025 Holidays
+  # ============================================================================
+  malta_2024:
+    - holiday_id: 1
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-01-01"
+      holiday_code: "NEW_YEAR"
+      holiday_name: "New Year's Day"
+      holiday_name_local: "L-Ewwel tas-Sena"
+      holiday_type: "NATIONAL"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 1
+      fixed_day: 1
+      observation_rule: "NEAREST_WEEKDAY"
+      created_by: "SYSTEM"
+    
+    - holiday_id: 2
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-02-10"
+      holiday_code: "SHIPWRECK"
+      holiday_name: "Feast of St Paul's Shipwreck"
+      holiday_name_local: "Il-Festa tan-Nawfraġju ta' San Pawl"
+      holiday_type: "NATIONAL"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 2
+      fixed_day: 10
+      created_by: "SYSTEM"
+    
+    - holiday_id: 3
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-03-19"
+      holiday_code: "ST_JOSEPH"
+      holiday_name: "Feast of St Joseph"
+      holiday_name_local: "San Ġużepp"
+      holiday_type: "RELIGIOUS"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 3
+      fixed_day: 19
+      created_by: "SYSTEM"
+    
+    - holiday_id: 4
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-03-29"
+      holiday_code: "GOOD_FRIDAY"
+      holiday_name: "Good Friday"
+      holiday_name_local: "Il-Ġimgħa l-Kbira"
+      holiday_type: "RELIGIOUS"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 0
+      calculation_rule: "EASTER-2"
+      created_by: "SYSTEM"
+    
+    - holiday_id: 5
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-03-31"
+      holiday_code: "FREEDOM_DAY"
+      holiday_name: "Freedom Day"
+      holiday_name_local: "Jum il-Ħelsien"
+      holiday_type: "NATIONAL"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 3
+      fixed_day: 31
+      holiday_description: "Commemorates withdrawal of British troops in 1979"
+      effective_from_year: 1979
+      created_by: "SYSTEM"
+    
+    - holiday_id: 6
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-05-01"
+      holiday_code: "WORKERS_DAY"
+      holiday_name: "Workers' Day"
+      holiday_name_local: "Jum il-Ħaddiem"
+      holiday_type: "NATIONAL"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 5
+      fixed_day: 1
+      created_by: "SYSTEM"
+    
+    - holiday_id: 7
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-06-07"
+      holiday_code: "SETTE_GIUGNO"
+      holiday_name: "Sette Giugno"
+      holiday_name_local: "Sette Giugno"
+      holiday_type: "NATIONAL"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 6
+      fixed_day: 7
+      holiday_description: "Commemorates 1919 uprising against British rule"
+      effective_from_year: 1989
+      created_by: "SYSTEM"
+    
+    - holiday_id: 8
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-06-29"
+      holiday_code: "ST_PETER_PAUL"
+      holiday_name: "Feast of St Peter and St Paul"
+      holiday_name_local: "L-Imnarja"
+      holiday_type: "RELIGIOUS"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 6
+      fixed_day: 29
+      created_by: "SYSTEM"
+    
+    - holiday_id: 9
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-08-15"
+      holiday_code: "ASSUMPTION"
+      holiday_name: "Feast of the Assumption"
+      holiday_name_local: "Santa Marija"
+      holiday_type: "RELIGIOUS"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 8
+      fixed_day: 15
+      created_by: "SYSTEM"
+    
+    - holiday_id: 10
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-09-08"
+      holiday_code: "VICTORY_DAY"
+      holiday_name: "Victory Day"
+      holiday_name_local: "Il-Vitorja"
+      holiday_type: "NATIONAL"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 9
+      fixed_day: 8
+      holiday_description: "Also known as Our Lady of Victories"
+      created_by: "SYSTEM"
+    
+    - holiday_id: 11
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-09-21"
+      holiday_code: "INDEPENDENCE_DAY"
+      holiday_name: "Independence Day"
+      holiday_name_local: "Jum l-Indipendenza"
+      holiday_type: "NATIONAL"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 9
+      fixed_day: 21
+      holiday_description: "Independence from Britain in 1964"
+      effective_from_year: 1964
+      created_by: "SYSTEM"
+    
+    - holiday_id: 12
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-12-08"
+      holiday_code: "IMMACULATE_CONCEPTION"
+      holiday_name: "Feast of the Immaculate Conception"
+      holiday_name_local: "Il-Kunċizzjoni"
+      holiday_type: "RELIGIOUS"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 12
+      fixed_day: 8
+      created_by: "SYSTEM"
+    
+    - holiday_id: 13
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-12-13"
+      holiday_code: "REPUBLIC_DAY"
+      holiday_name: "Republic Day"
+      holiday_name_local: "Jum ir-Repubblika"
+      holiday_type: "NATIONAL"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 12
+      fixed_day: 13
+      holiday_description: "Malta became a republic in 1974"
+      effective_from_year: 1974
+      created_by: "SYSTEM"
+    
+    - holiday_id: 14
+      country_code: "MLT"
+      holiday_year: 2024
+      holiday_date: "2024-12-25"
+      holiday_code: "CHRISTMAS"
+      holiday_name: "Christmas Day"
+      holiday_name_local: "Il-Milied"
+      holiday_type: "RELIGIOUS"
+      is_public_holiday: 1
+      is_bank_holiday: 1
+      is_government_holiday: 1
+      is_fixed_date: 1
+      fixed_month: 12
+      fixed_day: 25
+      created_by: "SYSTEM"
+
+  # ============================================================================
+  # Malta 2025 Holidays (with variable Easter dates)
+  # ============================================================================
+  malta_2025:
+    - holiday_id: 15
+      country_code: "MLT"
+      holiday_year: 2025
+      holiday_date: "2025-01-01"
+      holiday_code: "NEW_YEAR"
+      holiday_name: "New Year's Day"
+      holiday_name_local: "L-Ewwel tas-Sena"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 1
+      fixed_day: 1
+      created_by: "SYSTEM"
+    
+    - holiday_id: 16
+      country_code: "MLT"
+      holiday_year: 2025
+      holiday_date: "2025-02-10"
+      holiday_code: "SHIPWRECK"
+      holiday_name: "Feast of St Paul's Shipwreck"
+      holiday_name_local: "Il-Festa tan-Nawfraġju ta' San Pawl"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 2
+      fixed_day: 10
+      created_by: "SYSTEM"
+    
+    - holiday_id: 17
+      country_code: "MLT"
+      holiday_year: 2025
+      holiday_date: "2025-03-19"
+      holiday_code: "ST_JOSEPH"
+      holiday_name: "Feast of St Joseph"
+      holiday_name_local: "San Ġużepp"
+      holiday_type: "RELIGIOUS"
+      is_fixed_date: 1
+      fixed_month: 3
+      fixed_day: 19
+      created_by: "SYSTEM"
+    
+    - holiday_id: 18
+      country_code: "MLT"
+      holiday_year: 2025
+      holiday_date: "2025-03-31"
+      holiday_code: "FREEDOM_DAY"
+      holiday_name: "Freedom Day"
+      holiday_name_local: "Jum il-Ħelsien"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 3
+      fixed_day: 31
+      created_by: "SYSTEM"
+    
+    - holiday_id: 19
+      country_code: "MLT"
+      holiday_year: 2025
+      holiday_date: "2025-04-18"
+      holiday_code: "GOOD_FRIDAY"
+      holiday_name: "Good Friday"
+      holiday_name_local: "Il-Ġimgħa l-Kbira"
+      holiday_type: "RELIGIOUS"
+      is_fixed_date: 0
+      calculation_rule: "EASTER-2"
+      calculation_reference: "Easter 2025: April 20"
+      created_by: "SYSTEM"
+    
+    - holiday_id: 20
+      country_code: "MLT"
+      holiday_year: 2025
+      holiday_date: "2025-12-13"
+      holiday_code: "REPUBLIC_DAY"
+      holiday_name: "Republic Day"
+      holiday_name_local: "Jum ir-Repubblika"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 12
+      fixed_day: 13
+      created_by: "SYSTEM"
+    
+    - holiday_id: 21
+      country_code: "MLT"
+      holiday_year: 2025
+      holiday_date: "2025-12-25"
+      holiday_code: "CHRISTMAS"
+      holiday_name: "Christmas Day"
+      holiday_name_local: "Il-Milied"
+      holiday_type: "RELIGIOUS"
+      is_fixed_date: 1
+      fixed_month: 12
+      fixed_day: 25
+      created_by: "SYSTEM"
+
+  # ============================================================================
+  # Sri Lanka 2025 Holidays (sample)
+  # ============================================================================
+  sri_lanka_2025:
+    - holiday_id: 100
+      country_code: "LKA"
+      holiday_year: 2025
+      holiday_date: "2025-01-14"
+      holiday_code: "THAI_PONGAL"
+      holiday_name: "Thai Pongal Day"
+      holiday_name_local: "தைப்பொங்கல்"
+      holiday_type: "RELIGIOUS"
+      is_fixed_date: 1
+      fixed_month: 1
+      fixed_day: 14
+      holiday_description: "Tamil harvest festival"
+      created_by: "SYSTEM"
+    
+    - holiday_id: 101
+      country_code: "LKA"
+      holiday_year: 2025
+      holiday_date: "2025-01-15"
+      holiday_code: "DURUTHU_FULL_MOON"
+      holiday_name: "Duruthu Full Moon Poya Day"
+      holiday_name_local: "දුරුතු පොහොය දින"
+      holiday_type: "RELIGIOUS"
+      is_fixed_date: 0
+      calculation_rule: "LUNAR:POYA:1"
+      holiday_description: "Buddhist Poya day"
+      created_by: "SYSTEM"
+    
+    - holiday_id: 102
+      country_code: "LKA"
+      holiday_year: 2025
+      holiday_date: "2025-02-04"
+      holiday_code: "INDEPENDENCE_DAY"
+      holiday_name: "Independence Day"
+      holiday_name_local: "නිදහස් දිනය"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 2
+      fixed_day: 4
+      holiday_description: "Independence from Britain in 1948"
+      effective_from_year: 1948
+      created_by: "SYSTEM"
+    
+    - holiday_id: 103
+      country_code: "LKA"
+      holiday_year: 2025
+      holiday_date: "2025-04-14"
+      holiday_code: "SINHALA_TAMIL_NEW_YEAR"
+      holiday_name: "Sinhala and Tamil New Year Day"
+      holiday_name_local: "සිංහල හා දෙමළ අලුත් අවුරුදු දිනය"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 4
+      fixed_day: 14
+      created_by: "SYSTEM"
+    
+    - holiday_id: 104
+      country_code: "LKA"
+      holiday_year: 2025
+      holiday_date: "2025-05-01"
+      holiday_code: "MAY_DAY"
+      holiday_name: "May Day"
+      holiday_name_local: "මැයි දිනය"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 5
+      fixed_day: 1
+      created_by: "SYSTEM"
+    
+    - holiday_id: 105
+      country_code: "LKA"
+      holiday_year: 2025
+      holiday_date: "2025-05-12"
+      holiday_code: "VESAK_FULL_MOON"
+      holiday_name: "Vesak Full Moon Poya Day"
+      holiday_name_local: "වෙසක් පොහොය"
+      holiday_type: "RELIGIOUS"
+      is_fixed_date: 0
+      calculation_rule: "LUNAR:VESAK"
+      holiday_description: "Buddha's birth, enlightenment, and death"
+      created_by: "SYSTEM"
+
+  # ============================================================================
+  # Moldova 2025 Holidays (sample)
+  # ============================================================================
+  moldova_2025:
+    - holiday_id: 200
+      country_code: "MDA"
+      holiday_year: 2025
+      holiday_date: "2025-01-01"
+      holiday_code: "NEW_YEAR"
+      holiday_name: "New Year's Day"
+      holiday_name_local: "Anul Nou"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 1
+      fixed_day: 1
+      created_by: "SYSTEM"
+    
+    - holiday_id: 201
+      country_code: "MDA"
+      holiday_year: 2025
+      holiday_date: "2025-01-07"
+      holiday_code: "ORTHODOX_CHRISTMAS"
+      holiday_name: "Orthodox Christmas Day"
+      holiday_name_local: "Crăciunul pe stil vechi"
+      holiday_type: "RELIGIOUS"
+      is_fixed_date: 1
+      fixed_month: 1
+      fixed_day: 7
+      holiday_description: "Julian calendar Christmas"
+      created_by: "SYSTEM"
+    
+    - holiday_id: 202
+      country_code: "MDA"
+      holiday_year: 2025
+      holiday_date: "2025-03-08"
+      holiday_code: "WOMENS_DAY"
+      holiday_name: "International Women's Day"
+      holiday_name_local: "Ziua Internațională a Femeii"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 3
+      fixed_day: 8
+      created_by: "SYSTEM"
+    
+    - holiday_id: 203
+      country_code: "MDA"
+      holiday_year: 2025
+      holiday_date: "2025-04-20"
+      holiday_code: "ORTHODOX_EASTER"
+      holiday_name: "Orthodox Easter Sunday"
+      holiday_name_local: "Paștele Ortodox"
+      holiday_type: "RELIGIOUS"
+      is_fixed_date: 0
+      calculation_rule: "ORTHODOX_EASTER"
+      created_by: "SYSTEM"
+    
+    - holiday_id: 204
+      country_code: "MDA"
+      holiday_year: 2025
+      holiday_date: "2025-05-01"
+      holiday_code: "LABOUR_DAY"
+      holiday_name: "Labour Day"
+      holiday_name_local: "Ziua Muncii"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 5
+      fixed_day: 1
+      created_by: "SYSTEM"
+    
+    - holiday_id: 205
+      country_code: "MDA"
+      holiday_year: 2025
+      holiday_date: "2025-08-27"
+      holiday_code: "INDEPENDENCE_DAY"
+      holiday_name: "Independence Day"
+      holiday_name_local: "Ziua Independenței"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 8
+      fixed_day: 27
+      holiday_description: "Independence from Soviet Union in 1991"
+      effective_from_year: 1991
+      created_by: "SYSTEM"
+    
+    - holiday_id: 206
+      country_code: "MDA"
+      holiday_year: 2025
+      holiday_date: "2025-08-31"
+      holiday_code: "LIMBA_NOASTRA"
+      holiday_name: "Our Language Day"
+      holiday_name_local: "Limba Noastră"
+      holiday_type: "NATIONAL"
+      is_fixed_date: 1
+      fixed_month: 8
+      fixed_day: 31
+      holiday_description: "Celebrates the adoption of Romanian as official language"
+      effective_from_year: 1990
+      created_by: "SYSTEM"
+
+# =============================================================================
+# Query Patterns
+# =============================================================================
+
+query_patterns:
+  is_date_holiday:
+    description: "Check if a date is a public holiday for a country"
+    sql: |
+      SELECT 
+          CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END AS is_public_holiday,
+          MAX(h.holiday_name) AS holiday_name
+      FROM reference.ref_country_holiday h
+      WHERE h.country_code = :country_code
+        AND h.holiday_date = :check_date
+        AND h.is_public_holiday = 1
+        AND h.is_active = 1;
+  
+  holidays_for_year:
+    description: "Get all holidays for a country in a year"
+    sql: |
+      SELECT 
+          h.holiday_date,
+          h.holiday_code,
+          h.holiday_name,
+          h.holiday_name_local,
+          h.holiday_type,
+          h.is_fixed_date,
+          h.calculation_rule
+      FROM reference.ref_country_holiday h
+      WHERE h.country_code = :country_code
+        AND h.holiday_year = :year
+        AND h.is_public_holiday = 1
+        AND h.is_active = 1
+      ORDER BY h.holiday_date;
+  
+  next_business_day:
+    description: "Get next business day after a date"
+    sql: |
+      SELECT MIN(d.calendar_date) AS next_business_day
+      FROM warehouse.dim_date d
+      LEFT JOIN reference.ref_country_holiday h 
+          ON d.calendar_date = h.holiday_date
+          AND h.country_code = :country_code
+          AND h.is_public_holiday = 1
+      WHERE d.calendar_date > :from_date
+        AND d.is_weekday = 1
+        AND h.holiday_id IS NULL;
+  
+  filing_deadline_adjusted:
+    description: "Get adjusted filing deadline (skip weekends and holidays)"
+    sql: |
+      WITH deadline_sequence AS (
+          SELECT d.calendar_date,
+                 ROW_NUMBER() OVER (ORDER BY d.calendar_date) AS seq
+          FROM warehouse.dim_date d
+          LEFT JOIN reference.ref_country_holiday h 
+              ON d.calendar_date = h.holiday_date
+              AND h.country_code = :country_code
+              AND h.is_government_holiday = 1
+          WHERE d.calendar_date >= :original_deadline
+            AND d.is_weekday = 1
+            AND h.holiday_id IS NULL
+      )
+      SELECT calendar_date AS adjusted_deadline
+      FROM deadline_sequence
+      WHERE seq = 1;
+
+# =============================================================================
+# ETL Configuration
+# =============================================================================
+
+etl_config:
+  load_strategy: "INCREMENTAL"
+  load_frequency: "ANNUAL"
+  
+  generation_process:
+    description: |
+      Annual process to generate holidays for upcoming year:
+      1. Copy fixed-date holidays from template
+      2. Calculate variable-date holidays (Easter, lunar, Islamic)
+      3. Apply observation rules for weekend holidays
+      4. Validate against official sources
+    
+    steps:
+      - step: 1
+        name: "Load fixed holidays"
+        description: "Insert fixed-date holidays from holiday template"
+        sql: |
+          INSERT INTO reference.ref_country_holiday (
+            country_code, holiday_year, holiday_date, holiday_code, 
+            holiday_name, holiday_name_local, holiday_type,
+            is_fixed_date, fixed_month, fixed_day, created_by
+          )
+          SELECT 
+            t.country_code,
+            :target_year AS holiday_year,
+            MAKEDATE(:target_year, 1) + INTERVAL (t.fixed_month - 1) MONTH 
+              + INTERVAL (t.fixed_day - 1) DAY AS holiday_date,
+            t.holiday_code,
+            t.holiday_name,
+            t.holiday_name_local,
+            t.holiday_type,
+            t.is_fixed_date,
+            t.fixed_month,
+            t.fixed_day,
+            'ETL_HOLIDAY_GEN'
+          FROM reference.ref_holiday_template t
+          WHERE t.is_fixed_date = 1
+            AND t.is_active = 1
+            AND (t.effective_to_year IS NULL OR t.effective_to_year >= :target_year);
+      
+      - step: 2
+        name: "Calculate Easter-based holidays"
+        description: "Calculate Western Easter date and derive related holidays"
+        note: "Requires Easter calculation function"
+      
+      - step: 3
+        name: "Apply observation rules"
+        description: "Adjust holiday dates when falling on weekends"
+
+# =============================================================================
+# ClickHouse DDL
+# =============================================================================
+
+clickhouse_ddl:
+  database: "{country}_dw"
+  engine: MergeTree()
+  order_by: [country_code, holiday_date]
+  
+  ddl: |
+    CREATE TABLE IF NOT EXISTS reference.ref_country_holiday
+    (
+        holiday_id Int32,
+        country_code FixedString(3),
+        holiday_year Int16,
+        holiday_date Date,
+        holiday_code String,
+        holiday_name String,
+        holiday_name_local Nullable(String),
+        holiday_description Nullable(String),
+        holiday_type LowCardinality(String),
+        is_public_holiday UInt8 DEFAULT 1,
+        is_bank_holiday UInt8 DEFAULT 1,
+        is_government_holiday UInt8 DEFAULT 1,
+        is_fixed_date UInt8,
+        fixed_month Nullable(UInt8),
+        fixed_day Nullable(UInt8),
+        calculation_rule Nullable(String),
+        calculation_reference Nullable(String),
+        actual_date Nullable(Date),
+        is_observed_date UInt8 DEFAULT 0,
+        observation_rule Nullable(String),
+        region_code Nullable(String),
+        region_name Nullable(String),
+        applies_to_sectors Nullable(String),
+        effective_from_year Nullable(Int16),
+        effective_to_year Nullable(Int16),
+        is_active UInt8 DEFAULT 1,
+        data_source Nullable(String),
+        source_url Nullable(String),
+        notes Nullable(String),
+        created_date DateTime DEFAULT now(),
+        created_by String,
+        modified_date Nullable(DateTime),
+        modified_by Nullable(String)
+    )
+    ENGINE = MergeTree()
+    ORDER BY (country_code, holiday_date)
+    SETTINGS index_granularity = 8192;
+
+# =============================================================================
+# Business Rules
+# =============================================================================
+
+business_rules:
+  - rule_id: BR_HOL_001
+    description: "Holiday date must match holiday year"
+    severity: ERROR
+    validation_sql: |
+      SELECT holiday_id, holiday_year, holiday_date
+      FROM reference.ref_country_holiday
+      WHERE YEAR(holiday_date) != holiday_year
+    expected_result: "0 rows"
+  
+  - rule_id: BR_HOL_002
+    description: "Fixed holidays must have month and day"
+    severity: ERROR
+    validation_sql: |
+      SELECT holiday_id, holiday_code, is_fixed_date, fixed_month, fixed_day
+      FROM reference.ref_country_holiday
+      WHERE is_fixed_date = 1
+        AND (fixed_month IS NULL OR fixed_day IS NULL)
+    expected_result: "0 rows"
+  
+  - rule_id: BR_HOL_003
+    description: "Variable holidays must have calculation rule"
+    severity: ERROR
+    validation_sql: |
+      SELECT holiday_id, holiday_code, is_fixed_date, calculation_rule
+      FROM reference.ref_country_holiday
+      WHERE is_fixed_date = 0
+        AND calculation_rule IS NULL
+    expected_result: "0 rows"
+  
+  - rule_id: BR_HOL_004
+    description: "No duplicate holidays for same country/year/code"
+    severity: ERROR
+    validation_sql: |
+      SELECT country_code, holiday_year, holiday_code, COUNT(*) as cnt
+      FROM reference.ref_country_holiday
+      WHERE is_active = 1
+      GROUP BY country_code, holiday_year, holiday_code
+      HAVING COUNT(*) > 1
+    expected_result: "0 rows"
+  
+  - rule_id: BR_HOL_005
+    description: "Each active country should have at least 5 holidays per year"
+    severity: WARNING
+    validation_sql: |
+      SELECT c.country_code, h.holiday_year, COUNT(*) as holiday_count
+      FROM warehouse.dim_country c
+      LEFT JOIN reference.ref_country_holiday h 
+        ON c.country_code = h.country_code
+        AND h.is_active = 1
+      WHERE c.is_active = 1
+      GROUP BY c.country_code, h.holiday_year
+      HAVING COUNT(*) < 5
+    expected_result: "0 rows"
+
+# =============================================================================
+# Validation Criteria
+# =============================================================================
+# | Check                          | Expected                              |
+# |--------------------------------|---------------------------------------|
+# | Primary key                    | holiday_id (auto-increment)           |
+# | Unique constraint              | country_code + year + holiday_code    |
+# | Country FK                     | References dim_country                |
+# | Holiday types supported        | NATIONAL, RELIGIOUS, REGIONAL, etc.   |
+# | Fixed date handling            | fixed_month + fixed_day columns       |
+# | Variable date handling         | calculation_rule column               |
+# | Observed date handling         | actual_date + is_observed_date        |
+# | Sample data: Malta             | 14 holidays per year                  |
+# | Sample data: Sri Lanka         | 6 sample holidays                     |
+# | Sample data: Moldova           | 7 sample holidays                     |
+# | Query patterns                 | 4 patterns documented                 |
+# | Business rules                 | 5 rules defined                       |
+# =============================================================================

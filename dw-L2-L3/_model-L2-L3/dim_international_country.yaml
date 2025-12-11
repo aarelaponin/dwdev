@@ -1,0 +1,505 @@
+# ==============================================================================
+# Malta L3 Warehouse Model: dim_international_country
+# Step 10c: Reference & Analytical Dimensions
+# ==============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Purpose: International country dimension for customs, CRS, FATCA, and treaty analysis
+# ==============================================================================
+
+dimension:
+  name: "dim_international_country"
+  schema: "warehouse"
+  display_name: "International Country Dimension"
+  description: |
+    ISO 3166-1 country reference dimension enriched with tax-relevant attributes.
+    Supports customs partner analysis, tax treaty application, CRS/FATCA
+    reporting, and risk-based country classification.
+    
+    Covers all 249 ISO countries plus EU/EEA/Eurozone/Schengen membership,
+    Malta's double taxation treaty network, and automatic exchange
+    participation (CRS, FATCA).
+    
+  scd_type: 1
+  scd_type_description: "Type 1 - Overwrite on change (country status may change)"
+  
+  natural_key: ["country_code"]
+  surrogate_key: "country_key"
+  
+  grain: "One row per ISO 3166-1 country"
+  estimated_rows: 250
+  
+  source_system:
+    primary_table: "reference.ref_country"
+    enrichment_sources:
+      - "EU membership roster"
+      - "Malta treaty network"
+      - "OECD CRS participating jurisdictions"
+      - "FATCA IGA list"
+      - "EU tax haven lists"
+    
+  refresh_frequency: "Quarterly (or on treaty/membership changes)"
+  
+  # ============================================================================
+  # COLUMNS
+  # ============================================================================
+  columns:
+    # --------------------------------------------------------------------------
+    # Surrogate Key
+    # --------------------------------------------------------------------------
+    - name: "country_key"
+      display_name: "Country Key"
+      data_type: "INT"
+      nullable: false
+      description: "Surrogate key for country dimension"
+      constraints:
+        primary_key: true
+        auto_increment: true
+
+    # --------------------------------------------------------------------------
+    # ISO Country Codes
+    # --------------------------------------------------------------------------
+    - name: "country_code"
+      display_name: "Country Code (Alpha-2)"
+      data_type: "VARCHAR(2)"
+      nullable: false
+      description: "ISO 3166-1 alpha-2 country code"
+      constraints:
+        unique: true
+      examples: ["MT", "IT", "GB", "US", "DE", "FR"]
+      
+    - name: "country_code_alpha3"
+      display_name: "Country Code (Alpha-3)"
+      data_type: "VARCHAR(3)"
+      nullable: true
+      description: "ISO 3166-1 alpha-3 country code"
+      examples: ["MLT", "ITA", "GBR", "USA", "DEU", "FRA"]
+      
+    - name: "country_code_numeric"
+      display_name: "Country Code (Numeric)"
+      data_type: "VARCHAR(3)"
+      nullable: true
+      description: "ISO 3166-1 numeric country code"
+      examples: ["470", "380", "826", "840", "276", "250"]
+
+    # --------------------------------------------------------------------------
+    # Names
+    # --------------------------------------------------------------------------
+    - name: "country_name"
+      display_name: "Country Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Common name of the country in English"
+      examples: ["Malta", "Italy", "United Kingdom", "United States", "Germany"]
+      
+    - name: "country_name_official"
+      display_name: "Official Country Name"
+      data_type: "VARCHAR(200)"
+      nullable: true
+      description: "Official/formal name of the country"
+      examples: ["Republic of Malta", "Italian Republic", "United Kingdom of Great Britain and Northern Ireland"]
+      
+    - name: "country_name_mt"
+      display_name: "Country Name (Maltese)"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Country name in Maltese"
+      examples: ["Malta", "L-Italja", "Ir-Renju Unit", "L-Istati Uniti"]
+
+    # --------------------------------------------------------------------------
+    # Geographic Classification
+    # --------------------------------------------------------------------------
+    - name: "continent"
+      display_name: "Continent"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "Continent classification"
+      constraints:
+        check: "continent IN ('Europe', 'Asia', 'Africa', 'North America', 'South America', 'Oceania', 'Antarctica')"
+      examples: ["Europe", "Asia", "Africa"]
+      
+    - name: "region"
+      display_name: "Region"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Geographic region within continent"
+      examples: ["Southern Europe", "Western Europe", "Northern Africa", "East Asia"]
+      
+    - name: "subregion"
+      display_name: "Subregion"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "More specific geographic subregion"
+      examples: ["Mediterranean", "Baltic States", "Gulf States"]
+
+    # --------------------------------------------------------------------------
+    # EU & European Status
+    # --------------------------------------------------------------------------
+    - name: "is_eu_member"
+      display_name: "EU Member"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether country is an EU member state"
+      
+    - name: "eu_join_date"
+      display_name: "EU Join Date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date country joined the EU (NULL if not a member)"
+      
+    - name: "is_eea_member"
+      display_name: "EEA Member"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether country is an EEA member (EU + Iceland, Liechtenstein, Norway)"
+      
+    - name: "is_eurozone"
+      display_name: "Eurozone Member"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether country uses the Euro as official currency"
+      
+    - name: "is_schengen"
+      display_name: "Schengen Member"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether country is part of the Schengen Area"
+
+    # --------------------------------------------------------------------------
+    # Malta Tax Treaty Status
+    # --------------------------------------------------------------------------
+    - name: "has_malta_tax_treaty"
+      display_name: "Has Malta Tax Treaty"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether Malta has a double taxation agreement with this country"
+      
+    - name: "treaty_effective_date"
+      display_name: "Treaty Effective Date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date the tax treaty became effective"
+      
+    - name: "treaty_type"
+      display_name: "Treaty Type"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Type of tax information exchange agreement"
+      constraints:
+        check: "treaty_type IN ('COMPREHENSIVE', 'LIMITED', 'TIEA', 'PROTOCOL', 'NONE')"
+      examples: ["COMPREHENSIVE", "TIEA"]
+      
+    - name: "treaty_wht_dividend"
+      display_name: "Treaty WHT Dividend (%)"
+      data_type: "DECIMAL(5,2)"
+      nullable: true
+      description: "Treaty withholding tax rate on dividends"
+      
+    - name: "treaty_wht_interest"
+      display_name: "Treaty WHT Interest (%)"
+      data_type: "DECIMAL(5,2)"
+      nullable: true
+      description: "Treaty withholding tax rate on interest"
+      
+    - name: "treaty_wht_royalty"
+      display_name: "Treaty WHT Royalty (%)"
+      data_type: "DECIMAL(5,2)"
+      nullable: true
+      description: "Treaty withholding tax rate on royalties"
+
+    # --------------------------------------------------------------------------
+    # CRS & FATCA Status
+    # --------------------------------------------------------------------------
+    - name: "is_crs_participating"
+      display_name: "CRS Participating"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether country participates in OECD Common Reporting Standard"
+      
+    - name: "crs_effective_date"
+      display_name: "CRS Effective Date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date CRS automatic exchange became effective"
+      
+    - name: "crs_exchange_type"
+      display_name: "CRS Exchange Type"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Type of CRS exchange relationship"
+      constraints:
+        check: "crs_exchange_type IN ('MCAA', 'EU_DAC2', 'BILATERAL')"
+      examples: ["MCAA", "EU_DAC2"]
+      
+    - name: "is_fatca_partner"
+      display_name: "FATCA Partner"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether country has a FATCA IGA with the US"
+      
+    - name: "fatca_iga_type"
+      display_name: "FATCA IGA Type"
+      data_type: "VARCHAR(10)"
+      nullable: true
+      description: "Type of FATCA Intergovernmental Agreement"
+      constraints:
+        check: "fatca_iga_type IN ('Model 1', 'Model 2', 'None')"
+      examples: ["Model 1", "Model 2"]
+      
+    - name: "fatca_effective_date"
+      display_name: "FATCA Effective Date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date FATCA IGA became effective"
+
+    # --------------------------------------------------------------------------
+    # Risk Classification
+    # --------------------------------------------------------------------------
+    - name: "is_eu_blacklisted"
+      display_name: "EU Blacklisted"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether country is on EU tax haven blacklist (Annex I)"
+      
+    - name: "is_eu_grey_listed"
+      display_name: "EU Grey Listed"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether country is on EU tax haven grey list (Annex II)"
+      
+    - name: "eu_list_last_updated"
+      display_name: "EU List Last Updated"
+      data_type: "DATE"
+      nullable: true
+      description: "Date of last EU list status update"
+      
+    - name: "risk_rating"
+      display_name: "Tax Risk Rating"
+      data_type: "VARCHAR(10)"
+      nullable: true
+      description: "Internal tax risk classification"
+      constraints:
+        check: "risk_rating IN ('HIGH', 'MEDIUM', 'LOW', 'MINIMAL')"
+      examples: ["HIGH", "MEDIUM", "LOW"]
+      
+    - name: "aml_risk_rating"
+      display_name: "AML Risk Rating"
+      data_type: "VARCHAR(10)"
+      nullable: true
+      description: "Anti-money laundering risk classification"
+      constraints:
+        check: "aml_risk_rating IN ('HIGH', 'MEDIUM', 'LOW', 'MINIMAL')"
+      examples: ["HIGH", "MEDIUM", "LOW"]
+      
+    - name: "is_fatf_blacklisted"
+      display_name: "FATF Blacklisted"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether country is on FATF high-risk jurisdictions list"
+
+    # --------------------------------------------------------------------------
+    # Currency
+    # --------------------------------------------------------------------------
+    - name: "currency_code"
+      display_name: "Currency Code"
+      data_type: "VARCHAR(3)"
+      nullable: true
+      description: "ISO 4217 currency code"
+      examples: ["EUR", "USD", "GBP", "CHF"]
+      
+    - name: "currency_name"
+      display_name: "Currency Name"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Name of the currency"
+      examples: ["Euro", "US Dollar", "Pound Sterling"]
+
+    # --------------------------------------------------------------------------
+    # Display & Status
+    # --------------------------------------------------------------------------
+    - name: "sort_order"
+      display_name: "Sort Order"
+      data_type: "INT"
+      nullable: true
+      description: "Display sort order"
+      
+    - name: "is_active"
+      display_name: "Active Flag"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether country code is currently active"
+
+    # --------------------------------------------------------------------------
+    # ETL Metadata
+    # --------------------------------------------------------------------------
+    - name: "etl_batch_id"
+      display_name: "ETL Batch ID"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for audit trail"
+      
+    - name: "etl_load_timestamp"
+      display_name: "ETL Load Timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when record was loaded"
+
+  # ============================================================================
+  # INDEXES
+  # ============================================================================
+  indexes:
+    - name: "pk_dim_international_country"
+      columns: ["country_key"]
+      primary: true
+      
+    - name: "uk_dim_country_code"
+      columns: ["country_code"]
+      unique: true
+      
+    - name: "uk_dim_country_alpha3"
+      columns: ["country_code_alpha3"]
+      unique: true
+      
+    - name: "idx_dim_country_eu"
+      columns: ["is_eu_member"]
+      description: "Support EU/non-EU filtering"
+      
+    - name: "idx_dim_country_crs"
+      columns: ["is_crs_participating"]
+      description: "Support CRS reporting analysis"
+      
+    - name: "idx_dim_country_treaty"
+      columns: ["has_malta_tax_treaty"]
+      description: "Support treaty application analysis"
+      
+    - name: "idx_dim_country_risk"
+      columns: ["risk_rating"]
+      description: "Support risk-based analysis"
+      
+    - name: "idx_dim_country_continent"
+      columns: ["continent", "region"]
+      description: "Support geographic analysis"
+
+  # ============================================================================
+  # SAMPLE REFERENCE DATA (Key Countries)
+  # ============================================================================
+  sample_reference_data:
+    # Malta
+    - code: "MT"
+      alpha3: "MLT"
+      numeric: "470"
+      name: "Malta"
+      official: "Republic of Malta"
+      continent: "Europe"
+      region: "Southern Europe"
+      eu_member: true
+      eu_join_date: "2004-05-01"
+      eea: true
+      eurozone: true
+      schengen: true
+      crs: true
+      crs_type: "EU_DAC2"
+      fatca: true
+      fatca_iga: "Model 1"
+      currency: "EUR"
+      risk_rating: "MINIMAL"
+      
+    # Key EU Partners
+    - code: "IT"
+      name: "Italy"
+      eu_member: true
+      eurozone: true
+      crs: true
+      malta_treaty: true
+      
+    - code: "DE"
+      name: "Germany"
+      eu_member: true
+      eurozone: true
+      crs: true
+      malta_treaty: true
+      
+    - code: "FR"
+      name: "France"
+      eu_member: true
+      eurozone: true
+      crs: true
+      malta_treaty: true
+      
+    # UK (Post-Brexit)
+    - code: "GB"
+      name: "United Kingdom"
+      eu_member: false
+      eea: false
+      eurozone: false
+      crs: true
+      crs_type: "MCAA"
+      malta_treaty: true
+      currency: "GBP"
+      
+    # USA
+    - code: "US"
+      name: "United States"
+      eu_member: false
+      crs: false
+      fatca: true
+      fatca_iga: "Model 1"
+      malta_treaty: true
+      currency: "USD"
+      
+    # High-Risk Example
+    - code: "PA"
+      name: "Panama"
+      eu_member: false
+      eu_blacklisted: true
+      crs: true
+      risk_rating: "HIGH"
+
+  # ============================================================================
+  # USAGE NOTES
+  # ============================================================================
+  usage_notes:
+    fact_tables:
+      - fact_customs: "Trading partner country analysis"
+      - fact_crs_report: "CRS reporting by jurisdiction"
+      - fact_fatca_report: "FATCA reporting by jurisdiction"
+      - fact_payment: "International payment origins"
+      
+    common_queries:
+      - name: "EU vs Non-EU Trade"
+        pattern: "GROUP BY is_eu_member"
+        
+      - name: "CRS Reporting Coverage"
+        pattern: "WHERE is_crs_participating = true GROUP BY country_name"
+        
+      - name: "Treaty Application Analysis"
+        pattern: "WHERE has_malta_tax_treaty = true"
+        
+      - name: "High-Risk Country Transactions"
+        pattern: "WHERE risk_rating = 'HIGH' OR is_eu_blacklisted = true"
+        
+    analysis_patterns:
+      - name: "Treaty Benefit Monitoring"
+        description: "Track WHT rates applied vs treaty rates"
+        
+      - name: "CRS Coverage Gap"
+        description: "Identify accounts in non-CRS jurisdictions"
+        
+      - name: "Geographic Concentration"
+        description: "Analyze trade/investment by continent/region"
+
+# ==============================================================================
+# END OF SPECIFICATION
+# ==============================================================================

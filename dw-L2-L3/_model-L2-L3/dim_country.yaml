@@ -1,0 +1,906 @@
+# =============================================================================
+# TA-RDM L3 - Country Dimension
+# =============================================================================
+# Purpose: Central country reference dimension for multi-country warehouse
+# Pattern: P1 (Country Dimension) from L3 Generalization Catalog
+# Priority: CRITICAL - Must be created first
+# Version: 1.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4a of L3 Generalization Implementation
+# =============================================================================
+#
+# This dimension is the cornerstone of multi-country support. Every 
+# country-sensitive dimension and fact table should reference dim_country
+# via country_key to provide country context for:
+# - Fiscal year calculations (start month, YA offset, label patterns)
+# - Currency formatting and decimal precision
+# - Tax system configuration (primary ID type, VAT prefix)
+# - Regional grouping and EU/trade bloc membership
+# - Holiday calendars and timezone handling
+#
+# Design Principles:
+# - SCD Type 1: Configuration changes overwrite (no historical tracking)
+# - country_code (ISO 3166-1 alpha-3) is the natural key
+# - All dimensions and facts join via surrogate country_key
+# - Reference data driven: country configurations can be added/modified
+#   without code changes
+#
+# =============================================================================
+
+metadata:
+  dimension_name: dim_country
+  schema: warehouse
+  version: "1.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P1 - Country Dimension"
+  description: |
+    Central country reference dimension providing configuration for
+    country-specific business rules, fiscal years, currencies, and defaults.
+    This dimension is referenced by all country-sensitive dimensions and facts.
+    
+    This is a Type 1 SCD - country configuration changes are overwritten
+    (historical country config not tracked in dimension).
+
+# =============================================================================
+# Dimension Specification
+# =============================================================================
+
+dimension:
+  name: dim_country
+  schema: warehouse
+  type: dimension
+  scd_type: 1
+  
+  grain: "One row per country"
+  natural_key: [country_code]
+  surrogate_key: country_key
+  
+  business_context:
+    domain: "Reference Data"
+    usage: |
+      All country-sensitive dimensions and facts join to this dimension
+      for country context, fiscal year rules, and currency information.
+    refresh: "ON_CHANGE"
+    priority: "CRITICAL"
+  
+  description: |
+    Conformed dimension for country context. Every dimension and fact that
+    varies by country should reference this dimension via country_key.
+    
+    Key features:
+    - Fiscal year configuration (start month, offset, label pattern)
+    - Currency and regional information
+    - Tax system parameters (primary ID type, VAT prefix)
+    - EU/Eurozone membership flags
+    - Tax authority information
+  
+  columns:
+    # ==========================================================================
+    # Keys
+    # ==========================================================================
+    - name: country_key
+      data_type: Int32
+      nullable: false
+      description: "Surrogate key for dimension"
+      role: SURROGATE_KEY
+    
+    - name: country_code
+      data_type: String
+      length: 3
+      nullable: false
+      description: "ISO 3166-1 alpha-3 code (MLT, LKA, MDA, UKR, LBN)"
+      role: NATURAL_KEY
+      standard: "ISO 3166-1 alpha-3"
+    
+    - name: country_code_alpha2
+      data_type: String
+      length: 2
+      nullable: false
+      description: "ISO 3166-1 alpha-2 code (MT, LK, MD, UA, LB)"
+      standard: "ISO 3166-1 alpha-2"
+    
+    - name: country_code_numeric
+      data_type: String
+      length: 3
+      description: "ISO 3166-1 numeric code (470, 144, 498, 804, 422)"
+      standard: "ISO 3166-1 numeric"
+    
+    # ==========================================================================
+    # Basic Attributes
+    # ==========================================================================
+    - name: country_name
+      data_type: String
+      length: 100
+      nullable: false
+      description: "Official country name in English"
+    
+    - name: country_name_local
+      data_type: String
+      length: 100
+      description: "Country name in primary local language"
+    
+    - name: country_name_short
+      data_type: String
+      length: 50
+      description: "Short/common name (e.g., 'Malta' vs 'Republic of Malta')"
+    
+    # ==========================================================================
+    # Geographic Attributes
+    # ==========================================================================
+    - name: region_code
+      data_type: String
+      length: 10
+      description: "Geographic region code: EU, MENA, APAC, CIS, etc."
+    
+    - name: region_name
+      data_type: String
+      length: 50
+      description: "Geographic region name"
+    
+    - name: subregion_code
+      data_type: String
+      length: 20
+      description: "Subregion: SOUTHERN_EU, SOUTH_ASIA, EASTERN_EU, LEVANT, etc."
+    
+    - name: continent_code
+      data_type: String
+      length: 2
+      description: "Continent: EU (Europe), AS (Asia), AF (Africa), etc."
+    
+    - name: timezone_primary
+      data_type: String
+      length: 50
+      description: "Primary timezone (Europe/Malta, Asia/Colombo, Europe/Chisinau)"
+      standard: "IANA Time Zone Database"
+    
+    - name: timezone_offset_utc
+      data_type: Int8
+      description: "UTC offset in hours (standard time, not DST)"
+    
+    # ==========================================================================
+    # Currency Attributes
+    # ==========================================================================
+    - name: currency_code
+      data_type: String
+      length: 3
+      nullable: false
+      description: "ISO 4217 currency code (EUR, LKR, MDL, UAH, LBP)"
+      standard: "ISO 4217"
+    
+    - name: currency_name
+      data_type: String
+      length: 50
+      description: "Currency name (Euro, Sri Lankan Rupee, Moldovan Leu)"
+    
+    - name: currency_symbol
+      data_type: String
+      length: 5
+      description: "Currency symbol (€, Rs, L, ₴, ل.ل)"
+    
+    - name: currency_decimal_places
+      data_type: UInt8
+      default: 2
+      description: "Standard decimal places for currency"
+    
+    # ==========================================================================
+    # Fiscal Year Configuration
+    # ==========================================================================
+    - name: fiscal_year_start_month
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Month fiscal year starts (1=January, 4=April, 7=July)"
+      business_rule: "Must be between 1 and 12"
+    
+    - name: fiscal_year_start_day
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Day fiscal year starts (usually 1)"
+    
+    - name: fiscal_year_offset_years
+      data_type: Int8
+      nullable: false
+      default: 0
+      description: |
+        Offset for assessment/tax year naming:
+        0 = Same as calendar year (most countries)
+        1 = Next year (Malta: CY 2024 → YA 2025)
+    
+    - name: fiscal_year_label_pattern
+      data_type: String
+      length: 30
+      default: "'FY{YEAR}'"
+      description: |
+        Pattern for fiscal year labels:
+        - 'FY{YEAR}' → FY2024
+        - 'YA{YEAR}' → YA2025 (Malta)
+        - '{YEAR}/{NEXT_YEAR_SHORT}' → 2024/25 (Sri Lanka Apr-Mar)
+    
+    - name: tax_year_type
+      data_type: String
+      length: 20
+      default: "'CALENDAR'"
+      description: "CALENDAR, FISCAL_APR, FISCAL_JUL, CUSTOM"
+    
+    # ==========================================================================
+    # Language Configuration
+    # ==========================================================================
+    - name: default_language_code
+      data_type: String
+      length: 5
+      description: "Primary language ISO code (en, mt, si, ta, ro, uk, ar)"
+      standard: "ISO 639-1"
+    
+    - name: official_languages
+      data_type: String
+      length: 50
+      description: "Comma-separated official language codes"
+    
+    # ==========================================================================
+    # EU/Trade Bloc Membership
+    # ==========================================================================
+    - name: is_eu_member
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is EU member state (1=Yes, 0=No)"
+    
+    - name: eu_membership_date
+      data_type: Date
+      description: "Date of EU accession (NULL if not member)"
+    
+    - name: is_eurozone_member
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Uses Euro as currency (1=Yes, 0=No)"
+    
+    - name: eurozone_membership_date
+      data_type: Date
+      description: "Date of Eurozone adoption (NULL if not member)"
+    
+    - name: is_schengen_member
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is Schengen Area member"
+    
+    - name: is_oecd_member
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Is OECD member"
+    
+    - name: trade_bloc_codes
+      data_type: String
+      length: 100
+      description: "Comma-separated trade bloc codes: EU, EFTA, CIS, SAFTA, DCFTA, GAFTA"
+    
+    # ==========================================================================
+    # Tax System Configuration
+    # ==========================================================================
+    - name: primary_tax_id_type
+      data_type: String
+      length: 20
+      description: "Primary tax identifier type code: TIN, IDNO, EDRPOU, NIC"
+      reference: "Aligns with ref_identifier_type.identifier_type_code"
+    
+    - name: primary_tax_id_name
+      data_type: String
+      length: 100
+      description: "Name of primary tax ID (Tax Identification Number, IDNO)"
+    
+    - name: primary_tax_id_format
+      data_type: String
+      length: 100
+      description: "Format description (9 digits, 13 digits with checksum, etc.)"
+    
+    - name: vat_country_prefix
+      data_type: String
+      length: 2
+      description: "VAT number country prefix for EU (MT, NULL for non-EU)"
+    
+    - name: has_vat_system
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Country has VAT/GST system"
+    
+    - name: has_imputation_system
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: "Country has corporate imputation system (e.g., Malta)"
+    
+    - name: has_withholding_tax
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Country has withholding tax regime"
+    
+    - name: tax_authority_name
+      data_type: String
+      length: 200
+      description: "Primary tax authority name"
+    
+    - name: tax_authority_code
+      data_type: String
+      length: 20
+      description: "Tax authority code (CFR, IRD, SFS, DPS, MOF)"
+    
+    - name: tax_authority_url
+      data_type: String
+      length: 200
+      description: "Tax authority website URL"
+    
+    # ==========================================================================
+    # Status and ETL
+    # ==========================================================================
+    - name: is_active
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Is country active in warehouse (1=Yes, 0=No)"
+    
+    - name: activation_date
+      data_type: Date
+      description: "Date country was added to warehouse"
+    
+    - name: deactivation_date
+      data_type: Date
+      description: "Date country was deactivated (NULL if active)"
+    
+    - name: notes
+      data_type: String
+      description: "Additional notes about country configuration"
+    
+    # ==========================================================================
+    # ETL Metadata
+    # ==========================================================================
+    - name: etl_batch_id
+      data_type: Int64
+      nullable: false
+      description: "ETL batch identifier"
+    
+    - name: etl_load_timestamp
+      data_type: DateTime
+      nullable: false
+      description: "When record was loaded"
+    
+    - name: etl_source_system
+      data_type: String
+      length: 50
+      default: "'REFERENCE'"
+      description: "Source system for this record"
+
+  # ============================================================================
+  # Indexes
+  # ============================================================================
+  indexes:
+    - name: idx_dim_country_code
+      columns: [country_code]
+      unique: true
+      description: "Unique index on natural key"
+    
+    - name: idx_dim_country_alpha2
+      columns: [country_code_alpha2]
+      unique: true
+      description: "Unique index on alpha-2 code for lookups"
+    
+    - name: idx_dim_country_region
+      columns: [region_code, country_code]
+      description: "Support regional grouping queries"
+    
+    - name: idx_dim_country_eu
+      columns: [is_eu_member, country_code]
+      description: "Support EU member filtering"
+
+  # ============================================================================
+  # Business Rules
+  # ============================================================================
+  business_rules:
+    - rule_id: BR_DC_001
+      description: "country_code must be valid ISO 3166-1 alpha-3"
+      severity: ERROR
+      validation: "LENGTH(country_code) = 3 AND country_code = UPPER(country_code)"
+    
+    - rule_id: BR_DC_002
+      description: "If is_eu_member = 1, eu_membership_date must not be NULL"
+      severity: ERROR
+      validation: "NOT (is_eu_member = 1 AND eu_membership_date IS NULL)"
+    
+    - rule_id: BR_DC_003
+      description: "If is_eurozone_member = 1, currency_code must be EUR"
+      severity: ERROR
+      validation: "NOT (is_eurozone_member = 1 AND currency_code != 'EUR')"
+    
+    - rule_id: BR_DC_004
+      description: "fiscal_year_start_month must be between 1 and 12"
+      severity: ERROR
+      validation: "fiscal_year_start_month BETWEEN 1 AND 12"
+    
+    - rule_id: BR_DC_005
+      description: "fiscal_year_start_day must be between 1 and 31"
+      severity: ERROR
+      validation: "fiscal_year_start_day BETWEEN 1 AND 31"
+    
+    - rule_id: BR_DC_006
+      description: "is_eurozone_member cannot be 1 if is_eu_member is 0"
+      severity: ERROR
+      validation: "NOT (is_eurozone_member = 1 AND is_eu_member = 0)"
+    
+    - rule_id: BR_DC_007
+      description: "country_code_alpha2 must be 2 uppercase letters"
+      severity: ERROR
+      validation: "LENGTH(country_code_alpha2) = 2 AND country_code_alpha2 = UPPER(country_code_alpha2)"
+    
+    - rule_id: BR_DC_008
+      description: "Active countries must have currency_code defined"
+      severity: ERROR
+      validation: "NOT (is_active = 1 AND currency_code IS NULL)"
+
+# ==============================================================================
+# Sample Data
+# ==============================================================================
+sample_data:
+  # ---------------------------------------------------------------------------
+  # Malta - EU Member, Eurozone, YA = CY + 1
+  # ---------------------------------------------------------------------------
+  - country_key: 1
+    country_code: "MLT"
+    country_code_alpha2: "MT"
+    country_code_numeric: "470"
+    country_name: "Republic of Malta"
+    country_name_local: "Repubblika ta' Malta"
+    country_name_short: "Malta"
+    region_code: "EU"
+    region_name: "European Union"
+    subregion_code: "SOUTHERN_EU"
+    continent_code: "EU"
+    timezone_primary: "Europe/Malta"
+    timezone_offset_utc: 1
+    currency_code: "EUR"
+    currency_name: "Euro"
+    currency_symbol: "€"
+    currency_decimal_places: 2
+    fiscal_year_start_month: 1
+    fiscal_year_start_day: 1
+    fiscal_year_offset_years: 1
+    fiscal_year_label_pattern: "YA{YEAR}"
+    tax_year_type: "CALENDAR"
+    default_language_code: "en"
+    official_languages: "en,mt"
+    is_eu_member: 1
+    eu_membership_date: "2004-05-01"
+    is_eurozone_member: 1
+    eurozone_membership_date: "2008-01-01"
+    is_schengen_member: 1
+    is_oecd_member: 0
+    trade_bloc_codes: "EU,EUROZONE,SCHENGEN"
+    primary_tax_id_type: "TIN"
+    primary_tax_id_name: "Tax Identification Number"
+    primary_tax_id_format: "9 digits"
+    vat_country_prefix: "MT"
+    has_vat_system: 1
+    has_imputation_system: 1
+    has_withholding_tax: 1
+    tax_authority_name: "Commissioner for Revenue"
+    tax_authority_code: "CFR"
+    tax_authority_url: "https://cfr.gov.mt"
+    is_active: 1
+    activation_date: "2025-01-01"
+    notes: "Full imputation system for corporate tax; Year of Assessment = Calendar Year + 1"
+
+  # ---------------------------------------------------------------------------
+  # Sri Lanka - April-March fiscal year, non-EU
+  # ---------------------------------------------------------------------------
+  - country_key: 2
+    country_code: "LKA"
+    country_code_alpha2: "LK"
+    country_code_numeric: "144"
+    country_name: "Democratic Socialist Republic of Sri Lanka"
+    country_name_local: "ශ්‍රී ලංකා"
+    country_name_short: "Sri Lanka"
+    region_code: "APAC"
+    region_name: "Asia Pacific"
+    subregion_code: "SOUTH_ASIA"
+    continent_code: "AS"
+    timezone_primary: "Asia/Colombo"
+    timezone_offset_utc: 5
+    currency_code: "LKR"
+    currency_name: "Sri Lankan Rupee"
+    currency_symbol: "Rs"
+    currency_decimal_places: 2
+    fiscal_year_start_month: 4
+    fiscal_year_start_day: 1
+    fiscal_year_offset_years: 0
+    fiscal_year_label_pattern: "{YEAR}/{NEXT_YEAR_SHORT}"
+    tax_year_type: "FISCAL_APR"
+    default_language_code: "en"
+    official_languages: "si,ta,en"
+    is_eu_member: 0
+    eu_membership_date: null
+    is_eurozone_member: 0
+    eurozone_membership_date: null
+    is_schengen_member: 0
+    is_oecd_member: 0
+    trade_bloc_codes: "SAFTA"
+    primary_tax_id_type: "TIN"
+    primary_tax_id_name: "Taxpayer Identification Number"
+    primary_tax_id_format: "9 digits"
+    vat_country_prefix: null
+    has_vat_system: 1
+    has_imputation_system: 0
+    has_withholding_tax: 1
+    tax_authority_name: "Inland Revenue Department"
+    tax_authority_code: "IRD"
+    tax_authority_url: "https://www.ird.gov.lk"
+    is_active: 1
+    activation_date: "2025-01-01"
+    notes: "April-March fiscal year; fiscal year labeled as 2024/25"
+
+  # ---------------------------------------------------------------------------
+  # Moldova - Calendar year, IDNO-based identification
+  # ---------------------------------------------------------------------------
+  - country_key: 3
+    country_code: "MDA"
+    country_code_alpha2: "MD"
+    country_code_numeric: "498"
+    country_name: "Republic of Moldova"
+    country_name_local: "Republica Moldova"
+    country_name_short: "Moldova"
+    region_code: "CIS"
+    region_name: "Commonwealth of Independent States"
+    subregion_code: "EASTERN_EU"
+    continent_code: "EU"
+    timezone_primary: "Europe/Chisinau"
+    timezone_offset_utc: 2
+    currency_code: "MDL"
+    currency_name: "Moldovan Leu"
+    currency_symbol: "L"
+    currency_decimal_places: 2
+    fiscal_year_start_month: 1
+    fiscal_year_start_day: 1
+    fiscal_year_offset_years: 0
+    fiscal_year_label_pattern: "FY{YEAR}"
+    tax_year_type: "CALENDAR"
+    default_language_code: "ro"
+    official_languages: "ro"
+    is_eu_member: 0
+    eu_membership_date: null
+    is_eurozone_member: 0
+    eurozone_membership_date: null
+    is_schengen_member: 0
+    is_oecd_member: 0
+    trade_bloc_codes: "CIS,DCFTA"
+    primary_tax_id_type: "IDNO"
+    primary_tax_id_name: "Identification Number of Organization"
+    primary_tax_id_format: "13 digits with checksum"
+    vat_country_prefix: null
+    has_vat_system: 1
+    has_imputation_system: 0
+    has_withholding_tax: 1
+    tax_authority_name: "State Tax Service"
+    tax_authority_code: "SFS"
+    tax_authority_url: "https://sfs.md"
+    is_active: 1
+    activation_date: "2025-01-01"
+    notes: "EU Association Agreement country; DCFTA in force"
+
+  # ---------------------------------------------------------------------------
+  # Ukraine - Calendar year, EDRPOU-based identification
+  # ---------------------------------------------------------------------------
+  - country_key: 4
+    country_code: "UKR"
+    country_code_alpha2: "UA"
+    country_code_numeric: "804"
+    country_name: "Ukraine"
+    country_name_local: "Україна"
+    country_name_short: "Ukraine"
+    region_code: "CIS"
+    region_name: "Commonwealth of Independent States"
+    subregion_code: "EASTERN_EU"
+    continent_code: "EU"
+    timezone_primary: "Europe/Kyiv"
+    timezone_offset_utc: 2
+    currency_code: "UAH"
+    currency_name: "Ukrainian Hryvnia"
+    currency_symbol: "₴"
+    currency_decimal_places: 2
+    fiscal_year_start_month: 1
+    fiscal_year_start_day: 1
+    fiscal_year_offset_years: 0
+    fiscal_year_label_pattern: "FY{YEAR}"
+    tax_year_type: "CALENDAR"
+    default_language_code: "uk"
+    official_languages: "uk"
+    is_eu_member: 0
+    eu_membership_date: null
+    is_eurozone_member: 0
+    eurozone_membership_date: null
+    is_schengen_member: 0
+    is_oecd_member: 0
+    trade_bloc_codes: "DCFTA"
+    primary_tax_id_type: "EDRPOU"
+    primary_tax_id_name: "Unified State Register Code"
+    primary_tax_id_format: "8 digits for legal entities"
+    vat_country_prefix: null
+    has_vat_system: 1
+    has_imputation_system: 0
+    has_withholding_tax: 1
+    tax_authority_name: "State Tax Service of Ukraine"
+    tax_authority_code: "DPS"
+    tax_authority_url: "https://tax.gov.ua"
+    is_active: 1
+    activation_date: "2025-01-01"
+    notes: "EU candidate country; DCFTA in force"
+
+  # ---------------------------------------------------------------------------
+  # Lebanon - Calendar year, MENA region
+  # ---------------------------------------------------------------------------
+  - country_key: 5
+    country_code: "LBN"
+    country_code_alpha2: "LB"
+    country_code_numeric: "422"
+    country_name: "Lebanese Republic"
+    country_name_local: "الجمهورية اللبنانية"
+    country_name_short: "Lebanon"
+    region_code: "MENA"
+    region_name: "Middle East and North Africa"
+    subregion_code: "LEVANT"
+    continent_code: "AS"
+    timezone_primary: "Asia/Beirut"
+    timezone_offset_utc: 2
+    currency_code: "LBP"
+    currency_name: "Lebanese Pound"
+    currency_symbol: "ل.ل"
+    currency_decimal_places: 0
+    fiscal_year_start_month: 1
+    fiscal_year_start_day: 1
+    fiscal_year_offset_years: 0
+    fiscal_year_label_pattern: "FY{YEAR}"
+    tax_year_type: "CALENDAR"
+    default_language_code: "ar"
+    official_languages: "ar"
+    is_eu_member: 0
+    eu_membership_date: null
+    is_eurozone_member: 0
+    eurozone_membership_date: null
+    is_schengen_member: 0
+    is_oecd_member: 0
+    trade_bloc_codes: "GAFTA"
+    primary_tax_id_type: "TIN"
+    primary_tax_id_name: "Tax Identification Number"
+    primary_tax_id_format: "8 digits"
+    vat_country_prefix: null
+    has_vat_system: 1
+    has_imputation_system: 0
+    has_withholding_tax: 1
+    tax_authority_name: "Ministry of Finance"
+    tax_authority_code: "MOF"
+    tax_authority_url: "http://www.finance.gov.lb"
+    is_active: 1
+    activation_date: "2025-01-01"
+    notes: "Currency with 0 decimal places due to hyperinflation"
+
+# ==============================================================================
+# ETL Source Mapping
+# ==============================================================================
+etl_source:
+  source_system: "REFERENCE"
+  source_tables:
+    - reference.ref_country
+    - system.system_parameter
+    - configuration.country_config
+  load_strategy: "FULL_REFRESH"
+  load_frequency: "ON_CHANGE"
+  
+  transformations:
+    - name: fiscal_year_offset
+      description: "Derived from system_parameter country configuration"
+    - name: trade_bloc_membership
+      description: "Derived from reference tables (EU, trade agreements)"
+    - name: tax_authority_info
+      description: "From country configuration reference data"
+  
+  change_detection:
+    method: "Full comparison"
+    reason: "Low cardinality table (< 200 countries max)"
+
+# ==============================================================================
+# ClickHouse DDL
+# ==============================================================================
+clickhouse_ddl:
+  database: malta_warehouse
+  engine: MergeTree()
+  order_by: [country_key]
+  primary_key: country_key
+  
+  ddl: |
+    CREATE TABLE IF NOT EXISTS malta_warehouse.dim_country
+    (
+        -- Keys
+        country_key Int32,
+        country_code FixedString(3),
+        country_code_alpha2 FixedString(2),
+        country_code_numeric Nullable(FixedString(3)),
+        
+        -- Basic Attributes
+        country_name String,
+        country_name_local Nullable(String),
+        country_name_short Nullable(String),
+        
+        -- Geographic
+        region_code Nullable(String),
+        region_name Nullable(String),
+        subregion_code Nullable(String),
+        continent_code Nullable(FixedString(2)),
+        timezone_primary Nullable(String),
+        timezone_offset_utc Nullable(Int8),
+        
+        -- Currency
+        currency_code FixedString(3),
+        currency_name Nullable(String),
+        currency_symbol Nullable(String),
+        currency_decimal_places UInt8 DEFAULT 2,
+        
+        -- Fiscal Year
+        fiscal_year_start_month UInt8 DEFAULT 1,
+        fiscal_year_start_day UInt8 DEFAULT 1,
+        fiscal_year_offset_years Int8 DEFAULT 0,
+        fiscal_year_label_pattern String DEFAULT 'FY{YEAR}',
+        tax_year_type String DEFAULT 'CALENDAR',
+        
+        -- Language
+        default_language_code Nullable(String),
+        official_languages Nullable(String),
+        
+        -- EU/Trade Bloc
+        is_eu_member UInt8 DEFAULT 0,
+        eu_membership_date Nullable(Date),
+        is_eurozone_member UInt8 DEFAULT 0,
+        eurozone_membership_date Nullable(Date),
+        is_schengen_member UInt8 DEFAULT 0,
+        is_oecd_member UInt8 DEFAULT 0,
+        trade_bloc_codes Nullable(String),
+        
+        -- Tax System
+        primary_tax_id_type Nullable(String),
+        primary_tax_id_name Nullable(String),
+        primary_tax_id_format Nullable(String),
+        vat_country_prefix Nullable(FixedString(2)),
+        has_vat_system UInt8 DEFAULT 1,
+        has_imputation_system UInt8 DEFAULT 0,
+        has_withholding_tax UInt8 DEFAULT 1,
+        tax_authority_name Nullable(String),
+        tax_authority_code Nullable(String),
+        tax_authority_url Nullable(String),
+        
+        -- Status
+        is_active UInt8 DEFAULT 1,
+        activation_date Nullable(Date),
+        deactivation_date Nullable(Date),
+        notes Nullable(String),
+        
+        -- ETL Metadata
+        etl_batch_id Int64,
+        etl_load_timestamp DateTime DEFAULT now(),
+        etl_source_system String DEFAULT 'REFERENCE'
+    )
+    ENGINE = MergeTree()
+    ORDER BY (country_key)
+    SETTINGS index_granularity = 8192;
+
+# ==============================================================================
+# Integration Guide
+# ==============================================================================
+integration:
+  description: |
+    All country-sensitive dimensions and facts should include a country_key
+    foreign key column. This enables:
+    - Filtering by country in any query
+    - Joining for fiscal year calculations
+    - Currency formatting based on country rules
+    - Regional grouping and analysis
+  
+  standard_column_definition:
+    name: country_key
+    data_type: Int32
+    nullable: false
+    foreign_key: warehouse.dim_country(country_key)
+    description: "Country context for this record"
+  
+  affected_dimensions:
+    - dim_party: "Add country_key for party's tax jurisdiction"
+    - dim_date: "Add country_key for country-specific holidays"
+    - dim_tax_type: "Add country_key for country-specific tax types"
+    - dim_tax_period: "Add country_key for country-specific periods"
+    - dim_registration: "Add country_key for registration context"
+    - dim_geography: "Add country_key for country-specific admin divisions"
+  
+  affected_facts:
+    - fact_filing: "Add country_key for filing jurisdiction"
+    - fact_assessment: "Add country_key for assessment jurisdiction"
+    - fact_payment: "Add country_key for payment jurisdiction"
+    - fact_refund: "Add country_key for refund rules"
+    - fact_customs_declaration: "Add country_key for customs regime"
+  
+  query_examples:
+    - description: "Filter filings by EU countries"
+      sql: |
+        SELECT f.*
+        FROM fact_filing f
+        JOIN dim_country c ON f.country_key = c.country_key
+        WHERE c.is_eu_member = 1
+    
+    - description: "Get fiscal year label for a date"
+      sql: |
+        SELECT 
+          d.calendar_date,
+          c.country_name,
+          REPLACE(
+            REPLACE(c.fiscal_year_label_pattern, '{YEAR}', 
+              CAST(d.calendar_year + c.fiscal_year_offset_years AS VARCHAR)),
+            '{NEXT_YEAR_SHORT}', 
+              RIGHT(CAST(d.calendar_year + c.fiscal_year_offset_years + 1 AS VARCHAR), 2)
+          ) AS fiscal_year_label
+        FROM dim_date d
+        CROSS JOIN dim_country c
+        WHERE c.country_code = 'MLT'
+    
+    - description: "Count registrations by region"
+      sql: |
+        SELECT 
+          c.region_name,
+          COUNT(DISTINCT r.registration_key) as registration_count
+        FROM dim_registration r
+        JOIN dim_country c ON r.country_key = c.country_key
+        WHERE r.is_current_flag = 1
+        GROUP BY c.region_name
+
+# ==============================================================================
+# Usage Notes
+# ==============================================================================
+# 
+# All country-sensitive dimensions and facts should include:
+#
+#   - name: country_key
+#     data_type: Int32
+#     nullable: false
+#     foreign_key: warehouse.dim_country(country_key)
+#     description: "Country context for this record"
+#
+# Queries should join to dim_country for:
+# - Fiscal year calculations (offset, label pattern)
+# - Currency formatting (symbol, decimals)
+# - Tax system rules (primary ID type, VAT prefix)
+# - Regional grouping (EU membership, trade blocs)
+# - Holiday calendars (via bridge table)
+#
+# For holiday support:
+# - Holidays are stored in a separate bridge table (bridge_country_holiday)
+# - dim_date does NOT contain country-specific holiday flags
+# - Query pattern: JOIN dim_date, bridge_country_holiday, dim_country
+#
+# ==============================================================================
+
+# ==============================================================================
+# Validation Criteria
+# ==============================================================================
+# | Check                        | Expected                              |
+# |------------------------------|---------------------------------------|
+# | Surrogate key                | country_key (Int32)                   |
+# | Natural key                  | country_code (3-char ISO alpha-3)     |
+# | SCD Type                     | Type 1 (overwrite)                    |
+# | Fiscal year config           | Start month, offset, label pattern    |
+# | Currency config              | Code, name, symbol, decimals          |
+# | Tax system config            | Primary ID type, VAT prefix           |
+# | EU membership                | Flag + date for members               |
+# | Sample data                  | 5 countries (MLT, LKA, MDA, UKR, LBN) |
+# | Business rules               | 8 rules defined                       |
+# | Integration guide            | FK pattern documented                 |
+# | Query examples               | 3 examples provided                   |
+# ==============================================================================

@@ -1,0 +1,2696 @@
+# ============================================================================
+# MTCA Forms - Priority 4A: Customs Import/Export Declarations
+# Forms: SAD (H1-H7), Import Declaration (AIS), Export Declaration (AES),
+#        Simplified Declaration, Supplementary Declaration
+# Version: 1.0
+# Date: 2025-12-06
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# EU Systems: AIS (NIS upgrade), AES (NES upgrade), ICS2, CCI, CCE
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # SAD: Single Administrative Document - Import (H1)
+  # Release for Free Circulation (Art. 201 UCC)
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "SAD_H1"
+        form_name_en: "Single Administrative Document - Release for Free Circulation"
+        form_name_mt: "Dokument Amministrattiv Uniku - Rilaxx gÄ§al ÄŠirkolazzjoni Libera"
+        version: "2024"
+        effective_from: "2016-05-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Union Customs Code"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446"
+          - "Commission Implementing Regulation (EU) 2015/2447"
+          - "Customs Ordinance Cap. 37"
+          - "Import Duties Act Cap. 337"
+        administering_authority: "MTCA Customs"
+        tax_type: "Customs Duty / VAT on Import"
+        taxpayer_category: "Economic Operator"
+        filing_frequency: "Per transaction"
+        filing_deadline: "Pre-arrival lodgement or at presentation"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "AIS (Automated Import System)"
+        eu_system_interface: "Trans-European AIS"
+        source_url: "https://customs.gov.mt/import"
+        xml_schema_ref: "EUCDM v3.11"
+        message_types:
+          - "IE515 - Declaration data"
+          - "IE528 - MRN allocated"
+          - "IE529 - Release for free circulation"
+          - "IE560 - Control notification"
+        notes: |
+          H1 declaration type for release of non-Union goods for free circulation.
+          Mandatory electronic submission through AIS. Full declaration with all
+          data elements required. Links to ICS2 for ENS pre-arrival data.
+          Supports Centralised Clearance for Import (CCI) procedures.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Declaration Header (SAD Boxes 1-3)
+        # ----------------------------------------------------------------------
+        - section_id: "DECLARATION_HEADER"
+          section_name: "Declaration Header"
+          section_description: "Declaration type, parties and customs offices"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "declaration_type"
+              field_code: "Box 1(1)"
+              field_name_en: "Declaration Type"
+              field_name_mt: "Tip ta' Dikjarazzjoni"
+              field_description: "Type of declaration (IM for import)"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "IM"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_001"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid declaration type"
+                  rule_expression: "IN('IM','EX','EU','CO')"
+                  error_message_en: "Invalid declaration type"
+                  error_message_mt: "Tip ta' dikjarazzjoni mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "IM"
+                  description_en: "Import"
+                - code: "EX"
+                  description_en: "Export"
+                - code: "EU"
+                  description_en: "Union goods"
+                - code: "CO"
+                  description_en: "Transhipment"
+              reference_table: "eu_declaration_types"
+              eu_data_element: "11 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_header"
+                column: "decl_type"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "declaration_type"
+                data_type: "FixedString(2)"
+
+            - field_id: "declaration_category"
+              field_code: "Box 1(2)"
+              field_name_en: "Declaration Category"
+              field_name_mt: "Kategorija tad-Dikjarazzjoni"
+              field_description: "Category code per UCC (H1-H7, I1, etc.)"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "H1"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_002"
+                  rule_type: "codelist"
+                  rule_description: "Must be valid UCC declaration category"
+                  rule_expression: "IN('H1','H2','H3','H4','H5','H6','H7','I1','I2')"
+                  error_message_en: "Invalid declaration category"
+                  error_message_mt: "Kategorija mhux valida"
+                  severity: "error"
+              allowed_values:
+                - code: "H1"
+                  description_en: "Release for free circulation"
+                - code: "H2"
+                  description_en: "Customs warehousing"
+                - code: "H3"
+                  description_en: "Temporary admission"
+                - code: "H4"
+                  description_en: "Inward processing"
+                - code: "H5"
+                  description_en: "End-use"
+                - code: "H6"
+                  description_en: "Admission to free zone"
+                - code: "H7"
+                  description_en: "Low-value consignment"
+                - code: "I1"
+                  description_en: "Simplified declaration"
+                - code: "I2"
+                  description_en: "Entry in records"
+              reference_table: "eu_declaration_categories"
+              eu_data_element: "11 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_header"
+                column: "decl_category"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "declaration_category"
+                data_type: "FixedString(2)"
+
+            - field_id: "mrn"
+              field_code: "MRN"
+              field_name_en: "Movement Reference Number"
+              field_name_mt: "Numru ta' Referenza tal-Moviment"
+              field_description: "Unique identifier assigned by customs system"
+              data_type: "MRN"
+              format: "YYCCnnnnnnnnnnnnnnC"
+              max_length: 18
+              precision: null
+              scale: null
+              required: true
+              required_condition: "System-generated upon acceptance"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules:
+                - rule_id: "SAD_003"
+                  rule_type: "pattern"
+                  rule_description: "Valid MRN format per EUCDM"
+                  rule_expression: "^[0-9]{2}[A-Z]{2}[A-Z0-9]{13}[0-9]$"
+                  error_message_en: "Invalid MRN format"
+                  error_message_mt: "Format MRN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "21 05 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_header"
+                column: "mrn"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "mrn"
+                data_type: "FixedString(18)"
+
+            - field_id: "lrn"
+              field_code: "LRN"
+              field_name_en: "Local Reference Number"
+              field_name_mt: "Numru ta' Referenza Lokali"
+              field_description: "Declarant's unique reference number"
+              data_type: "STRING"
+              format: null
+              max_length: 22
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_004"
+                  rule_type: "pattern"
+                  rule_description: "Alphanumeric only"
+                  rule_expression: "^[A-Za-z0-9]{1,22}$"
+                  error_message_en: "Invalid LRN format"
+                  error_message_mt: "Format LRN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "21 05 002 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_header"
+                column: "lrn"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "lrn"
+                data_type: "String"
+
+            - field_id: "customs_office_entry"
+              field_code: "Box 29"
+              field_name_en: "Office of Entry"
+              field_name_mt: "UffiÄ‹Ä‹ju tad-DÄ§ul"
+              field_description: "Customs office where goods are presented"
+              data_type: "CODE"
+              format: "CCNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_005"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid customs office code"
+                  rule_expression: "EXISTS(eu_customs_offices.code)"
+                  error_message_en: "Invalid customs office code"
+                  error_message_mt: "KodiÄ‹i tal-uffiÄ‹Ä‹ju doganali mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_customs_offices"
+              eu_data_element: "17 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_header"
+                column: "office_entry"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "customs_office_entry"
+                data_type: "FixedString(8)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Parties (SAD Boxes 2, 8, 14)
+        # ----------------------------------------------------------------------
+        - section_id: "PARTIES"
+          section_name: "Parties"
+          section_description: "Consignor, consignee, declarant and representative"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "consignor_eori"
+              field_code: "Box 2"
+              field_name_en: "Consignor/Exporter EORI"
+              field_name_mt: "EORI tal-Konsenjatur/Esportatur"
+              field_description: "EORI number of the consignor/exporter"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: "Required for export; optional for import"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_010"
+                  rule_type: "pattern"
+                  rule_description: "Valid EORI format"
+                  rule_expression: "^[A-Z]{2}[A-Z0-9]{1,15}$"
+                  error_message_en: "Invalid EORI format"
+                  error_message_mt: "Format EORI mhux validu"
+                  severity: "error"
+                - rule_id: "SAD_011"
+                  rule_type: "lookup"
+                  rule_description: "EORI must exist in EU registry"
+                  rule_expression: "EXISTS(eu_eori_registry.eori)"
+                  error_message_en: "EORI not found in EU registry"
+                  error_message_mt: "EORI ma nstabx fir-reÄ¡istru tal-UE"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_eori_registry"
+              eu_data_element: "13 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_parties"
+                column: "consignor_eori"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "consignor_eori"
+                data_type: "String"
+
+            - field_id: "consignor_name"
+              field_code: "Box 2(name)"
+              field_name_en: "Consignor Name"
+              field_name_mt: "Isem tal-Konsenjatur"
+              field_description: "Full name of consignor/exporter"
+              data_type: "STRING"
+              format: null
+              max_length: 70
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "13 01 016 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_parties"
+                column: "consignor_name"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "consignor_name"
+                data_type: "String"
+
+            - field_id: "consignee_eori"
+              field_code: "Box 8"
+              field_name_en: "Consignee EORI"
+              field_name_mt: "EORI tal-Konsenjatarju"
+              field_description: "EORI number of the consignee/importer"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_012"
+                  rule_type: "pattern"
+                  rule_description: "Valid EORI format"
+                  rule_expression: "^[A-Z]{2}[A-Z0-9]{1,15}$"
+                  error_message_en: "Invalid EORI format"
+                  error_message_mt: "Format EORI mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_eori_registry"
+              eu_data_element: "13 02 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_parties"
+                column: "consignee_eori"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "consignee_eori"
+                data_type: "String"
+
+            - field_id: "consignee_name"
+              field_code: "Box 8(name)"
+              field_name_en: "Consignee Name"
+              field_name_mt: "Isem tal-Konsenjatarju"
+              field_description: "Full name of consignee/importer"
+              data_type: "STRING"
+              format: null
+              max_length: 70
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "13 02 016 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_parties"
+                column: "consignee_name"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "consignee_name"
+                data_type: "String"
+
+            - field_id: "declarant_eori"
+              field_code: "Box 14"
+              field_name_en: "Declarant EORI"
+              field_name_mt: "EORI tad-Dikjarant"
+              field_description: "EORI number of the declarant"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_013"
+                  rule_type: "pattern"
+                  rule_description: "Valid EORI format"
+                  rule_expression: "^[A-Z]{2}[A-Z0-9]{1,15}$"
+                  error_message_en: "Invalid EORI format"
+                  error_message_mt: "Format EORI mhux validu"
+                  severity: "error"
+                - rule_id: "SAD_014"
+                  rule_type: "lookup"
+                  rule_description: "Declarant must be registered in Malta"
+                  rule_expression: "STARTS_WITH('MT') OR is_authorised_representative"
+                  error_message_en: "Declarant must be Malta-registered or authorised representative"
+                  error_message_mt: "Dikjarant irid ikun reÄ¡istrat f'Malta jew rappreÅ¼entant awtorizzat"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_eori_registry"
+              eu_data_element: "13 03 000 000"
+              cross_form_reference: "EORI_APPLICATION.eori_number"
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_parties"
+                column: "declarant_eori"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "declarant_eori"
+                data_type: "String"
+
+            - field_id: "representative_eori"
+              field_code: "Box 14(rep)"
+              field_name_en: "Representative EORI"
+              field_name_mt: "EORI tar-RappreÅ¼entant"
+              field_description: "EORI number of customs representative (if applicable)"
+              data_type: "EORI"
+              format: "CCnnnnnnnnnnnnnn"
+              max_length: 17
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if acting through representative"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_015"
+                  rule_type: "pattern"
+                  rule_description: "Valid EORI format if provided"
+                  rule_expression: "^[A-Z]{2}[A-Z0-9]{1,15}$"
+                  error_message_en: "Invalid representative EORI format"
+                  error_message_mt: "Format EORI tar-rappreÅ¼entant mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_eori_registry"
+              eu_data_element: "13 03 017 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_parties"
+                column: "representative_eori"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "representative_eori"
+                data_type: "Nullable(String)"
+
+            - field_id: "representation_type"
+              field_code: "Box 14(status)"
+              field_name_en: "Representation Status"
+              field_name_mt: "Status tar-RappreÅ¼entanza"
+              field_description: "Type of customs representation"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "1"
+                  description_en: "Declarant (no representative)"
+                - code: "2"
+                  description_en: "Direct representation"
+                - code: "3"
+                  description_en: "Indirect representation"
+              reference_table: "eu_representation_types"
+              eu_data_element: "13 03 019 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_parties"
+                column: "representation_type"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "representation_type"
+                data_type: "FixedString(1)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Financial Data (SAD Boxes 22, 23, 44)
+        # ----------------------------------------------------------------------
+        - section_id: "FINANCIAL_DATA"
+          section_name: "Financial Data"
+          section_description: "Currency, invoiced amount, exchange rate"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "currency_code"
+              field_code: "Box 22(1)"
+              field_name_en: "Invoice Currency"
+              field_name_mt: "Munita tal-Fattura"
+              field_description: "Currency of the invoice (ISO 4217)"
+              data_type: "CURRENCY_CODE"
+              format: "AAA"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "EUR"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_020"
+                  rule_type: "codelist"
+                  rule_description: "Valid ISO 4217 currency code"
+                  rule_expression: "EXISTS(iso_4217_currencies.code)"
+                  error_message_en: "Invalid currency code"
+                  error_message_mt: "KodiÄ‹i tal-munita mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_4217_currencies"
+              eu_data_element: "14 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_financial"
+                column: "currency_code"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "currency_code"
+                data_type: "FixedString(3)"
+
+            - field_id: "total_invoiced_amount"
+              field_code: "Box 22(2)"
+              field_name_en: "Total Invoiced Amount"
+              field_name_mt: "Ammont Totali Fatturati"
+              field_description: "Total invoice value in declared currency"
+              data_type: "DECIMAL"
+              format: "###,###,###,###.##"
+              max_length: null
+              precision: 16
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_021"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "total_invoiced_amount > 0"
+                  error_message_en: "Invoice amount must be positive"
+                  error_message_mt: "Ammont tal-fattura irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "14 02 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_financial"
+                column: "total_invoiced"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "total_invoiced_amount"
+                data_type: "Decimal(16,2)"
+
+            - field_id: "exchange_rate"
+              field_code: "Box 23"
+              field_name_en: "Exchange Rate"
+              field_name_mt: "Rata tal-Kambju"
+              field_description: "Exchange rate to EUR (applicable date)"
+              data_type: "DECIMAL"
+              format: "##.######"
+              max_length: null
+              precision: 12
+              scale: 6
+              required: true
+              required_condition: "Required if currency is not EUR"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "ECB rate on valuation date"
+              validation_rules:
+                - rule_id: "SAD_022"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "exchange_rate > 0"
+                  error_message_en: "Exchange rate must be positive"
+                  error_message_mt: "Rata tal-kambju trid tkun poÅ¼ittiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "ecb_exchange_rates"
+              eu_data_element: "14 04 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_financial"
+                column: "exchange_rate"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "exchange_rate"
+                data_type: "Decimal(12,6)"
+
+            - field_id: "transaction_nature"
+              field_code: "Box 24"
+              field_name_en: "Nature of Transaction"
+              field_name_mt: "Natura tat-Transazzjoni"
+              field_description: "Code indicating type of commercial transaction"
+              data_type: "CODE"
+              format: "NN"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_023"
+                  rule_type: "codelist"
+                  rule_description: "Valid transaction nature code"
+                  rule_expression: "EXISTS(eu_transaction_nature.code)"
+                  error_message_en: "Invalid transaction nature code"
+                  error_message_mt: "KodiÄ‹i tan-natura tat-transazzjoni mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "11"
+                  description_en: "Outright purchase/sale"
+                - code: "12"
+                  description_en: "Supply for sale on approval"
+                - code: "21"
+                  description_en: "Return of goods"
+                - code: "22"
+                  description_en: "Replacement for returned goods"
+                - code: "31"
+                  description_en: "Transactions involving transfer of ownership"
+                - code: "41"
+                  description_en: "Processing under contract"
+                - code: "42"
+                  description_en: "Other processing"
+                - code: "51"
+                  description_en: "Goods entering after outward processing"
+                - code: "52"
+                  description_en: "Goods entering for outward processing"
+                - code: "71"
+                  description_en: "Operations for common defence"
+                - code: "80"
+                  description_en: "Building materials and equipment"
+                - code: "91"
+                  description_en: "Other transactions"
+              reference_table: "eu_transaction_nature"
+              eu_data_element: "14 03 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_financial"
+                column: "transaction_nature"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "transaction_nature"
+                data_type: "FixedString(2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Goods Items (SAD Boxes 31-47) - Repeatable
+        # ----------------------------------------------------------------------
+        - section_id: "GOODS_ITEMS"
+          section_name: "Goods Item Details"
+          section_description: "Individual goods items in the declaration"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          max_occurrences: 999
+          fields:
+            - field_id: "item_number"
+              field_code: "Box 32"
+              field_name_en: "Item Number"
+              field_name_mt: "Numru tal-OÄ¡Ä¡ett"
+              field_description: "Sequential number of goods item"
+              data_type: "INTEGER"
+              format: "NNN"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "AUTO_INCREMENT"
+              validation_rules:
+                - rule_id: "SAD_030"
+                  rule_type: "range"
+                  rule_description: "Item number between 1 and 999"
+                  rule_expression: "item_number >= 1 AND item_number <= 999"
+                  error_message_en: "Item number must be between 1 and 999"
+                  error_message_mt: "Numru tal-oÄ¡Ä¡ett irid ikun bejn 1 u 999"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "16 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "item_no"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "item_number"
+                data_type: "UInt16"
+
+            - field_id: "goods_description"
+              field_code: "Box 31"
+              field_name_en: "Goods Description"
+              field_name_mt: "Deskrizzjoni tal-Merkanzija"
+              field_description: "Description of the goods (marks and numbers, type of packages)"
+              data_type: "STRING"
+              format: null
+              max_length: 512
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_031"
+                  rule_type: "format"
+                  rule_description: "Description must be meaningful"
+                  rule_expression: "LENGTH(goods_description) >= 10"
+                  error_message_en: "Goods description too short"
+                  error_message_mt: "Deskrizzjoni tal-merkanzija qasira wisq"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "18 05 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "goods_desc"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "goods_description"
+                data_type: "String"
+
+            - field_id: "commodity_code"
+              field_code: "Box 33(1)"
+              field_name_en: "Commodity Code (CN)"
+              field_name_mt: "KodiÄ‹i tal-Merkanzija (NK)"
+              field_description: "8-digit Combined Nomenclature code"
+              data_type: "CN_CODE"
+              format: "NNNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_032"
+                  rule_type: "pattern"
+                  rule_description: "Must be 8 digits"
+                  rule_expression: "^[0-9]{8}$"
+                  error_message_en: "Commodity code must be 8 digits"
+                  error_message_mt: "KodiÄ‹i tal-merkanzija irid ikun 8 numri"
+                  severity: "error"
+                - rule_id: "SAD_033"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid CN code"
+                  rule_expression: "EXISTS(taric_database.cn_code)"
+                  error_message_en: "Invalid commodity code"
+                  error_message_mt: "KodiÄ‹i tal-merkanzija mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taric_cn_codes"
+              eu_data_element: "18 01 002 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "cn_code"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "commodity_code_cn"
+                data_type: "FixedString(8)"
+
+            - field_id: "taric_code"
+              field_code: "Box 33(2)"
+              field_name_en: "TARIC Code"
+              field_name_mt: "KodiÄ‹i TARIC"
+              field_description: "2-digit TARIC subheading (additional to CN)"
+              data_type: "CODE"
+              format: "NN"
+              max_length: 2
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if TARIC measures apply"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_034"
+                  rule_type: "pattern"
+                  rule_description: "Must be 2 digits"
+                  rule_expression: "^[0-9]{2}$"
+                  error_message_en: "TARIC code must be 2 digits"
+                  error_message_mt: "KodiÄ‹i TARIC irid ikun 2 numri"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taric_additional_codes"
+              eu_data_element: "18 01 003 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "taric_code"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "taric_code"
+                data_type: "Nullable(FixedString(2))"
+
+            - field_id: "country_of_origin"
+              field_code: "Box 34a"
+              field_name_en: "Country of Origin"
+              field_name_mt: "PajjiÅ¼ ta' OriÄ¡ini"
+              field_description: "Country where goods were produced/manufactured"
+              data_type: "COUNTRY_CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_035"
+                  rule_type: "codelist"
+                  rule_description: "Valid ISO 3166-1 alpha-2 code"
+                  rule_expression: "EXISTS(iso_3166_countries.alpha2)"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "iso_3166_countries"
+              eu_data_element: "16 08 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "origin_country"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "country_of_origin"
+                data_type: "FixedString(2)"
+
+            - field_id: "preferential_origin"
+              field_code: "Box 34b"
+              field_name_en: "Preferential Origin"
+              field_name_mt: "OriÄ¡ini Preferenzjali"
+              field_description: "Country of preferential origin (if different)"
+              data_type: "COUNTRY_CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if claiming preferential treatment"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_countries"
+              eu_data_element: "16 09 000 000"
+              cross_form_reference: "EUR1.origin_country"
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "pref_origin"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "preferential_origin"
+                data_type: "Nullable(FixedString(2))"
+
+            - field_id: "net_mass"
+              field_code: "Box 38"
+              field_name_en: "Net Mass (kg)"
+              field_name_mt: "Massa Netta (kg)"
+              field_description: "Net weight in kilograms"
+              data_type: "DECIMAL"
+              format: "###,###,###.######"
+              max_length: null
+              precision: 16
+              scale: 6
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_036"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "net_mass > 0"
+                  error_message_en: "Net mass must be positive"
+                  error_message_mt: "Massa netta trid tkun poÅ¼ittiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "18 04 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "net_mass_kg"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "net_mass_kg"
+                data_type: "Decimal(16,6)"
+
+            - field_id: "gross_mass"
+              field_code: "Box 35"
+              field_name_en: "Gross Mass (kg)"
+              field_name_mt: "Massa Grossa (kg)"
+              field_description: "Gross weight including packaging"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 16
+              scale: 3
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_037"
+                  rule_type: "comparison"
+                  rule_description: "Gross mass >= Net mass"
+                  rule_expression: "gross_mass >= net_mass"
+                  error_message_en: "Gross mass must be >= net mass"
+                  error_message_mt: "Massa grossa trid tkun >= massa netta"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "16 06 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "gross_mass_kg"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "gross_mass_kg"
+                data_type: "Decimal(16,3)"
+
+            - field_id: "supplementary_units"
+              field_code: "Box 41"
+              field_name_en: "Supplementary Units"
+              field_name_mt: "Unitajiet Supplimentari"
+              field_description: "Quantity in supplementary units (if applicable)"
+              data_type: "DECIMAL"
+              format: "###,###,###.###"
+              max_length: null
+              precision: 16
+              scale: 3
+              required: false
+              required_condition: "Required if commodity code requires supplementary units"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_038"
+                  rule_type: "range"
+                  rule_description: "Must be positive if provided"
+                  rule_expression: "supplementary_units > 0"
+                  error_message_en: "Supplementary units must be positive"
+                  error_message_mt: "Unitajiet supplimentari tridu jkunu poÅ¼ittivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "18 02 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "supp_units"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "supplementary_units"
+                data_type: "Nullable(Decimal(16,3))"
+
+            - field_id: "preference_code"
+              field_code: "Box 36"
+              field_name_en: "Preference Code"
+              field_name_mt: "KodiÄ‹i ta' Preferenza"
+              field_description: "Code for preferential duty treatment"
+              data_type: "CODE"
+              format: "NNN"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "100"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_039"
+                  rule_type: "codelist"
+                  rule_description: "Valid preference code"
+                  rule_expression: "EXISTS(taric_preference_codes.code)"
+                  error_message_en: "Invalid preference code"
+                  error_message_mt: "KodiÄ‹i ta' preferenza mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "100"
+                  description_en: "Erga omnes (MFN rate)"
+                - code: "110"
+                  description_en: "Autonomous tariff suspension"
+                - code: "120"
+                  description_en: "Quota"
+                - code: "200"
+                  description_en: "GSP without origin certificate"
+                - code: "300"
+                  description_en: "Preferential agreement - origin declared"
+                - code: "310"
+                  description_en: "Preferential - EUR.1 presented"
+                - code: "320"
+                  description_en: "Preferential - invoice declaration"
+                - code: "340"
+                  description_en: "Preferential - REX statement"
+              reference_table: "taric_preference_codes"
+              eu_data_element: "14 11 000 000"
+              cross_form_reference: "EUR1.certificate_number"
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "preference"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "preference_code"
+                data_type: "FixedString(3)"
+
+            - field_id: "procedure_code_requested"
+              field_code: "Box 37(1)"
+              field_name_en: "Requested Procedure Code"
+              field_name_mt: "KodiÄ‹i tal-ProÄ‹edura Mitluba"
+              field_description: "4-digit customs procedure being applied for"
+              data_type: "CODE"
+              format: "NNNN"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_040"
+                  rule_type: "codelist"
+                  rule_description: "Valid UCC procedure code"
+                  rule_expression: "EXISTS(ucc_procedure_codes.code)"
+                  error_message_en: "Invalid procedure code"
+                  error_message_mt: "KodiÄ‹i tal-proÄ‹edura mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "4000"
+                  description_en: "Release for free circulation (no previous procedure)"
+                - code: "4051"
+                  description_en: "Release - inward processing (no previous procedure)"
+                - code: "4071"
+                  description_en: "Release - customs warehousing"
+                - code: "4200"
+                  description_en: "Simultaneous release and home use"
+                - code: "4400"
+                  description_en: "Release - duty exemption"
+                - code: "4500"
+                  description_en: "Release - partial relief"
+                - code: "5100"
+                  description_en: "Inward processing"
+                - code: "5300"
+                  description_en: "Temporary admission"
+                - code: "6100"
+                  description_en: "Re-importation - unchanged state"
+                - code: "7100"
+                  description_en: "Customs warehousing"
+              reference_table: "ucc_procedure_codes"
+              eu_data_element: "11 09 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "proc_requested"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "procedure_code_requested"
+                data_type: "FixedString(4)"
+
+            - field_id: "procedure_code_previous"
+              field_code: "Box 37(2)"
+              field_name_en: "Previous Procedure Code"
+              field_name_mt: "KodiÄ‹i tal-ProÄ‹edura PreÄ‹edenti"
+              field_description: "3-digit previous customs procedure (if applicable)"
+              data_type: "CODE"
+              format: "NNN"
+              max_length: 3
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if goods were under previous procedure"
+              editable: true
+              default_value: "000"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_041"
+                  rule_type: "codelist"
+                  rule_description: "Valid previous procedure code"
+                  rule_expression: "EXISTS(ucc_previous_procedure_codes.code)"
+                  error_message_en: "Invalid previous procedure code"
+                  error_message_mt: "KodiÄ‹i tal-proÄ‹edura preÄ‹edenti mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "000"
+                  description_en: "No previous procedure"
+                - code: "F01"
+                  description_en: "Equivalent compensating products"
+                - code: "F02"
+                  description_en: "Prior export of equivalent goods"
+                - code: "F03"
+                  description_en: "Prior importation for release"
+                - code: "1XX"
+                  description_en: "Various additional codes"
+              reference_table: "ucc_previous_procedure_codes"
+              eu_data_element: "11 09 002 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "proc_previous"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "procedure_code_previous"
+                data_type: "FixedString(3)"
+
+            - field_id: "statistical_value_eur"
+              field_code: "Box 46"
+              field_name_en: "Statistical Value (EUR)"
+              field_name_mt: "Valur Statistiku (EUR)"
+              field_description: "Statistical value in EUR for reporting purposes"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.##"
+              max_length: null
+              precision: 16
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: true
+              calculation_formula: "item_customs_value_eur * adjustment_factor"
+              validation_rules:
+                - rule_id: "SAD_042"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "statistical_value_eur > 0"
+                  error_message_en: "Statistical value must be positive"
+                  error_message_mt: "Valur statistiku irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "14 07 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "stat_value_eur"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "statistical_value_eur"
+                data_type: "Decimal(16,2)"
+
+            - field_id: "customs_value_eur"
+              field_code: "Box 47(base)"
+              field_name_en: "Customs Value (EUR)"
+              field_name_mt: "Valur Doganali (EUR)"
+              field_description: "Transaction value for customs valuation"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.##"
+              max_length: null
+              precision: 16
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_043"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "customs_value_eur > 0"
+                  error_message_en: "Customs value must be positive"
+                  error_message_mt: "Valur doganali irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "14 05 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_items"
+                column: "customs_value"
+              ors_mapping:
+                table: "mtca_ors.customs_items"
+                column: "customs_value_eur"
+                data_type: "Decimal(16,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Tax Calculation (SAD Box 47)
+        # ----------------------------------------------------------------------
+        - section_id: "TAX_CALCULATION"
+          section_name: "Calculation of Taxes"
+          section_description: "Customs duty, VAT, excise calculations per item"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          parent_section: "GOODS_ITEMS"
+          fields:
+            - field_id: "tax_type"
+              field_code: "Box 47(type)"
+              field_name_en: "Tax Type"
+              field_name_mt: "Tip tat-Taxxa"
+              field_description: "Type of tax/duty being calculated"
+              data_type: "CODE"
+              format: "AAA"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_050"
+                  rule_type: "codelist"
+                  rule_description: "Valid tax type code"
+                  rule_expression: "IN('A00','B00','C00','A20','A30','A50','B10')"
+                  error_message_en: "Invalid tax type"
+                  error_message_mt: "Tip tat-taxxa mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "A00"
+                  description_en: "Customs duty (third country)"
+                - code: "B00"
+                  description_en: "VAT on import"
+                - code: "C00"
+                  description_en: "Export duty"
+                - code: "A20"
+                  description_en: "Additional customs duty"
+                - code: "A30"
+                  description_en: "Anti-dumping duty"
+                - code: "A50"
+                  description_en: "Countervailing duty"
+                - code: "B10"
+                  description_en: "Excise duty"
+              reference_table: "eu_tax_types"
+              eu_data_element: "14 08 016 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_taxes"
+                column: "tax_type"
+              ors_mapping:
+                table: "mtca_ors.customs_taxes"
+                column: "tax_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "tax_base"
+              field_code: "Box 47(base)"
+              field_name_en: "Tax Base"
+              field_name_mt: "BaÅ¼i tat-Taxxa"
+              field_description: "Base amount for tax calculation"
+              data_type: "DECIMAL"
+              format: "###,###,###.##"
+              max_length: null
+              precision: 16
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "Depends on tax type - customs value, value + duty, quantity"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "14 08 019 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_taxes"
+                column: "tax_base"
+              ors_mapping:
+                table: "mtca_ors.customs_taxes"
+                column: "tax_base"
+                data_type: "Decimal(16,2)"
+
+            - field_id: "tax_rate"
+              field_code: "Box 47(rate)"
+              field_name_en: "Tax Rate"
+              field_name_mt: "Rata tat-Taxxa"
+              field_description: "Applicable rate (% or per unit)"
+              data_type: "DECIMAL"
+              format: "##.###"
+              max_length: null
+              precision: 8
+              scale: 3
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "Retrieved from TARIC based on CN code and origin"
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taric_duty_rates"
+              eu_data_element: "14 08 022 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_taxes"
+                column: "tax_rate"
+              ors_mapping:
+                table: "mtca_ors.customs_taxes"
+                column: "tax_rate"
+                data_type: "Decimal(8,3)"
+
+            - field_id: "tax_amount"
+              field_code: "Box 47(amount)"
+              field_name_en: "Tax Amount (EUR)"
+              field_name_mt: "Ammont tat-Taxxa (EUR)"
+              field_description: "Calculated tax amount in EUR"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.##"
+              max_length: null
+              precision: 16
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "tax_base * tax_rate / 100 (for percentage rates)"
+              validation_rules:
+                - rule_id: "SAD_051"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "tax_amount >= 0"
+                  error_message_en: "Tax amount cannot be negative"
+                  error_message_mt: "Ammont tat-taxxa ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "14 08 025 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_taxes"
+                column: "tax_amount"
+              ors_mapping:
+                table: "mtca_ors.customs_taxes"
+                column: "tax_amount_eur"
+                data_type: "Decimal(16,2)"
+
+            - field_id: "payment_method"
+              field_code: "Box 47(MP)"
+              field_name_en: "Method of Payment"
+              field_name_mt: "Metodu ta' Ä¦las"
+              field_description: "Code for payment method"
+              data_type: "CODE"
+              format: "A"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "A"
+                  description_en: "Cash payment"
+                - code: "C"
+                  description_en: "Credit (deferred payment)"
+                - code: "D"
+                  description_en: "Credit other debtor"
+                - code: "E"
+                  description_en: "Deferred (authorized)"
+                - code: "F"
+                  description_en: "Deferred (suspended guarantee)"
+                - code: "G"
+                  description_en: "Postponed VAT accounting"
+                - code: "H"
+                  description_en: "Electronic credit transfer"
+                - code: "J"
+                  description_en: "Payment via intermediary"
+                - code: "M"
+                  description_en: "Exemption/not collected"
+                - code: "R"
+                  description_en: "Guarantee deposit"
+              reference_table: "eu_payment_methods"
+              eu_data_element: "14 08 028 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_taxes"
+                column: "payment_method"
+              ors_mapping:
+                table: "mtca_ors.customs_taxes"
+                column: "payment_method"
+                data_type: "FixedString(1)"
+
+        # ----------------------------------------------------------------------
+        # Section 6: Transport Information (SAD Boxes 18-21, 25-27)
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSPORT"
+          section_name: "Transport Information"
+          section_description: "Mode of transport, nationality, container details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "mode_at_border"
+              field_code: "Box 25"
+              field_name_en: "Mode of Transport at Border"
+              field_name_mt: "Mod ta' Trasport fil-Fruntiera"
+              field_description: "Mode of transport used at border crossing"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_060"
+                  rule_type: "codelist"
+                  rule_description: "Valid mode of transport code"
+                  rule_expression: "IN('1','2','3','4','5','7','8','9')"
+                  error_message_en: "Invalid mode of transport"
+                  error_message_mt: "Mod ta' trasport mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "1"
+                  description_en: "Sea transport"
+                - code: "2"
+                  description_en: "Rail transport"
+                - code: "3"
+                  description_en: "Road transport"
+                - code: "4"
+                  description_en: "Air transport"
+                - code: "5"
+                  description_en: "Postal consignments"
+                - code: "7"
+                  description_en: "Fixed transport installations"
+                - code: "8"
+                  description_en: "Inland waterway transport"
+                - code: "9"
+                  description_en: "Own propulsion"
+              reference_table: "eu_transport_modes"
+              eu_data_element: "19 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_transport"
+                column: "mode_border"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "transport_mode_border"
+                data_type: "FixedString(1)"
+
+            - field_id: "mode_inland"
+              field_code: "Box 26"
+              field_name_en: "Inland Mode of Transport"
+              field_name_mt: "Mod ta' Trasport Intern"
+              field_description: "Mode of transport inland"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eu_transport_modes"
+              eu_data_element: "19 02 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_transport"
+                column: "mode_inland"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "transport_mode_inland"
+                data_type: "Nullable(FixedString(1))"
+
+            - field_id: "transport_id"
+              field_code: "Box 18"
+              field_name_en: "Identity of Transport"
+              field_name_mt: "IdentitÃ  tat-Trasport"
+              field_description: "Registration number/name of transport means"
+              data_type: "STRING"
+              format: null
+              max_length: 27
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "19 03 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_transport"
+                column: "transport_id"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "transport_identity"
+                data_type: "String"
+
+            - field_id: "transport_nationality"
+              field_code: "Box 18(nat)"
+              field_name_en: "Nationality of Transport"
+              field_name_mt: "NazzjonalitÃ  tat-Trasport"
+              field_description: "Country of registration of transport means"
+              data_type: "COUNTRY_CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_countries"
+              eu_data_element: "19 03 006 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_transport"
+                column: "transport_nat"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "transport_nationality"
+                data_type: "FixedString(2)"
+
+            - field_id: "container_indicator"
+              field_code: "Box 19"
+              field_name_en: "Container"
+              field_name_mt: "Kontejner"
+              field_description: "Indicator if goods are in container"
+              data_type: "CODE"
+              format: "N"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "0"
+                  description_en: "Not containerized"
+                - code: "1"
+                  description_en: "Containerized"
+              reference_table: null
+              eu_data_element: "19 04 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_transport"
+                column: "container_ind"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "container_indicator"
+                data_type: "UInt8"
+
+            - field_id: "container_numbers"
+              field_code: "Box 31(container)"
+              field_name_en: "Container Identification Numbers"
+              field_name_mt: "Numri ta' Identifikazzjoni tal-Kontejner"
+              field_description: "Container numbers (ISO 6346 format)"
+              data_type: "STRING"
+              format: null
+              max_length: 512
+              precision: null
+              scale: null
+              required: false
+              required_condition: "Required if container_indicator = 1"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_061"
+                  rule_type: "pattern"
+                  rule_description: "ISO 6346 container format"
+                  rule_expression: "^[A-Z]{4}[0-9]{7}$"
+                  error_message_en: "Invalid container number format"
+                  error_message_mt: "Format tan-numru tal-kontejner mhux validu"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "19 05 062 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_containers"
+                column: "container_no"
+              ors_mapping:
+                table: "mtca_ors.customs_containers"
+                column: "container_number"
+                data_type: "String"
+
+            - field_id: "delivery_terms"
+              field_code: "Box 20"
+              field_name_en: "Delivery Terms"
+              field_name_mt: "Termini ta' Konsenja"
+              field_description: "Incoterms code"
+              data_type: "CODE"
+              format: "AAA"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_062"
+                  rule_type: "codelist"
+                  rule_description: "Valid Incoterms 2020 code"
+                  rule_expression: "EXISTS(incoterms_2020.code)"
+                  error_message_en: "Invalid Incoterms code"
+                  error_message_mt: "KodiÄ‹i Incoterms mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "EXW"
+                  description_en: "Ex Works"
+                - code: "FCA"
+                  description_en: "Free Carrier"
+                - code: "CPT"
+                  description_en: "Carriage Paid To"
+                - code: "CIP"
+                  description_en: "Carriage and Insurance Paid To"
+                - code: "DAP"
+                  description_en: "Delivered at Place"
+                - code: "DPU"
+                  description_en: "Delivered at Place Unloaded"
+                - code: "DDP"
+                  description_en: "Delivered Duty Paid"
+                - code: "FAS"
+                  description_en: "Free Alongside Ship"
+                - code: "FOB"
+                  description_en: "Free On Board"
+                - code: "CFR"
+                  description_en: "Cost and Freight"
+                - code: "CIF"
+                  description_en: "Cost Insurance and Freight"
+              reference_table: "incoterms_2020"
+              eu_data_element: "14 06 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_transport"
+                column: "incoterms"
+              ors_mapping:
+                table: "mtca_ors.customs_declarations"
+                column: "delivery_terms"
+                data_type: "FixedString(3)"
+
+        # ----------------------------------------------------------------------
+        # Section 7: Additional Information and Documents
+        # ----------------------------------------------------------------------
+        - section_id: "DOCUMENTS"
+          section_name: "Supporting Documents"
+          section_description: "Document references and additional information codes"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "document_type"
+              field_code: "Box 44"
+              field_name_en: "Document Type Code"
+              field_name_mt: "KodiÄ‹i tat-Tip tad-Dokument"
+              field_description: "Type of supporting document"
+              data_type: "CODE"
+              format: "ANNN"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SAD_070"
+                  rule_type: "lookup"
+                  rule_description: "Valid document code"
+                  rule_expression: "EXISTS(eu_document_codes.code)"
+                  error_message_en: "Invalid document code"
+                  error_message_mt: "KodiÄ‹i tad-dokument mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_document_codes"
+              eu_data_element: "12 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_documents"
+                column: "doc_type"
+              ors_mapping:
+                table: "mtca_ors.customs_documents"
+                column: "document_type"
+                data_type: "FixedString(4)"
+
+            - field_id: "document_reference"
+              field_code: "Box 44(ref)"
+              field_name_en: "Document Reference Number"
+              field_name_mt: "Numru ta' Referenza tad-Dokument"
+              field_description: "Unique identifier of the document"
+              data_type: "STRING"
+              format: null
+              max_length: 70
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "12 01 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_documents"
+                column: "doc_ref"
+              ors_mapping:
+                table: "mtca_ors.customs_documents"
+                column: "document_reference"
+                data_type: "String"
+
+            - field_id: "additional_info_code"
+              field_code: "Box 44(AI)"
+              field_name_en: "Additional Information Code"
+              field_name_mt: "KodiÄ‹i ta' Informazzjoni Addizzjonali"
+              field_description: "EU harmonized additional information code"
+              data_type: "CODE"
+              format: "ANNNN"
+              max_length: 5
+              precision: null
+              scale: null
+              required: false
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eu_additional_info_codes"
+              eu_data_element: "12 02 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_additional_info"
+                column: "ai_code"
+              ors_mapping:
+                table: "mtca_ors.customs_additional_info"
+                column: "additional_info_code"
+                data_type: "FixedString(5)"
+
+      attachments:
+        - attachment_code: "INVOICE"
+          description_en: "Commercial Invoice"
+          description_mt: "Fattura KummerÄ‹jali"
+          required: true
+          file_types: ["PDF", "TIFF", "JPG"]
+        - attachment_code: "PACKING_LIST"
+          description_en: "Packing List"
+          description_mt: "Lista tal-Ippakkjar"
+          required: false
+          file_types: ["PDF", "TIFF"]
+        - attachment_code: "BL_AWB"
+          description_en: "Bill of Lading / Air Waybill"
+          description_mt: "Polza ta' TagÄ§bija / Ittra ta' Trasport bl-Ajru"
+          required: true
+          file_types: ["PDF"]
+        - attachment_code: "CERT_ORIGIN"
+          description_en: "Certificate of Origin"
+          description_mt: "ÄŠertifikat ta' OriÄ¡ini"
+          required: false
+          required_condition: "If claiming preferential origin"
+          file_types: ["PDF"]
+        - attachment_code: "IMPORT_LICENSE"
+          description_en: "Import License"
+          description_mt: "LiÄ‹enzja ta' Importazzjoni"
+          required: false
+          required_condition: "If goods require license"
+          file_types: ["PDF"]
+
+      related_forms:
+        - form_code: "ENS"
+          relationship: "Pre-arrival data feeds into import declaration"
+          eu_system: "ICS2"
+        - form_code: "T1"
+          relationship: "Transit procedure may precede import"
+          eu_system: "NCTS-P5"
+        - form_code: "EUR.1"
+          relationship: "Proof of preferential origin"
+          eu_system: "National"
+        - form_code: "e-AD"
+          relationship: "Excise goods require EMCS documentation"
+          eu_system: "EMCS"
+        - form_code: "BTI"
+          relationship: "Binding tariff classification"
+          eu_system: "EBTI"
+
+      eu_system_integration:
+        trans_european_system: "AIS (Automated Import System)"
+        message_exchange: "S2S (System-to-System) and Portal"
+        interface_specification: "EUCDM v3.11 / UCC DA Annex B"
+        connected_systems:
+          - system: "ICS2"
+            purpose: "ENS data for risk analysis"
+          - system: "TARIC"
+            purpose: "Duty rates and measures"
+          - system: "CS/RD2"
+            purpose: "Reference data synchronization"
+          - system: "GUM"
+            purpose: "Guarantee validation"
+          - system: "UUM&DS"
+            purpose: "Authentication"
+
+      submission_workflow:
+        authentication_required: "UUM&DS / EORI-based"
+        signature_required: false
+        guarantee_required: true
+        guarantee_types: ["Comprehensive", "Individual"]
+        payment_integration: true
+        acknowledgment_type: "MRN"
+        processing_stages:
+          - stage: "Submission"
+            description: "Declaration received"
+          - stage: "Validation"
+            description: "Format and business rules check"
+          - stage: "Risk Analysis"
+            description: "Automated risk assessment"
+          - stage: "Control"
+            description: "Physical/documentary control if selected"
+          - stage: "Release"
+            description: "Release for procedure"
+          - stage: "Post-clearance"
+            description: "Post-clearance audit"
+
+  # ==========================================================================
+  # SAD: Single Administrative Document - Export (B1/B2)
+  # Export declarations (Art. 263 UCC)
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "SAD_B1"
+        form_name_en: "Single Administrative Document - Export Declaration"
+        form_name_mt: "Dokument Amministrattiv Uniku - Dikjarazzjoni ta' Esportazzjoni"
+        version: "2024"
+        effective_from: "2016-05-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Union Customs Code"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446"
+          - "Commission Implementing Regulation (EU) 2015/2447"
+          - "Customs Ordinance Cap. 37"
+        administering_authority: "MTCA Customs"
+        tax_type: "Export Controls"
+        taxpayer_category: "Economic Operator"
+        filing_frequency: "Per transaction"
+        filing_deadline: "Pre-departure"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "AES (Automated Export System)"
+        eu_system_interface: "Trans-European AES"
+        source_url: "https://customs.gov.mt/export"
+        xml_schema_ref: "EUCDM v3.11"
+        message_types:
+          - "IE515 - Export declaration"
+          - "IE528 - MRN allocated"
+          - "IE529 - Release for export"
+          - "IE599 - Exit results"
+        notes: |
+          B1 declaration type for standard export procedure. B2 for simplified 
+          declarations. Mandatory electronic submission through AES.
+          Supports Centralised Clearance for Export (CCE).
+
+      sections:
+        # Similar structure to import but with export-specific fields
+        - section_id: "EXPORT_HEADER"
+          section_name: "Export Declaration Header"
+          section_description: "Declaration type and offices"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "declaration_type"
+              field_code: "Box 1(1)"
+              field_name_en: "Declaration Type"
+              field_name_mt: "Tip ta' Dikjarazzjoni"
+              field_description: "Type of declaration (EX for export)"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "EX"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SADX_001"
+                  rule_type: "codelist"
+                  rule_description: "Must be EX for export"
+                  rule_expression: "declaration_type = 'EX'"
+                  error_message_en: "Export declaration must use type EX"
+                  error_message_mt: "Dikjarazzjoni ta' esportazzjoni trid tuÅ¼a tip EX"
+                  severity: "error"
+              allowed_values:
+                - code: "EX"
+                  description_en: "Export"
+              reference_table: "eu_declaration_types"
+              eu_data_element: "11 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_export_header"
+                column: "decl_type"
+              ors_mapping:
+                table: "mtca_ors.customs_export_declarations"
+                column: "declaration_type"
+                data_type: "FixedString(2)"
+
+            - field_id: "export_declaration_category"
+              field_code: "Box 1(2)"
+              field_name_en: "Export Declaration Category"
+              field_name_mt: "Kategorija tad-Dikjarazzjoni ta' Esportazzjoni"
+              field_description: "UCC export declaration category"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "B1"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "B1"
+                  description_en: "Standard export"
+                - code: "B2"
+                  description_en: "Simplified export"
+                - code: "B3"
+                  description_en: "Entry in declarant's records"
+                - code: "B4"
+                  description_en: "Exit summary declaration as export declaration"
+                - code: "C1"
+                  description_en: "Re-export from customs warehouse"
+                - code: "C2"
+                  description_en: "Re-export simplified"
+              reference_table: "eu_export_categories"
+              eu_data_element: "11 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_export_header"
+                column: "decl_category"
+              ors_mapping:
+                table: "mtca_ors.customs_export_declarations"
+                column: "declaration_category"
+                data_type: "FixedString(2)"
+
+            - field_id: "mrn_export"
+              field_code: "MRN"
+              field_name_en: "Movement Reference Number"
+              field_name_mt: "Numru ta' Referenza tal-Moviment"
+              field_description: "Export MRN assigned by AES"
+              data_type: "MRN"
+              format: "YYCCnnnnnnnnnnnnnnC"
+              max_length: 18
+              precision: null
+              scale: null
+              required: true
+              required_condition: "System-generated"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "21 05 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_export_header"
+                column: "mrn"
+              ors_mapping:
+                table: "mtca_ors.customs_export_declarations"
+                column: "mrn"
+                data_type: "FixedString(18)"
+
+            - field_id: "customs_office_export"
+              field_code: "Box A"
+              field_name_en: "Customs Office of Export"
+              field_name_mt: "UffiÄ‹Ä‹ju Doganali tal-Esportazzjoni"
+              field_description: "Office where export declaration is lodged"
+              data_type: "CODE"
+              format: "CCNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eu_customs_offices"
+              eu_data_element: "17 02 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_export_header"
+                column: "office_export"
+              ors_mapping:
+                table: "mtca_ors.customs_export_declarations"
+                column: "customs_office_export"
+                data_type: "FixedString(8)"
+
+            - field_id: "customs_office_exit"
+              field_code: "Box 29"
+              field_name_en: "Customs Office of Exit"
+              field_name_mt: "UffiÄ‹Ä‹ju Doganali tal-Ä¦ruÄ¡"
+              field_description: "Office where goods will exit the customs territory"
+              data_type: "CODE"
+              format: "CCNNNNNN"
+              max_length: 8
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eu_customs_offices"
+              eu_data_element: "17 03 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_export_header"
+                column: "office_exit"
+              ors_mapping:
+                table: "mtca_ors.customs_export_declarations"
+                column: "customs_office_exit"
+                data_type: "FixedString(8)"
+
+            - field_id: "country_of_destination"
+              field_code: "Box 17a"
+              field_name_en: "Country of Destination"
+              field_name_mt: "PajjiÅ¼ tad-Destinazzjoni"
+              field_description: "Final country where goods will be delivered"
+              data_type: "COUNTRY_CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "iso_3166_countries"
+              eu_data_element: "16 03 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "sad_export_header"
+                column: "dest_country"
+              ors_mapping:
+                table: "mtca_ors.customs_export_declarations"
+                column: "country_of_destination"
+                data_type: "FixedString(2)"
+
+      eu_system_integration:
+        trans_european_system: "AES (Automated Export System)"
+        message_exchange: "S2S and Portal"
+        interface_specification: "EUCDM v3.11"
+        connected_systems:
+          - system: "NCTS-P5"
+            purpose: "Transit following export"
+          - system: "EMCS"
+            purpose: "Excise goods"
+          - system: "UUM&DS"
+            purpose: "Authentication"
+
+      submission_workflow:
+        authentication_required: "UUM&DS / EORI-based"
+        signature_required: false
+        guarantee_required: false
+        payment_integration: false
+        acknowledgment_type: "MRN"
+
+  # ==========================================================================
+  # I1: Simplified Import Declaration
+  # Simplified procedure per Art. 166 UCC
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "SAD_I1"
+        form_name_en: "Simplified Declaration for Import"
+        form_name_mt: "Dikjarazzjoni Simplifikata gÄ§al Importazzjoni"
+        version: "2024"
+        effective_from: "2016-05-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Art. 166"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446"
+          - "Commission Implementing Regulation (EU) 2015/2447"
+        administering_authority: "MTCA Customs"
+        tax_type: "Customs Duty / VAT on Import"
+        taxpayer_category: "Authorized Economic Operator"
+        filing_frequency: "Per transaction"
+        filing_deadline: "At presentation of goods"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "AIS"
+        eu_system_interface: "Trans-European AIS"
+        source_url: "https://customs.gov.mt/simplified-procedures"
+        xml_schema_ref: "EUCDM v3.11"
+        message_types:
+          - "IE515 - Simplified declaration"
+          - "IE528 - MRN allocated"
+        notes: |
+          Requires authorization per Art. 166 UCC. Reduced data set at time of
+          presentation. Must be followed by Supplementary Declaration within 
+          specified timeframe.
+
+      sections:
+        - section_id: "SIMPLIFIED_HEADER"
+          section_name: "Simplified Declaration Header"
+          section_description: "Reduced data set for initial declaration"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "authorization_number"
+              field_code: "Auth"
+              field_name_en: "Simplified Procedure Authorization"
+              field_name_mt: "Awtorizzazzjoni gÄ§al ProÄ‹edura Simplifikata"
+              field_description: "Authorization number for simplified procedures"
+              data_type: "STRING"
+              format: null
+              max_length: 35
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SADI1_001"
+                  rule_type: "lookup"
+                  rule_description: "Valid authorization in EU CDS"
+                  rule_expression: "EXISTS(eu_cds_authorizations.number)"
+                  error_message_en: "Invalid or expired authorization"
+                  error_message_mt: "Awtorizzazzjoni mhux valida jew skaduta"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "eu_cds_authorizations"
+              eu_data_element: "12 12 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "simplified_decl"
+                column: "auth_number"
+              ors_mapping:
+                table: "mtca_ors.customs_simplified"
+                column: "authorization_number"
+                data_type: "String"
+
+            - field_id: "simplified_mrn"
+              field_code: "MRN-S"
+              field_name_en: "Simplified Declaration MRN"
+              field_name_mt: "MRN tad-Dikjarazzjoni Simplifikata"
+              field_description: "MRN for the simplified declaration"
+              data_type: "MRN"
+              format: "YYCCnnnnnnnnnnnnnnC"
+              max_length: 18
+              precision: null
+              scale: null
+              required: true
+              required_condition: "System-generated"
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "System-generated"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              eu_data_element: "21 05 001 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "simplified_decl"
+                column: "mrn"
+              ors_mapping:
+                table: "mtca_ors.customs_simplified"
+                column: "mrn"
+                data_type: "FixedString(18)"
+
+      related_forms:
+        - form_code: "SAD_Z"
+          relationship: "Supplementary declaration must follow"
+          eu_system: "AIS"
+
+      submission_workflow:
+        authentication_required: "UUM&DS / EORI-based"
+        signature_required: false
+        guarantee_required: true
+        payment_integration: false
+        acknowledgment_type: "MRN"
+
+  # ==========================================================================
+  # Z: Supplementary Declaration
+  # Follow-up to simplified declaration per Art. 167 UCC
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "SAD_Z"
+        form_name_en: "Supplementary Declaration"
+        form_name_mt: "Dikjarazzjoni Supplimentari"
+        version: "2024"
+        effective_from: "2016-05-01"
+        effective_to: "current"
+        legislative_basis: "Regulation (EU) No 952/2013 - Art. 167"
+        subsidiary_legislation:
+          - "Commission Delegated Regulation (EU) 2015/2446"
+          - "Commission Implementing Regulation (EU) 2015/2447"
+        administering_authority: "MTCA Customs"
+        tax_type: "Customs Duty / VAT on Import"
+        taxpayer_category: "Authorized Economic Operator"
+        filing_frequency: "Per simplified declaration or periodic"
+        filing_deadline: "Within timeframe specified in authorization"
+        submission_method: "Mandatory Electronic"
+        electronic_portal: "AIS"
+        eu_system_interface: "Trans-European AIS"
+        source_url: "https://customs.gov.mt/simplified-procedures"
+        xml_schema_ref: "EUCDM v3.11"
+        message_types:
+          - "IE515 - Supplementary declaration"
+          - "IE528 - MRN allocated"
+        notes: |
+          Completes the simplified declaration with full data set.
+          Can be individual (per simplified declaration) or periodic
+          (recapitulative for multiple simplified declarations).
+
+      sections:
+        - section_id: "SUPPLEMENTARY_HEADER"
+          section_name: "Supplementary Declaration Header"
+          section_description: "Reference to simplified declaration(s)"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "supplementary_type"
+              field_code: "Type"
+              field_name_en: "Supplementary Declaration Type"
+              field_name_mt: "Tip ta' Dikjarazzjoni Supplimentari"
+              field_description: "Individual or periodic supplementary"
+              data_type: "CODE"
+              format: "A"
+              max_length: 1
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "Z"
+                  description_en: "Individual supplementary"
+                - code: "Y"
+                  description_en: "Periodic supplementary"
+              reference_table: null
+              eu_data_element: "11 01 000 000"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "customs_db"
+                table: "supplementary_decl"
+                column: "supp_type"
+              ors_mapping:
+                table: "mtca_ors.customs_supplementary"
+                column: "supplementary_type"
+                data_type: "FixedString(1)"
+
+            - field_id: "previous_mrn_ref"
+              field_code: "Previous MRN"
+              field_name_en: "Reference to Simplified Declaration MRN"
+              field_name_mt: "Referenza gÄ§al MRN tad-Dikjarazzjoni Simplifikata"
+              field_description: "MRN of the simplified declaration being completed"
+              data_type: "MRN"
+              format: "YYCCnnnnnnnnnnnnnnC"
+              max_length: 18
+              precision: null
+              scale: null
+              required: true
+              required_condition: "For individual supplementary"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "SADZ_001"
+                  rule_type: "lookup"
+                  rule_description: "Referenced MRN must exist and be incomplete"
+                  rule_expression: "EXISTS(customs_simplified.mrn) AND status = 'PENDING_SUPPLEMENTARY'"
+                  error_message_en: "Invalid or already completed MRN reference"
+                  error_message_mt: "Referenza MRN mhux valida jew diÄ¡Ã  kompluta"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "customs_simplified_declarations"
+              eu_data_element: "12 04 000 000"
+              cross_form_reference: "SAD_I1.simplified_mrn"
+              legacy_mapping:
+                database: "customs_db"
+                table: "supplementary_decl"
+                column: "prev_mrn"
+              ors_mapping:
+                table: "mtca_ors.customs_supplementary"
+                column: "previous_mrn_reference"
+                data_type: "FixedString(18)"
+
+      submission_workflow:
+        authentication_required: "UUM&DS / EORI-based"
+        signature_required: false
+        guarantee_required: false
+        payment_integration: true
+        acknowledgment_type: "MRN"
+
+# ============================================================================
+# Reference Tables for Priority 4A: Customs Declarations
+# ============================================================================
+reference_tables:
+  declaration_types:
+    - code: "IM"
+      description_en: "Import"
+      description_mt: "Importazzjoni"
+    - code: "EX"
+      description_en: "Export"
+      description_mt: "Esportazzjoni"
+    - code: "EU"
+      description_en: "Union goods"
+      description_mt: "Merkanzija tal-Unjoni"
+    - code: "CO"
+      description_en: "Transhipment"
+      description_mt: "TraÅ¼bordu"
+
+  declaration_categories_import:
+    - code: "H1"
+      description_en: "Release for free circulation"
+      ucc_article: "Art. 201"
+    - code: "H2"
+      description_en: "Customs warehousing"
+      ucc_article: "Art. 237"
+    - code: "H3"
+      description_en: "Temporary admission"
+      ucc_article: "Art. 250"
+    - code: "H4"
+      description_en: "Inward processing"
+      ucc_article: "Art. 256"
+    - code: "H5"
+      description_en: "End-use"
+      ucc_article: "Art. 254"
+    - code: "H6"
+      description_en: "Admission to free zone"
+      ucc_article: "Art. 245"
+    - code: "H7"
+      description_en: "Low-value consignment"
+      ucc_article: "Art. 143a"
+    - code: "I1"
+      description_en: "Simplified declaration"
+      ucc_article: "Art. 166"
+    - code: "I2"
+      description_en: "Entry in declarant's records"
+      ucc_article: "Art. 182"
+
+  procedure_codes:
+    - code: "4000"
+      description_en: "Release for free circulation with simultaneous re-dispatch"
+      requested: "40"
+      previous: "00"
+    - code: "4051"
+      description_en: "Release for free circulation of goods previously under IP"
+      requested: "40"
+      previous: "51"
+    - code: "4071"
+      description_en: "Release for free circulation of goods from customs warehouse"
+      requested: "40"
+      previous: "71"
+    - code: "4200"
+      description_en: "Simultaneous release for free circulation and home use"
+      requested: "42"
+      previous: "00"
+    - code: "5100"
+      description_en: "Inward processing (suspension)"
+      requested: "51"
+      previous: "00"
+    - code: "5300"
+      description_en: "Temporary admission with total relief"
+      requested: "53"
+      previous: "00"
+    - code: "7100"
+      description_en: "Placing under customs warehousing"
+      requested: "71"
+      previous: "00"
+
+  transport_modes:
+    - code: "1"
+      description_en: "Sea transport"
+      description_mt: "Trasport bil-BaÄ§ar"
+    - code: "2"
+      description_en: "Rail transport"
+      description_mt: "Trasport bil-Ferrovija"
+    - code: "3"
+      description_en: "Road transport"
+      description_mt: "Trasport bit-Triq"
+    - code: "4"
+      description_en: "Air transport"
+      description_mt: "Trasport bl-Ajru"
+    - code: "5"
+      description_en: "Postal consignments"
+      description_mt: "Kunsinni Postali"
+    - code: "7"
+      description_en: "Fixed transport installations"
+      description_mt: "Installazzjonijiet Fissi ta' Trasport"
+    - code: "8"
+      description_en: "Inland waterway transport"
+      description_mt: "Trasport bil-PassaÄ¡Ä¡ Intern"
+    - code: "9"
+      description_en: "Own propulsion"
+      description_mt: "Propulsjoni TiegÄ§u"
+
+  tax_types:
+    - code: "A00"
+      description_en: "Customs duty - third country"
+      description_mt: "Dazju Doganali - PajjiÅ¼ Terz"
+    - code: "B00"
+      description_en: "VAT"
+      description_mt: "VAT"
+    - code: "C00"
+      description_en: "Export duty"
+      description_mt: "Dazju ta' Esportazzjoni"
+    - code: "A20"
+      description_en: "Additional customs duty"
+      description_mt: "Dazju Doganali Addizzjonali"
+    - code: "A30"
+      description_en: "Anti-dumping duty"
+      description_mt: "Dazju Kontra d-Dumping"
+    - code: "A50"
+      description_en: "Countervailing duty"
+      description_mt: "Dazju Kompensatorju"
+    - code: "B10"
+      description_en: "Excise duty"
+      description_mt: "Dazju tas-Sisa"
+
+  payment_methods:
+    - code: "A"
+      description_en: "Cash payment"
+    - code: "C"
+      description_en: "Credit (deferred payment)"
+    - code: "E"
+      description_en: "Deferred payment (authorized)"
+    - code: "G"
+      description_en: "Postponed VAT accounting"
+    - code: "H"
+      description_en: "Electronic credit transfer"
+    - code: "M"
+      description_en: "Exemption/not collected"
+    - code: "R"
+      description_en: "Guarantee deposit"
+
+  malta_customs_offices:
+    - code: "MT000010"
+      name: "Malta Freeport"
+      type: "Entry/Exit"
+    - code: "MT000020"
+      name: "Malta International Airport"
+      type: "Entry/Exit"
+    - code: "MT000030"
+      name: "Grand Harbour"
+      type: "Entry/Exit"
+    - code: "MT000040"
+      name: "Inland Clearance"
+      type: "Clearance"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  customs_db:
+    tables:
+      - legacy_table: "sad_header"
+        ors_table: "mtca_ors.customs_declarations"
+        description: "Main declaration header records"
+        key_columns:
+          - legacy: "mrn"
+            ors: "mrn"
+        volume_estimate: "~500,000 records/year"
+        
+      - legacy_table: "sad_items"
+        ors_table: "mtca_ors.customs_items"
+        description: "Declaration goods items"
+        key_columns:
+          - legacy: "mrn"
+            ors: "mrn"
+          - legacy: "item_no"
+            ors: "item_number"
+        volume_estimate: "~1,500,000 records/year"
+        
+      - legacy_table: "sad_taxes"
+        ors_table: "mtca_ors.customs_taxes"
+        description: "Tax calculations per item"
+        key_columns:
+          - legacy: "mrn"
+            ors: "mrn"
+          - legacy: "item_no"
+            ors: "item_number"
+          - legacy: "tax_type"
+            ors: "tax_type"
+        volume_estimate: "~3,000,000 records/year"
+        
+      - legacy_table: "sad_parties"
+        ors_table: "mtca_ors.customs_declarations"
+        description: "Merged into main declaration table"
+        join_key: "mrn"
+        
+      - legacy_table: "sad_transport"
+        ors_table: "mtca_ors.customs_declarations"
+        description: "Merged into main declaration table"
+        join_key: "mrn"
+        
+      - legacy_table: "sad_documents"
+        ors_table: "mtca_ors.customs_documents"
+        description: "Supporting document references"
+        key_columns:
+          - legacy: "mrn"
+            ors: "mrn"
+          - legacy: "doc_seq"
+            ors: "document_sequence"

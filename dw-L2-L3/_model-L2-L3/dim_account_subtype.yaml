@@ -1,0 +1,854 @@
+# =============================================================================
+# TA-RDM L3 - Account Subtype Dimension
+# =============================================================================
+# Purpose: Country-specific tax account subtypes (Malta imputation, etc.)
+# Pattern: P5 (Account Subtype Dimension) from L3 Generalization Patterns Catalog
+# Priority: HIGH
+# Version: 1.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4e of L3 Generalization Implementation
+# =============================================================================
+#
+# This dimension supports country-specific tax account classifications that
+# require breakdown-level detail in fact tables. Primary use case is Malta's
+# corporate tax imputation system, which allocates profits to five accounts:
+#
+#   - FTA (Final Tax Account): Income taxed at final withholding rates
+#   - MTA (Maltese Taxed Account): Malta-source income taxed at 35%
+#   - FIA (Foreign Income Account): Foreign-source income
+#   - IPA (Immovable Property Account): Malta property income
+#   - UA (Untaxed Account): Exempt/untaxed profits
+#
+# For non-imputation countries, a single "STD" (Standard) account type exists.
+#
+# Design Principles:
+# - SCD Type 1: Account types are reference data, changes overwrite
+# - Composite natural key: country_code + account_subtype_code
+# - Country FK to dim_country for jurisdiction context
+# - Refund rates stored in dimension for calculation purposes
+# - Distribution priority enables allocation ordering (Malta IPA→FIA→MTA→FTA→UA)
+#
+# =============================================================================
+
+metadata:
+  dimension_name: dim_account_subtype
+  schema: warehouse
+  version: "1.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P5 - Account Subtype Dimension"
+  description: |
+    Dimension for country-specific tax account subtypes. Enables storage of
+    account breakdown information (previously Malta-specific columns in 
+    fact_refund) as rows in a bridge table linked to this dimension.
+    
+    Primary use case: Malta corporate imputation system where shareholders
+    receive refunds based on the source account of distributed dividends.
+    The refund rates vary by account type (6/7 for MTA, 5/7 for FIA, etc.).
+    
+    For countries without imputation systems, a single "Standard" account
+    type provides compatibility with the bridge table pattern.
+    
+    This dimension replaces the following Malta-specific columns in fact_refund:
+    - fta_refund_amount
+    - mta_refund_amount
+    - fia_refund_amount
+    - ipa_refund_amount
+    - ua_refund_amount
+    - imputation_credit_amount
+    - shareholder_refund_rate
+
+# =============================================================================
+# Dimension Specification
+# =============================================================================
+
+dimension:
+  name: dim_account_subtype
+  schema: warehouse
+  type: dimension
+  scd_type: 1
+  
+  grain: "One row per account subtype per country"
+  natural_key: [country_code, account_subtype_code]
+  surrogate_key: account_subtype_key
+  
+  business_context:
+    domain: "Tax Administration"
+    usage: |
+      Provides account subtype context for refund breakdown analysis.
+      Used with bridge_refund_account to decompose refund amounts by
+      country-specific account categories. Essential for Malta imputation
+      refund calculations and reporting.
+    refresh: "ON_CHANGE"
+    priority: "HIGH"
+  
+  description: |
+    Conformed dimension for country-specific tax account subtypes.
+    
+    Key features:
+    - Supports Malta's five-account imputation system
+    - Stores refund rates for calculation purposes
+    - Defines distribution priority for allocation ordering
+    - Indicates taxable source and refundability status
+    - Provides legal reference for compliance documentation
+    
+    Used primarily with:
+    - bridge_refund_account: Breaks down refund amounts by account type
+    - fact_refund: Links via bridge for country-specific analysis
+  
+  columns:
+    # ==========================================================================
+    # Keys
+    # ==========================================================================
+    - name: account_subtype_key
+      data_type: Int32
+      nullable: false
+      description: "Surrogate key for dimension"
+      role: SURROGATE_KEY
+    
+    - name: account_subtype_code
+      data_type: String
+      length: 20
+      nullable: false
+      description: |
+        Account subtype code: FTA, MTA, FIA, IPA, UA, STD
+        Must be unique within country context.
+      role: NATURAL_KEY
+    
+    # ==========================================================================
+    # Country Context
+    # ==========================================================================
+    - name: country_key
+      data_type: Int32
+      nullable: false
+      foreign_key: warehouse.dim_country(country_key)
+      description: "Country this account subtype belongs to"
+    
+    - name: country_code
+      data_type: String
+      length: 3
+      nullable: false
+      description: "ISO 3166-1 alpha-3 country code (denormalized)"
+      note: "Duplicated from dim_country for efficient filtering and natural key"
+    
+    # ==========================================================================
+    # Subtype Identification
+    # ==========================================================================
+    - name: account_subtype_name
+      data_type: String
+      length: 100
+      nullable: false
+      description: |
+        Full account subtype name in English.
+        Examples: "Final Tax Account", "Maltese Taxed Account", "Standard Account"
+    
+    - name: account_subtype_name_short
+      data_type: String
+      length: 30
+      description: |
+        Short name for display.
+        Examples: "FTA", "MTA", "Standard"
+    
+    - name: account_subtype_name_local
+      data_type: String
+      length: 100
+      description: |
+        Account subtype name in local language.
+        Malta: "Kont tat-Taxxa Finali", "Kont Taxxat Malti", etc.
+    
+    - name: account_subtype_description
+      data_type: String
+      description: |
+        Detailed description explaining the account type's purpose,
+        what income is allocated to it, and how it affects refund calculations.
+    
+    # ==========================================================================
+    # Tax Type Context
+    # ==========================================================================
+    - name: tax_type_code
+      data_type: String
+      length: 20
+      description: |
+        Applicable tax type code.
+        For Malta imputation: CIT (Corporate Income Tax)
+        May be NULL for account types applicable to multiple tax types.
+    
+    - name: tax_type_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_tax_type(tax_type_key)
+      description: "FK to dim_tax_type (if applicable to specific tax type)"
+    
+    # ==========================================================================
+    # Refund Rate Configuration
+    # ==========================================================================
+    - name: refund_rate
+      data_type: Decimal64(4)
+      description: |
+        Standard refund rate for this account type (as decimal).
+        Malta imputation rates:
+        - MTA: 0.8571 (6/7)
+        - FIA: 0.7143 (5/7) or 0.8571 (6/7) for participating holdings
+        - IPA: 0.6667 (2/3)
+        - FTA: 0.0000 (no refund)
+        - UA: 0.0000 (no refund)
+        Note: FIA rate depends on holding type - base rate is 5/7.
+    
+    - name: refund_rate_display
+      data_type: String
+      length: 20
+      description: |
+        Human-readable refund rate format.
+        Examples: "6/7", "5/7", "2/3", "0", "N/A"
+    
+    - name: refund_rate_alternative
+      data_type: Decimal64(4)
+      description: |
+        Alternative refund rate for special cases.
+        FIA may have 6/7 rate for participating holdings vs 5/7 standard.
+    
+    - name: refund_rate_alternative_condition
+      data_type: String
+      length: 200
+      description: |
+        Condition for applying alternative rate.
+        Example: "Participating holdings in non-EU subsidiaries"
+    
+    # ==========================================================================
+    # Distribution Priority (Malta Imputation Ordering)
+    # ==========================================================================
+    - name: distribution_priority
+      data_type: Int16
+      description: |
+        Order for distribution calculations (lower = distributed first).
+        Malta ordering: IPA(1) → FIA(2) → MTA(3) → FTA(4) → UA(5)
+        NULL for non-ordered account types.
+    
+    # ==========================================================================
+    # Classification Flags
+    # ==========================================================================
+    - name: is_taxable_source
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: |
+        Whether profits in this account were subject to tax (1=Yes, 0=No).
+        UA (Untaxed Account) = 0; all others = 1
+    
+    - name: is_refundable
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: |
+        Whether refunds are available from this account (1=Yes, 0=No).
+        FTA, UA = 0 (no refund); MTA, FIA, IPA = 1 (refund available)
+    
+    - name: requires_underlying_tax
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: |
+        Whether refund requires underlying tax to have been paid (1=Yes, 0=No).
+        All imputation accounts require underlying corporate tax at 35%.
+    
+    - name: is_imputation_account
+      data_type: UInt8
+      nullable: false
+      default: 0
+      description: |
+        Whether this is a corporate imputation account (1=Yes, 0=No).
+        Malta FTA/MTA/FIA/IPA/UA = 1; Standard accounts = 0
+    
+    # ==========================================================================
+    # Legal Reference
+    # ==========================================================================
+    - name: legal_reference
+      data_type: String
+      length: 200
+      description: |
+        Law or article establishing this account type.
+        Malta: "Income Tax Act, Article 12", "Income Tax Act Cap. 123"
+    
+    - name: legal_reference_url
+      data_type: String
+      length: 500
+      description: "URL to official legislation text"
+    
+    # ==========================================================================
+    # Status and Display
+    # ==========================================================================
+    - name: is_active
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "Whether this account type is currently active (1=Yes, 0=No)"
+    
+    - name: display_order
+      data_type: Int16
+      nullable: false
+      default: 100
+      description: "Order for display in reports and UI dropdowns"
+    
+    - name: notes
+      data_type: String
+      description: "Additional implementation notes"
+    
+    # ==========================================================================
+    # ETL Metadata
+    # ==========================================================================
+    - name: etl_batch_id
+      data_type: Int64
+      nullable: false
+      description: "ETL batch identifier for data lineage"
+    
+    - name: etl_load_timestamp
+      data_type: DateTime
+      nullable: false
+      description: "Timestamp when record was loaded"
+      default: "now()"
+    
+    - name: etl_source_system
+      data_type: String
+      length: 50
+      default: "'REFERENCE'"
+      description: "Source system identifier"
+
+# =============================================================================
+# Sample Data
+# =============================================================================
+sample_data:
+  # ---------------------------------------------------------------------------
+  # Malta Imputation Accounts
+  # ---------------------------------------------------------------------------
+  - account_subtype_key: 1
+    account_subtype_code: "FTA"
+    country_key: 1
+    country_code: "MLT"
+    account_subtype_name: "Final Tax Account"
+    account_subtype_name_short: "FTA"
+    account_subtype_name_local: "Kont tat-Taxxa Finali"
+    account_subtype_description: |
+      Profits taxed at final withholding rates (e.g., 15% on rental income,
+      final withholding on dividends from qualifying subsidiaries). No
+      further refund is available to shareholders.
+    tax_type_code: "CIT"
+    tax_type_key: 1
+    refund_rate: 0.0000
+    refund_rate_display: "0"
+    distribution_priority: 4
+    is_taxable_source: 1
+    is_refundable: 0
+    requires_underlying_tax: 1
+    is_imputation_account: 1
+    legal_reference: "Income Tax Act Cap. 123, Article 12"
+    is_active: 1
+    display_order: 10
+    notes: "Final withholding tax applied at source"
+    etl_batch_id: 1
+    etl_source_system: "REFERENCE"
+
+  - account_subtype_key: 2
+    account_subtype_code: "MTA"
+    country_key: 1
+    country_code: "MLT"
+    account_subtype_name: "Maltese Taxed Account"
+    account_subtype_name_short: "MTA"
+    account_subtype_name_local: "Kont Taxxat Malti"
+    account_subtype_description: |
+      Profits derived from Malta and taxed at the standard 35% corporate
+      tax rate. Shareholders receiving dividends from MTA are entitled
+      to a 6/7 refund of the underlying tax, resulting in an effective
+      5% tax rate.
+    tax_type_code: "CIT"
+    tax_type_key: 1
+    refund_rate: 0.8571
+    refund_rate_display: "6/7"
+    distribution_priority: 3
+    is_taxable_source: 1
+    is_refundable: 1
+    requires_underlying_tax: 1
+    is_imputation_account: 1
+    legal_reference: "Income Tax Act Cap. 123, Article 12"
+    is_active: 1
+    display_order: 20
+    notes: "Standard 6/7 refund - most common imputation refund"
+    etl_batch_id: 1
+    etl_source_system: "REFERENCE"
+
+  - account_subtype_key: 3
+    account_subtype_code: "FIA"
+    country_key: 1
+    country_code: "MLT"
+    account_subtype_name: "Foreign Income Account"
+    account_subtype_name_short: "FIA"
+    account_subtype_name_local: "Kont tad-Dħul Barrani"
+    account_subtype_description: |
+      Foreign-source income taxed in Malta. Refund rate depends on the
+      nature of the income: 6/7 for participating holdings or income
+      subject to foreign tax relief; 5/7 for passive foreign income
+      without foreign tax credit. The 6/7 rate applies when the 
+      participation exemption or foreign tax credit reduces effective
+      Malta tax to 5% or less.
+    tax_type_code: "CIT"
+    tax_type_key: 1
+    refund_rate: 0.7143
+    refund_rate_display: "5/7"
+    refund_rate_alternative: 0.8571
+    refund_rate_alternative_condition: "Participating holdings or foreign tax credit claimed"
+    distribution_priority: 2
+    is_taxable_source: 1
+    is_refundable: 1
+    requires_underlying_tax: 1
+    is_imputation_account: 1
+    legal_reference: "Income Tax Act Cap. 123, Article 12"
+    is_active: 1
+    display_order: 30
+    notes: "5/7 base rate; 6/7 for participating holdings"
+    etl_batch_id: 1
+    etl_source_system: "REFERENCE"
+
+  - account_subtype_key: 4
+    account_subtype_code: "IPA"
+    country_key: 1
+    country_code: "MLT"
+    account_subtype_name: "Immovable Property Account"
+    account_subtype_name_short: "IPA"
+    account_subtype_name_local: "Kont tal-Proprjetà Immobbli"
+    account_subtype_description: |
+      Income from immovable property situated in Malta, including rental
+      income and capital gains from property disposals. Dividends paid
+      from IPA entitle shareholders to a 2/3 refund of underlying tax.
+      IPA is distributed first in the priority ordering.
+    tax_type_code: "CIT"
+    tax_type_key: 1
+    refund_rate: 0.6667
+    refund_rate_display: "2/3"
+    distribution_priority: 1
+    is_taxable_source: 1
+    is_refundable: 1
+    requires_underlying_tax: 1
+    is_imputation_account: 1
+    legal_reference: "Income Tax Act Cap. 123, Article 12"
+    is_active: 1
+    display_order: 40
+    notes: "Distributed first; 2/3 refund rate"
+    etl_batch_id: 1
+    etl_source_system: "REFERENCE"
+
+  - account_subtype_key: 5
+    account_subtype_code: "UA"
+    country_key: 1
+    country_code: "MLT"
+    account_subtype_name: "Untaxed Account"
+    account_subtype_name_short: "UA"
+    account_subtype_name_local: "Kont Mhux Taxxat"
+    account_subtype_description: |
+      Profits not subject to Malta tax, including exempt dividends from
+      participating holdings, income exempt under Double Tax Treaties,
+      and notional interest deduction amounts. No refund is available
+      as no underlying tax was paid. UA is distributed last.
+    tax_type_code: "CIT"
+    tax_type_key: 1
+    refund_rate: 0.0000
+    refund_rate_display: "0"
+    distribution_priority: 5
+    is_taxable_source: 0
+    is_refundable: 0
+    requires_underlying_tax: 0
+    is_imputation_account: 1
+    legal_reference: "Income Tax Act Cap. 123, Article 12"
+    is_active: 1
+    display_order: 50
+    notes: "No refund available - untaxed profits"
+    etl_batch_id: 1
+    etl_source_system: "REFERENCE"
+
+  # ---------------------------------------------------------------------------
+  # Standard Accounts for Non-Imputation Countries
+  # ---------------------------------------------------------------------------
+  - account_subtype_key: 100
+    account_subtype_code: "STD"
+    country_key: 2
+    country_code: "LKA"
+    account_subtype_name: "Standard Account"
+    account_subtype_name_short: "Standard"
+    account_subtype_name_local: "සම්මත ගිණුම"
+    account_subtype_description: |
+      Standard tax account for Sri Lanka. No imputation system exists;
+      dividends are taxed separately from corporate income. This account
+      type exists for bridge table compatibility.
+    tax_type_code: "CIT"
+    tax_type_key: 10
+    refund_rate: 0.0000
+    refund_rate_display: "N/A"
+    distribution_priority: 1
+    is_taxable_source: 1
+    is_refundable: 0
+    requires_underlying_tax: 0
+    is_imputation_account: 0
+    legal_reference: "Inland Revenue Act No. 24 of 2017"
+    is_active: 1
+    display_order: 10
+    notes: "No imputation system in Sri Lanka"
+    etl_batch_id: 1
+    etl_source_system: "REFERENCE"
+
+  - account_subtype_key: 101
+    account_subtype_code: "STD"
+    country_key: 3
+    country_code: "MDA"
+    account_subtype_name: "Standard Account"
+    account_subtype_name_short: "Standard"
+    account_subtype_name_local: "Cont Standard"
+    account_subtype_description: |
+      Standard tax account for Moldova. No imputation system exists.
+      This account type exists for bridge table compatibility.
+    tax_type_code: "CIT"
+    tax_type_key: 20
+    refund_rate: 0.0000
+    refund_rate_display: "N/A"
+    distribution_priority: 1
+    is_taxable_source: 1
+    is_refundable: 0
+    requires_underlying_tax: 0
+    is_imputation_account: 0
+    legal_reference: "Tax Code of Republic of Moldova"
+    is_active: 1
+    display_order: 10
+    notes: "No imputation system in Moldova"
+    etl_batch_id: 1
+    etl_source_system: "REFERENCE"
+
+  - account_subtype_key: 102
+    account_subtype_code: "STD"
+    country_key: 4
+    country_code: "UKR"
+    account_subtype_name: "Standard Account"
+    account_subtype_name_short: "Standard"
+    account_subtype_name_local: "Стандартний рахунок"
+    account_subtype_description: |
+      Standard tax account for Ukraine. No imputation system exists.
+      This account type exists for bridge table compatibility.
+    tax_type_code: "CIT"
+    tax_type_key: 30
+    refund_rate: 0.0000
+    refund_rate_display: "N/A"
+    distribution_priority: 1
+    is_taxable_source: 1
+    is_refundable: 0
+    requires_underlying_tax: 0
+    is_imputation_account: 0
+    legal_reference: "Tax Code of Ukraine"
+    is_active: 1
+    display_order: 10
+    notes: "No imputation system in Ukraine"
+    etl_batch_id: 1
+    etl_source_system: "REFERENCE"
+
+  - account_subtype_key: 103
+    account_subtype_code: "STD"
+    country_key: 5
+    country_code: "LBN"
+    account_subtype_name: "Standard Account"
+    account_subtype_name_short: "Standard"
+    account_subtype_name_local: "الحساب القياسي"
+    account_subtype_description: |
+      Standard tax account for Lebanon. No imputation system exists.
+      This account type exists for bridge table compatibility.
+    tax_type_code: "CIT"
+    tax_type_key: 40
+    refund_rate: 0.0000
+    refund_rate_display: "N/A"
+    distribution_priority: 1
+    is_taxable_source: 1
+    is_refundable: 0
+    requires_underlying_tax: 0
+    is_imputation_account: 0
+    legal_reference: "Income Tax Law"
+    is_active: 1
+    display_order: 10
+    notes: "No imputation system in Lebanon"
+    etl_batch_id: 1
+    etl_source_system: "REFERENCE"
+
+# =============================================================================
+# Business Rules
+# =============================================================================
+business_rules:
+  - rule_id: BR_AS_001
+    description: "Account subtype code must be unique within country"
+    severity: ERROR
+    validation_sql: |
+      SELECT country_code, account_subtype_code, COUNT(*) as cnt
+      FROM warehouse.dim_account_subtype
+      WHERE is_active = 1
+      GROUP BY country_code, account_subtype_code
+      HAVING COUNT(*) > 1
+    expected_result: "0 rows"
+
+  - rule_id: BR_AS_002
+    description: "country_key must reference valid dim_country"
+    severity: ERROR
+    validation_sql: |
+      SELECT a.account_subtype_key
+      FROM warehouse.dim_account_subtype a
+      LEFT JOIN warehouse.dim_country c ON a.country_key = c.country_key
+      WHERE c.country_key IS NULL
+    expected_result: "0 rows"
+
+  - rule_id: BR_AS_003
+    description: "Imputation accounts must have refund rate defined"
+    severity: ERROR
+    validation_sql: |
+      SELECT account_subtype_key
+      FROM warehouse.dim_account_subtype
+      WHERE is_imputation_account = 1
+        AND refund_rate IS NULL
+    expected_result: "0 rows"
+
+  - rule_id: BR_AS_004
+    description: "Refund rate must be between 0 and 1"
+    severity: ERROR
+    validation_sql: |
+      SELECT account_subtype_key
+      FROM warehouse.dim_account_subtype
+      WHERE refund_rate IS NOT NULL
+        AND (refund_rate < 0 OR refund_rate > 1)
+    expected_result: "0 rows"
+
+  - rule_id: BR_AS_005
+    description: "Distribution priority must be unique within country for imputation accounts"
+    severity: WARNING
+    validation_sql: |
+      SELECT country_code, distribution_priority, COUNT(*) as cnt
+      FROM warehouse.dim_account_subtype
+      WHERE is_imputation_account = 1
+        AND distribution_priority IS NOT NULL
+        AND is_active = 1
+      GROUP BY country_code, distribution_priority
+      HAVING COUNT(*) > 1
+    expected_result: "0 rows"
+
+  - rule_id: BR_AS_006
+    description: "Non-refundable accounts must have refund_rate = 0"
+    severity: ERROR
+    validation_sql: |
+      SELECT account_subtype_key
+      FROM warehouse.dim_account_subtype
+      WHERE is_refundable = 0
+        AND refund_rate > 0
+    expected_result: "0 rows"
+
+  - rule_id: BR_AS_007
+    description: "Every country must have at least one account subtype"
+    severity: WARNING
+    validation_sql: |
+      SELECT c.country_code
+      FROM warehouse.dim_country c
+      LEFT JOIN warehouse.dim_account_subtype a ON c.country_key = a.country_key
+        AND a.is_active = 1
+      WHERE c.is_active = 1
+        AND a.account_subtype_key IS NULL
+    expected_result: "0 rows"
+
+  - rule_id: BR_AS_008
+    description: "Malta must have all five imputation accounts (FTA, MTA, FIA, IPA, UA)"
+    severity: ERROR
+    validation_sql: |
+      SELECT 'Missing accounts' as issue, 5 - COUNT(*) as missing_count
+      FROM warehouse.dim_account_subtype
+      WHERE country_code = 'MLT'
+        AND is_imputation_account = 1
+        AND account_subtype_code IN ('FTA', 'MTA', 'FIA', 'IPA', 'UA')
+        AND is_active = 1
+      HAVING COUNT(*) < 5
+    expected_result: "0 rows"
+
+# =============================================================================
+# ClickHouse DDL
+# =============================================================================
+clickhouse_ddl:
+  database: malta_warehouse
+  engine: MergeTree()
+  order_by: [country_key, account_subtype_key]
+  primary_key: account_subtype_key
+  
+  ddl: |
+    CREATE TABLE IF NOT EXISTS malta_warehouse.dim_account_subtype
+    (
+        -- Keys
+        account_subtype_key Int32,
+        account_subtype_code String,
+        
+        -- Country Context
+        country_key Int32,
+        country_code FixedString(3),
+        
+        -- Subtype Identification
+        account_subtype_name String,
+        account_subtype_name_short Nullable(String),
+        account_subtype_name_local Nullable(String),
+        account_subtype_description Nullable(String),
+        
+        -- Tax Type Context
+        tax_type_code Nullable(String),
+        tax_type_key Nullable(Int32),
+        
+        -- Refund Rate Configuration
+        refund_rate Nullable(Decimal64(4)),
+        refund_rate_display Nullable(String),
+        refund_rate_alternative Nullable(Decimal64(4)),
+        refund_rate_alternative_condition Nullable(String),
+        
+        -- Distribution Priority
+        distribution_priority Nullable(Int16),
+        
+        -- Classification Flags
+        is_taxable_source UInt8 DEFAULT 1,
+        is_refundable UInt8 DEFAULT 1,
+        requires_underlying_tax UInt8 DEFAULT 0,
+        is_imputation_account UInt8 DEFAULT 0,
+        
+        -- Legal Reference
+        legal_reference Nullable(String),
+        legal_reference_url Nullable(String),
+        
+        -- Status and Display
+        is_active UInt8 DEFAULT 1,
+        display_order Int16 DEFAULT 100,
+        notes Nullable(String),
+        
+        -- ETL Metadata
+        etl_batch_id Int64,
+        etl_load_timestamp DateTime DEFAULT now(),
+        etl_source_system String DEFAULT 'REFERENCE'
+    )
+    ENGINE = MergeTree()
+    ORDER BY (country_key, account_subtype_key)
+    SETTINGS index_granularity = 8192;
+    
+    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_dim_account_subtype_code 
+        ON malta_warehouse.dim_account_subtype (account_subtype_code) TYPE bloom_filter GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_dim_account_subtype_country 
+        ON malta_warehouse.dim_account_subtype (country_code) TYPE minmax GRANULARITY 1;
+    
+    CREATE INDEX IF NOT EXISTS idx_dim_account_subtype_imputation 
+        ON malta_warehouse.dim_account_subtype (is_imputation_account, is_refundable) TYPE minmax GRANULARITY 1;
+
+# =============================================================================
+# ETL Source Mapping
+# =============================================================================
+etl_source:
+  source_system: "REFERENCE"
+  source_tables:
+    - reference.ref_imputation_account_type
+    - reference.ref_shareholder_refund_type
+    - system.system_parameter
+  load_strategy: "FULL_REFRESH"
+  load_frequency: "ON_CHANGE"
+  
+  transformations:
+    - name: refund_rate_calculation
+      description: "Convert fractional rates (6/7) to decimal for calculations"
+    - name: country_lookup
+      description: "Join to dim_country for country_key"
+    - name: tax_type_lookup
+      description: "Join to dim_tax_type for tax_type_key (CIT for imputation)"
+  
+  column_mapping:
+    account_subtype_code: "source.account_type_code"
+    account_subtype_name: "source.description_en"
+    account_subtype_name_local: "source.description_mt"
+    refund_rate: "CAST(source.refund_percentage / 100 AS Decimal64(4))"
+    refund_rate_display: "source.refund_fraction"
+    is_refundable: "source.allows_refund"
+  
+  change_detection:
+    method: "Full comparison"
+    reason: "Low cardinality table (< 50 records max)"
+
+# =============================================================================
+# Integration Guide
+# =============================================================================
+integration:
+  description: |
+    dim_account_subtype enables country-specific account breakdown in fact
+    tables without hardcoding columns. Used with bridge_refund_account to
+    decompose refund amounts by account type.
+    
+    Primary use: Malta imputation refund analysis
+    Secondary use: Compatibility layer for non-imputation countries
+  
+  standard_column_definition:
+    name: account_subtype_key
+    data_type: Int32
+    nullable: false
+    foreign_key: warehouse.dim_account_subtype(account_subtype_key)
+    description: "Account subtype for this breakdown"
+  
+  related_tables:
+    - bridge_refund_account: "Links fact_refund to account subtypes with amounts"
+  
+  query_examples:
+    - description: "Get Malta imputation account types with refund rates"
+      sql: |
+        SELECT 
+            account_subtype_code,
+            account_subtype_name,
+            refund_rate,
+            refund_rate_display,
+            distribution_priority
+        FROM warehouse.dim_account_subtype
+        WHERE country_code = 'MLT'
+          AND is_imputation_account = 1
+          AND is_active = 1
+        ORDER BY distribution_priority
+    
+    - description: "Get refundable accounts by country"
+      sql: |
+        SELECT 
+            c.country_name,
+            a.account_subtype_code,
+            a.account_subtype_name,
+            a.refund_rate,
+            a.refund_rate_display
+        FROM warehouse.dim_account_subtype a
+        JOIN warehouse.dim_country c ON a.country_key = c.country_key
+        WHERE a.is_refundable = 1
+          AND a.is_active = 1
+        ORDER BY c.country_name, a.display_order
+    
+    - description: "Calculate expected refund by account type"
+      sql: |
+        SELECT 
+            a.account_subtype_code,
+            a.account_subtype_name,
+            a.refund_rate,
+            b.gross_distribution_amount,
+            b.gross_distribution_amount * a.refund_rate AS expected_refund
+        FROM warehouse.bridge_refund_account b
+        JOIN warehouse.dim_account_subtype a ON b.account_subtype_key = a.account_subtype_key
+        WHERE b.refund_source_id = :refund_id
+
+# =============================================================================
+# Validation Criteria
+# =============================================================================
+# | Check                      | Expected                                    |
+# |----------------------------|---------------------------------------------|
+# | Surrogate key              | account_subtype_key (Int32)                 |
+# | Natural key                | country_code + account_subtype_code         |
+# | Country FK                 | country_key → dim_country                   |
+# | Tax type FK (optional)     | tax_type_key → dim_tax_type                 |
+# | SCD Type                   | Type 1 (overwrite)                          |
+# | Refund rate attributes     | refund_rate, refund_rate_display            |
+# | Distribution ordering      | distribution_priority for Malta accounts    |
+# | Classification flags       | is_taxable, is_refundable, is_imputation    |
+# | Sample data: Malta         | 5 accounts (FTA, MTA, FIA, IPA, UA)         |
+# | Sample data: Other         | 1 STD account each (LKA, MDA, UKR, LBN)     |
+# | Business rules             | 8 rules defined                             |
+# | ClickHouse DDL             | Included with indexes                       |
+# | Integration guide          | FK pattern and query examples               |
+# =============================================================================

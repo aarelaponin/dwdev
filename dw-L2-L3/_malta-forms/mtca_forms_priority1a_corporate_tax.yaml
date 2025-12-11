@@ -1,0 +1,3579 @@
+# ============================================================================
+# MTCA Forms - Priority 1A: Corporate Income Tax
+# Forms: e-CO, TIFD, TRA 63, TRA 100/100A, TRA 107
+# Version: 1.0
+# Date: 2025-12-05
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # e-CO: Electronic Company Income Tax Return
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "e-CO"
+        form_name_en: "Electronic Company Income Tax Return"
+        form_name_mt: "Dikjarazzjoni Elettronika tat-Taxxa fuq l-Introjtu tal-Kumpanija"
+        version: "2024"
+        effective_from: "2024-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "S.L.123.128 - Income Tax Act (Electronic Communications) Rules"
+          - "S.L.123.01 - Income Tax Management Act"
+        administering_authority: "CFR"
+        tax_type: "Corporate Income Tax"
+        taxpayer_category: "Company"
+        filing_frequency: "Annual"
+        filing_deadline: "9 months after end of accounting period"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/Company-Tax-Return-Cycle.aspx"
+        pdf_available: false
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Mandatory electronic filing since 2002. Submitted as Excel spreadsheet 
+          with integrated TIFD component. Only registered Tax Practitioners can 
+          submit. Pre-populated with company-specific data from CFR register.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Company Identification
+        # ----------------------------------------------------------------------
+        - section_id: "COMPANY_ID"
+          section_name: "Company Identification"
+          section_description: "Legal entity identification and registration details"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "company_tin"
+              field_code: "Box 1"
+              field_name_en: "Company Tax Identification Number"
+              field_name_mt: "Numru ta' Identifikazzjoni tat-Taxxa tal-Kumpanija"
+              field_description: "9-digit TIN assigned to the company"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid 9-digit corporate TIN"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid Company TIN format"
+                  error_message_mt: "Format tal-TIN tal-kumpanija mhux validu"
+                  severity: "error"
+                - rule_id: "ECO_002"
+                  rule_type: "lookup"
+                  rule_description: "TIN must exist in CFR company register"
+                  rule_expression: "EXISTS(company_register.tin)"
+                  error_message_en: "Company TIN not found in register"
+                  error_message_mt: "TIN tal-kumpanija ma nstabx fir-reÄ¡istru"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "company"
+                column: "company_tin"
+              ors_mapping:
+                table: "mtca_ors.company"
+                column: "company_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "company_roc"
+              field_code: "Box 2"
+              field_name_en: "Company Registration Number (ROC)"
+              field_name_mt: "Numru ta' ReÄ¡istrazzjoni tal-Kumpanija"
+              field_description: "Malta Business Registry company number (C + sequential)"
+              data_type: "STRING"
+              format: "C#####"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_003"
+                  rule_type: "pattern"
+                  rule_description: "Must be C followed by digits"
+                  rule_expression: "^C[0-9]+$"
+                  error_message_en: "Invalid ROC format"
+                  error_message_mt: "Format tar-ROC mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "mbr_company_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "company"
+                column: "roc_number"
+              ors_mapping:
+                table: "mtca_ors.company"
+                column: "company_roc"
+                data_type: "String"
+
+            - field_id: "company_name"
+              field_code: "Box 3"
+              field_name_en: "Company Legal Name"
+              field_name_mt: "Isem Legali tal-Kumpanija"
+              field_description: "Full registered legal name of the company"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "company"
+                column: "company_name"
+              ors_mapping:
+                table: "mtca_ors.company"
+                column: "company_name"
+                data_type: "String"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 4"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Tax year for which return is being filed"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_004"
+                  rule_type: "range"
+                  rule_description: "Must be valid assessment year"
+                  rule_expression: "year_of_assessment >= 2000 AND year_of_assessment <= CURRENT_YEAR + 1"
+                  error_message_en: "Invalid year of assessment"
+                  error_message_mt: "Sena ta' stima mhux valida"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.corporate_return"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+            - field_id: "accounting_period_start"
+              field_code: "Box 5a"
+              field_name_en: "Accounting Period Start Date"
+              field_name_mt: "Data tal-Bidu tal-Perjodu ta' KontabilitÃ "
+              field_description: "First day of the company's accounting period (basis year)"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_005"
+                  rule_type: "date_logic"
+                  rule_description: "Start date must be before end date"
+                  rule_expression: "accounting_period_start < accounting_period_end"
+                  error_message_en: "Start date must be before end date"
+                  error_message_mt: "Data tal-bidu trid tkun qabel id-data tat-tmiem"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return"
+                column: "acct_period_start"
+              ors_mapping:
+                table: "mtca_ors.corporate_return"
+                column: "accounting_period_start"
+                data_type: "Date"
+
+            - field_id: "accounting_period_end"
+              field_code: "Box 5b"
+              field_name_en: "Accounting Period End Date"
+              field_name_mt: "Data tat-Tmiem tal-Perjodu ta' KontabilitÃ "
+              field_description: "Last day of the company's accounting period (basis year)"
+              data_type: "DATE"
+              format: "YYYY-MM-DD"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_006"
+                  rule_type: "date_logic"
+                  rule_description: "Period must not exceed 18 months"
+                  rule_expression: "DATEDIFF(accounting_period_end, accounting_period_start) <= 548"
+                  error_message_en: "Accounting period cannot exceed 18 months"
+                  error_message_mt: "Il-perjodu ta' kontabilitÃ  ma jistax jaqbeÅ¼ 18-il xahar"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return"
+                column: "acct_period_end"
+              ors_mapping:
+                table: "mtca_ors.corporate_return"
+                column: "accounting_period_end"
+                data_type: "Date"
+
+            - field_id: "company_status"
+              field_code: "Box 6"
+              field_name_en: "Company Status"
+              field_name_mt: "Status tal-Kumpanija"
+              field_description: "Current operational status of company"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "ACT"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_007"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid company status code"
+                  rule_expression: "EXISTS(company_status_codes.code)"
+                  error_message_en: "Invalid company status"
+                  error_message_mt: "Status tal-kumpanija mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "ACT"
+                  description_en: "Active/Trading"
+                  description_mt: "Attiva/Tinnegozja"
+                - code: "DOR"
+                  description_en: "Dormant"
+                  description_mt: "Dormanti"
+                - code: "LIQ"
+                  description_en: "In Liquidation"
+                  description_mt: "Fil-Likwidazzjoni"
+                - code: "STR"
+                  description_en: "Struck Off"
+                  description_mt: "ImÄ§assra"
+              reference_table: "company_status_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "company"
+                column: "status_code"
+              ors_mapping:
+                table: "mtca_ors.company"
+                column: "company_status"
+                data_type: "FixedString(3)"
+
+            - field_id: "fiscal_unit_member"
+              field_code: "Box 7"
+              field_name_en: "Fiscal Unit Member"
+              field_name_mt: "Membru ta' UnitÃ  Fiskali"
+              field_description: "Is company part of a fiscal unit for tax consolidation?"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "Fiscal_Unit_Return"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "company"
+                column: "fiscal_unit_flag"
+              ors_mapping:
+                table: "mtca_ors.company"
+                column: "fiscal_unit_member"
+                data_type: "UInt8"
+
+            - field_id: "fiscal_unit_id"
+              field_code: "Box 7a"
+              field_name_en: "Fiscal Unit Identification"
+              field_name_mt: "Identifikazzjoni tal-UnitÃ  Fiskali"
+              field_description: "TIN of the fiscal unit principal company"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: false
+              required_condition: "fiscal_unit_member = true"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_008"
+                  rule_type: "conditional"
+                  rule_description: "Required if fiscal unit member"
+                  rule_expression: "IF fiscal_unit_member THEN fiscal_unit_id IS NOT NULL"
+                  error_message_en: "Fiscal unit ID required for fiscal unit members"
+                  error_message_mt: "ID tal-unitÃ  fiskali meÄ§tieÄ¡ gÄ§all-membri tal-unitÃ  fiskali"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "fiscal_units"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "company"
+                column: "fiscal_unit_tin"
+              ors_mapping:
+                table: "mtca_ors.company"
+                column: "fiscal_unit_id"
+                data_type: "Nullable(String)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Income Computation
+        # ----------------------------------------------------------------------
+        - section_id: "INCOME"
+          section_name: "Income Computation"
+          section_description: "Calculation of chargeable income from various sources"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "trading_income"
+              field_code: "Page 2, Line 1"
+              field_name_en: "Trading Income"
+              field_name_mt: "Introjtu min-Negozju"
+              field_description: "Net profit from trading activities per audited accounts"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TIFD.trading_profit"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_income"
+                column: "trading_income"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_income"
+                column: "trading_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "investment_income"
+              field_code: "Page 2, Line 2"
+              field_name_en: "Investment Income"
+              field_name_mt: "Introjtu mill-Investimenti"
+              field_description: "Passive income from investments (dividends, interest, royalties)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_income"
+                column: "investment_income"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_income"
+                column: "investment_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "rental_income"
+              field_code: "Page 2, Line 3"
+              field_name_en: "Rental Income"
+              field_name_mt: "Introjtu mill-Kera"
+              field_description: "Income from immovable property rentals"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_income"
+                column: "rental_income"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_income"
+                column: "rental_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "capital_gains"
+              field_code: "Page 2, Line 4"
+              field_name_en: "Capital Gains"
+              field_name_mt: "QligÄ§ Kapitali"
+              field_description: "Gains on disposal of capital assets (property, shares)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "Schedule_B"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_income"
+                column: "capital_gains"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_income"
+                column: "capital_gains"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "other_income"
+              field_code: "Page 2, Line 5"
+              field_name_en: "Other Income"
+              field_name_mt: "Introjtu IeÄ§or"
+              field_description: "Any other taxable income not classified above"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_income"
+                column: "other_income"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_income"
+                column: "other_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "gross_income"
+              field_code: "Page 2, Line 6"
+              field_name_en: "Gross Income"
+              field_name_mt: "Introjtu Gross"
+              field_description: "Total of all income sources"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "trading_income + investment_income + rental_income + capital_gains + other_income"
+              validation_rules:
+                - rule_id: "ECO_010"
+                  rule_type: "cross_field"
+                  rule_description: "Must equal sum of income components"
+                  rule_expression: "gross_income = trading_income + investment_income + rental_income + capital_gains + other_income"
+                  error_message_en: "Gross income does not equal sum of components"
+                  error_message_mt: "L-introjtu gross mhux ugwali gÄ§as-somma tal-komponenti"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_income"
+                column: "gross_income"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_income"
+                column: "gross_income"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Deductions
+        # ----------------------------------------------------------------------
+        - section_id: "DEDUCTIONS"
+          section_name: "Deductions"
+          section_description: "Allowable deductions from gross income"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "capital_allowances"
+              field_code: "Page 2, Line 7"
+              field_name_en: "Capital Allowances"
+              field_name_mt: "Allowances Kapitali"
+              field_description: "Wear and tear allowances on plant and machinery"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_015"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "capital_allowances >= 0"
+                  error_message_en: "Capital allowances cannot be negative"
+                  error_message_mt: "Allowances kapitali ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TIFD.capital_allowances"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_deductions"
+                column: "capital_allowances"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_deductions"
+                column: "capital_allowances"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "nid_claimed"
+              field_code: "Page 2, Line 8"
+              field_name_en: "Notional Interest Deduction (NID)"
+              field_name_mt: "Tnaqqis ta' Interessi Nozzjonali"
+              field_description: "Deemed interest on risk capital (per TRA 100)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_016"
+                  rule_type: "cross_field"
+                  rule_description: "Must match TRA 100 claimed amount"
+                  rule_expression: "nid_claimed = TRA100.nid_amount"
+                  error_message_en: "NID must match TRA 100 submission"
+                  error_message_mt: "NID irid jaqbel mas-sottomissjoni TRA 100"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_100.nid_amount"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_deductions"
+                column: "nid_claimed"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_deductions"
+                column: "nid_claimed"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "group_loss_claimed"
+              field_code: "Page 2, Line 9"
+              field_name_en: "Group Loss Relief Claimed"
+              field_name_mt: "Telf Gruppali PretiÅ¼"
+              field_description: "Trading losses surrendered from group company (per TRA 20)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_017"
+                  rule_type: "cross_field"
+                  rule_description: "Must match TRA 20 claimed amount"
+                  rule_expression: "group_loss_claimed = TRA20.loss_claimed"
+                  error_message_en: "Group loss must match TRA 20 submission"
+                  error_message_mt: "Telf gruppali irid jaqbel mas-sottomissjoni TRA 20"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_20.loss_claimed"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_deductions"
+                column: "group_loss_claimed"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_deductions"
+                column: "group_loss_claimed"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "losses_brought_forward"
+              field_code: "Page 2, Line 10"
+              field_name_en: "Losses Brought Forward"
+              field_name_mt: "Telf MiÄ¡juba 'l Quddiem"
+              field_description: "Unutilized trading losses from prior years"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_018"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed available losses from prior returns"
+                  rule_expression: "losses_brought_forward <= prior_year_losses_available"
+                  error_message_en: "Losses claimed exceed available losses"
+                  error_message_mt: "Telf pretizi jaqbÅ¼u t-telf disponibbli"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_deductions"
+                column: "losses_bf"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_deductions"
+                column: "losses_brought_forward"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_deductions"
+              field_code: "Page 2, Line 11"
+              field_name_en: "Total Deductions"
+              field_name_mt: "Tnaqqis Totali"
+              field_description: "Sum of all allowable deductions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "capital_allowances + nid_claimed + group_loss_claimed + losses_brought_forward"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_deductions"
+                column: "total_deductions"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_deductions"
+                column: "total_deductions"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Tax Computation
+        # ----------------------------------------------------------------------
+        - section_id: "TAX_COMP"
+          section_name: "Tax Computation"
+          section_description: "Calculation of tax liability at 35% rate"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "chargeable_income"
+              field_code: "Page 2, Line 12"
+              field_name_en: "Chargeable Income"
+              field_name_mt: "Introjtu Taxxabbli"
+              field_description: "Gross income less total deductions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MAX(0, gross_income - total_deductions)"
+              validation_rules:
+                - rule_id: "ECO_020"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative (losses carried forward instead)"
+                  rule_expression: "chargeable_income >= 0"
+                  error_message_en: "Chargeable income cannot be negative"
+                  error_message_mt: "Introjtu taxxabbli ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_computation"
+                column: "chargeable_income"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_tax"
+                column: "chargeable_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_at_35"
+              field_code: "Page 2, Line 13"
+              field_name_en: "Tax at 35%"
+              field_name_mt: "Taxxa b'35%"
+              field_description: "Standard corporate tax rate applied to chargeable income"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "chargeable_income * 0.35"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_computation"
+                column: "tax_at_35"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_tax"
+                column: "tax_at_35"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "double_tax_relief"
+              field_code: "Page 2, Line 14"
+              field_name_en: "Double Taxation Relief"
+              field_name_mt: "Rimedju kontra Taxxa Doppja"
+              field_description: "Foreign tax credit claimed (per TRA 107)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_021"
+                  rule_type: "cross_field"
+                  rule_description: "Must match TRA 107 claimed amount"
+                  rule_expression: "double_tax_relief = TRA107.dtr_claimed"
+                  error_message_en: "DTR must match TRA 107 submission"
+                  error_message_mt: "DTR irid jaqbel mas-sottomissjoni TRA 107"
+                  severity: "error"
+                - rule_id: "ECO_022"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed Malta tax on foreign income"
+                  rule_expression: "double_tax_relief <= tax_at_35"
+                  error_message_en: "DTR cannot exceed total tax liability"
+                  error_message_mt: "DTR ma jistax jaqbeÅ¼ it-taxxa totali"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_107.dtr_claimed"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_computation"
+                column: "dtr_claimed"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_tax"
+                column: "double_tax_relief"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_credits"
+              field_code: "Page 2, Line 15"
+              field_name_en: "Tax Credits"
+              field_name_mt: "Krediti tat-Taxxa"
+              field_description: "Qualifying tax credits (investment credits, incentive schemes)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_computation"
+                column: "tax_credits"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_tax"
+                column: "tax_credits"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "net_tax_payable"
+              field_code: "Page 2, Line 16"
+              field_name_en: "Net Tax Payable"
+              field_name_mt: "Taxxa Netta Pagabbli"
+              field_description: "Final corporate tax liability after reliefs and credits"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MAX(0, tax_at_35 - double_tax_relief - tax_credits)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_computation"
+                column: "net_tax_payable"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_tax"
+                column: "net_tax_payable"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Transfer Pricing Disclosure (NEW from YA 2025)
+        # ----------------------------------------------------------------------
+        - section_id: "TRANSFER_PRICING"
+          section_name: "Transfer Pricing Disclosure"
+          section_description: "Related party transaction disclosure (mandatory from YA 2025)"
+          repeatable: false
+          conditional: true
+          condition_logic: "If related_party_transactions > 0 OR meets_TP_threshold"
+          fields:
+            - field_id: "tp_disclosure_required"
+              field_code: "Page 2A, Box 1"
+              field_name_en: "Transfer Pricing Disclosure Required"
+              field_name_mt: "Disklosure dwar Prezzijiet ta' Trasferiment MeÄ§tieÄ¡"
+              field_description: "Indicates if TP disclosure is required based on thresholds"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_tp"
+                column: "tp_required"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_tp"
+                column: "tp_disclosure_required"
+                data_type: "UInt8"
+
+            - field_id: "related_party_transactions"
+              field_code: "Page 2A, Box 2"
+              field_name_en: "Total Related Party Transactions"
+              field_name_mt: "Transazzjonijiet Totali ma' Partijiet Relatati"
+              field_description: "Aggregate value of transactions with related parties"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: "tp_disclosure_required = true"
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_tp"
+                column: "rp_transactions"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_tp"
+                column: "related_party_transactions"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tp_documentation_available"
+              field_code: "Page 2A, Box 3"
+              field_name_en: "TP Documentation Available"
+              field_name_mt: "Dokumentazzjoni TP Disponibbli"
+              field_description: "Confirms transfer pricing documentation is maintained"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: false
+              required_condition: "tp_disclosure_required = true"
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tax_return_tp"
+                column: "tp_docs_available"
+              ors_mapping:
+                table: "mtca_ors.corporate_return_tp"
+                column: "tp_documentation_available"
+                data_type: "UInt8"
+
+      attachments:
+        - attachment_code: "TIFD"
+          attachment_name: "Tax Index of Financial Data"
+          required: true
+          required_condition: null
+          max_file_size_mb: 10
+          allowed_formats:
+            - "XLSX"
+            - "XLS"
+
+        - attachment_code: "AUDITED_FS"
+          attachment_name: "Audited Financial Statements"
+          required: true
+          required_condition: null
+          max_file_size_mb: 50
+          allowed_formats:
+            - "PDF"
+
+        - attachment_code: "TRA_FORMS"
+          attachment_name: "TRA Form Attachments"
+          required: false
+          required_condition: "Based on specific TRA forms applicable"
+          max_file_size_mb: 10
+          allowed_formats:
+            - "PDF"
+            - "XLSX"
+
+      related_forms:
+        - form_code: "TIFD"
+          relationship_type: "attachment"
+          relationship_description: "TIFD must be submitted with every e-CO return"
+        - form_code: "TRA_63"
+          relationship_type: "attachment"
+          relationship_description: "Tax account allocations mandatory for all companies"
+        - form_code: "TRA_100"
+          relationship_type: "attachment"
+          relationship_description: "Required if claiming NID"
+        - form_code: "TRA_100A"
+          relationship_type: "attachment"
+          relationship_description: "Required if carrying forward excess NID"
+        - form_code: "TRA_107"
+          relationship_type: "attachment"
+          relationship_description: "Required if claiming double taxation relief"
+        - form_code: "TRA_19"
+          relationship_type: "attachment"
+          relationship_description: "Required if surrendering group losses"
+        - form_code: "TRA_20"
+          relationship_type: "attachment"
+          relationship_description: "Required if claiming group losses"
+        - form_code: "Fiscal_Unit_Return"
+          relationship_type: "parent"
+          relationship_description: "Supplemental document for fiscal unit members"
+        - form_code: "Shareholder_Refund"
+          relationship_type: "child"
+          relationship_description: "Enables shareholder refund claims"
+
+      submission_workflow:
+        authentication_required: "e-ID (2-factor) via registered Tax Practitioner only"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Reference number and submission receipt"
+
+  # ==========================================================================
+  # TIFD: Tax Index of Financial Data
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TIFD"
+        form_name_en: "Tax Index of Financial Data"
+        form_name_mt: "IndiÄ‹i tat-Taxxa tad-Data Finanzjarja"
+        version: "2024"
+        effective_from: "2002-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "S.L.123.128 - Income Tax Act (Electronic Communications) Rules"
+        administering_authority: "CFR"
+        tax_type: "Corporate Income Tax"
+        taxpayer_category: "Company"
+        filing_frequency: "Annual"
+        filing_deadline: "With e-CO return"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/TIFD.aspx"
+        pdf_available: false
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          TIFD is a structured Excel spreadsheet that standardizes financial 
+          statement data for electronic filing. Introduced in 2002 to enable 
+          efficient data capture and tax policy analysis. Malta does NOT use 
+          SAF-T; TIFD is the proprietary format for corporate tax data.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Balance Sheet - Assets
+        # ----------------------------------------------------------------------
+        - section_id: "BS_ASSETS"
+          section_name: "Balance Sheet - Assets"
+          section_description: "Fixed and current assets per audited financial statements"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "intangible_assets"
+              field_code: "TIFD-001"
+              field_name_en: "Intangible Assets"
+              field_name_mt: "Assi IntanÄ¡ibbli"
+              field_description: "Goodwill, patents, trademarks, licenses"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "intangible_assets"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "intangible_assets"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tangible_assets"
+              field_code: "TIFD-002"
+              field_name_en: "Tangible Fixed Assets"
+              field_name_mt: "Assi Fissi TanÄ¡ibbli"
+              field_description: "Property, plant, machinery, equipment"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "tangible_assets"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "tangible_assets"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "investments"
+              field_code: "TIFD-003"
+              field_name_en: "Investments"
+              field_name_mt: "Investimenti"
+              field_description: "Investments in subsidiaries, associates, other companies"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "investments"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "investments"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "stock"
+              field_code: "TIFD-010"
+              field_name_en: "Stock/Inventory"
+              field_name_mt: "Ä¦aÅ¼niet/Inventarju"
+              field_description: "Raw materials, work in progress, finished goods"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "stock"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "stock"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "trade_debtors"
+              field_code: "TIFD-011"
+              field_name_en: "Trade Debtors"
+              field_name_mt: "Debituri KummerÄ‹jali"
+              field_description: "Amounts receivable from customers"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "trade_debtors"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "trade_debtors"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "cash_bank"
+              field_code: "TIFD-015"
+              field_name_en: "Cash and Bank Balances"
+              field_name_mt: "Flus Kontanti u Balanzi Bankarji"
+              field_description: "Cash in hand, bank current and deposit accounts"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "cash_bank"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "cash_bank"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_assets"
+              field_code: "TIFD-020"
+              field_name_en: "Total Assets"
+              field_name_mt: "Assi Totali"
+              field_description: "Sum of all assets"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(all asset lines)"
+              validation_rules:
+                - rule_id: "TIFD_001"
+                  rule_type: "cross_field"
+                  rule_description: "Assets must equal liabilities plus equity"
+                  rule_expression: "total_assets = total_liabilities + total_equity"
+                  error_message_en: "Balance sheet does not balance"
+                  error_message_mt: "Il-karta tal-bilanÄ‹ ma tibbilanÄ‹ax"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "total_assets"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "total_assets"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Balance Sheet - Liabilities & Equity
+        # ----------------------------------------------------------------------
+        - section_id: "BS_LIABILITIES"
+          section_name: "Balance Sheet - Liabilities and Equity"
+          section_description: "Creditors and shareholders' funds"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "share_capital"
+              field_code: "TIFD-030"
+              field_name_en: "Share Capital"
+              field_name_mt: "Kapital tal-Ishma"
+              field_description: "Issued and paid-up share capital"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TIFD_010"
+                  rule_type: "range"
+                  rule_description: "Share capital cannot be negative"
+                  rule_expression: "share_capital >= 0"
+                  error_message_en: "Share capital cannot be negative"
+                  error_message_mt: "Kapital tal-ishma ma jistax ikun negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_100.share_capital"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "share_capital"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "share_capital"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "share_premium"
+              field_code: "TIFD-031"
+              field_name_en: "Share Premium"
+              field_name_mt: "Premium tal-Ishma"
+              field_description: "Premium paid on issue of shares above par value"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_100.share_premium"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "share_premium"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "share_premium"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "retained_earnings"
+              field_code: "TIFD-032"
+              field_name_en: "Retained Earnings"
+              field_name_mt: "QligÄ§ MiÅ¼mum"
+              field_description: "Accumulated profits or losses"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "retained_earnings"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "retained_earnings"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_equity"
+              field_code: "TIFD-039"
+              field_name_en: "Total Shareholders' Funds"
+              field_name_mt: "Fondi Totali tal-Azzjonisti"
+              field_description: "Sum of share capital, premium, and retained earnings"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "share_capital + share_premium + retained_earnings"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_100.risk_capital"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "total_equity"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "total_equity"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "bank_loans"
+              field_code: "TIFD-040"
+              field_name_en: "Bank Loans"
+              field_name_mt: "Slifijiet Bankarji"
+              field_description: "Long-term and short-term bank borrowings"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "bank_loans"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "bank_loans"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "trade_creditors"
+              field_code: "TIFD-041"
+              field_name_en: "Trade Creditors"
+              field_name_mt: "Kredituri KummerÄ‹jali"
+              field_description: "Amounts payable to suppliers"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "trade_creditors"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "trade_creditors"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_liabilities"
+              field_code: "TIFD-049"
+              field_name_en: "Total Liabilities"
+              field_name_mt: "Obbligazzjonijiet Totali"
+              field_description: "Sum of all liabilities"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(all liability lines)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_balance_sheet"
+                column: "total_liabilities"
+              ors_mapping:
+                table: "mtca_ors.tifd_balance_sheet"
+                column: "total_liabilities"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Profit and Loss Account
+        # ----------------------------------------------------------------------
+        - section_id: "PROFIT_LOSS"
+          section_name: "Profit and Loss Account"
+          section_description: "Income and expenditure for the accounting period"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "turnover"
+              field_code: "TIFD-100"
+              field_name_en: "Turnover"
+              field_name_mt: "DÄ§ul mill-BejgÄ§"
+              field_description: "Gross sales revenue"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "turnover"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "turnover"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "cost_of_sales"
+              field_code: "TIFD-101"
+              field_name_en: "Cost of Sales"
+              field_name_mt: "SpiÅ¼a tal-BejgÄ§"
+              field_description: "Direct costs attributable to goods/services sold"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "cost_of_sales"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "cost_of_sales"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "gross_profit"
+              field_code: "TIFD-102"
+              field_name_en: "Gross Profit"
+              field_name_mt: "Profitt Gross"
+              field_description: "Turnover less cost of sales"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "turnover - cost_of_sales"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "gross_profit"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "gross_profit"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "admin_expenses"
+              field_code: "TIFD-110"
+              field_name_en: "Administrative Expenses"
+              field_name_mt: "SpejjeÅ¼ Amministrattivi"
+              field_description: "Overhead and administrative costs"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "admin_expenses"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "admin_expenses"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "staff_costs"
+              field_code: "TIFD-111"
+              field_name_en: "Staff Costs"
+              field_name_mt: "SpejjeÅ¼ tal-Persunal"
+              field_description: "Wages, salaries, and employee benefits"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "FS7.total_emoluments"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "staff_costs"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "staff_costs"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "depreciation"
+              field_code: "TIFD-112"
+              field_name_en: "Depreciation"
+              field_name_mt: "Deprezzament"
+              field_description: "Accounting depreciation on fixed assets"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "depreciation"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "depreciation"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "interest_expense"
+              field_code: "TIFD-115"
+              field_name_en: "Interest Expense"
+              field_name_mt: "SpiÅ¼a tal-Interessi"
+              field_description: "Interest paid on borrowings"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_111.interest_expense"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "interest_expense"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "interest_expense"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "operating_profit"
+              field_code: "TIFD-120"
+              field_name_en: "Operating Profit"
+              field_name_mt: "Profitt mill-Operazzjonijiet"
+              field_description: "Profit before interest and tax"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "gross_profit - admin_expenses - staff_costs - depreciation"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "operating_profit"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "operating_profit"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "profit_before_tax"
+              field_code: "TIFD-130"
+              field_name_en: "Profit Before Tax"
+              field_name_mt: "Profitt Qabel it-Taxxa"
+              field_description: "Net profit before income tax"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "operating_profit - interest_expense + interest_income + other_income"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.trading_income"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "profit_before_tax"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "profit_before_tax"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_charge"
+              field_code: "TIFD-131"
+              field_name_en: "Tax Charge"
+              field_name_mt: "Ä¦las tat-Taxxa"
+              field_description: "Income tax expense for the period"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.net_tax_payable"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "tax_charge"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "tax_charge"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "profit_after_tax"
+              field_code: "TIFD-140"
+              field_name_en: "Profit After Tax"
+              field_name_mt: "Profitt Wara t-Taxxa"
+              field_description: "Net profit after income tax"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "profit_before_tax - tax_charge"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tifd_profit_loss"
+                column: "profit_after_tax"
+              ors_mapping:
+                table: "mtca_ors.tifd_profit_loss"
+                column: "profit_after_tax"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "e-CO"
+          relationship_type: "parent"
+          relationship_description: "TIFD is mandatory attachment to e-CO return"
+        - form_code: "AUDITED_FS"
+          relationship_type: "source"
+          relationship_description: "TIFD data must reconcile with audited financial statements"
+
+      submission_workflow:
+        authentication_required: "Via e-CO submission"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Included in e-CO submission receipt"
+
+  # ==========================================================================
+  # TRA 63: Tax Account Allocations
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TRA_63"
+        form_name_en: "Tax Account Allocations"
+        form_name_mt: "Allokazzjonijiet tal-Kont tat-Taxxa"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123"
+        subsidiary_legislation:
+          - "S.L.123.182 - Companies Act (Reconstruction and Amalgamation) Rules"
+        administering_authority: "CFR"
+        tax_type: "Corporate Income Tax"
+        taxpayer_category: "Company"
+        filing_frequency: "Annual"
+        filing_deadline: "With e-CO return"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/TRA-Forms.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          MANDATORY for ALL companies. Allocates distributable profits to the 
+          five tax accounts (FTA, MTA, FIA, IPA, UA) which determine shareholder 
+          refund entitlements. Updated for YA 2024 to include NID reallocation rules.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Company Identification
+        # ----------------------------------------------------------------------
+        - section_id: "COMPANY_ID"
+          section_name: "Company Identification"
+          section_description: "Company details and accounting period"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "company_tin"
+              field_code: "Box 1"
+              field_name_en: "Company TIN"
+              field_name_mt: "TIN tal-Kumpanija"
+              field_description: "Tax identification number of the company"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA63_001"
+                  rule_type: "pattern"
+                  rule_description: "Must be valid 9-digit TIN"
+                  rule_expression: "^[0-9]{9}$"
+                  error_message_en: "Invalid Company TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: "e-CO.company_tin"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "company_tin"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "company_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "year_of_assessment"
+              field_code: "Box 2"
+              field_name_en: "Year of Assessment"
+              field_name_mt: "Sena ta' Stima"
+              field_description: "Tax year for allocation"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.year_of_assessment"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "year_of_assessment"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "year_of_assessment"
+                data_type: "UInt16"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Profits Available for Distribution
+        # ----------------------------------------------------------------------
+        - section_id: "PROFITS_AVAILABLE"
+          section_name: "Profits Available for Distribution"
+          section_description: "Calculation of distributable profits"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "chargeable_income"
+              field_code: "Box 3"
+              field_name_en: "Chargeable Income"
+              field_name_mt: "Introjtu Taxxabbli"
+              field_description: "As per e-CO return"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA63_010"
+                  rule_type: "cross_field"
+                  rule_description: "Must match e-CO chargeable income"
+                  rule_expression: "chargeable_income = e-CO.chargeable_income"
+                  error_message_en: "Must match e-CO chargeable income"
+                  error_message_mt: "Irid jaqbel mal-introjtu taxxabbli tal-e-CO"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.chargeable_income"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "chargeable_income"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "chargeable_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "tax_payable"
+              field_code: "Box 4"
+              field_name_en: "Tax Payable"
+              field_name_mt: "Taxxa Pagabbli"
+              field_description: "Total tax liability as per e-CO"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.net_tax_payable"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "tax_payable"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "tax_payable"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "distributable_profits"
+              field_code: "Box 5"
+              field_name_en: "Distributable Profits"
+              field_name_mt: "Profitti Distribwibbli"
+              field_description: "Chargeable income less tax payable"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "chargeable_income - tax_payable"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "distributable_profits"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "distributable_profits"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Five Tax Account Allocations
+        # ----------------------------------------------------------------------
+        - section_id: "TAX_ACCOUNTS"
+          section_name: "Tax Account Allocations"
+          section_description: "Allocation of distributable profits to the five tax accounts"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "fta_allocation"
+              field_code: "Box 6"
+              field_name_en: "Final Tax Account (FTA)"
+              field_name_mt: "Kont tat-Taxxa Finali"
+              field_description: "Profits taxed at final withholding rates (15% rental, etc.)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA63_020"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "fta_allocation >= 0"
+                  error_message_en: "FTA allocation cannot be negative"
+                  error_message_mt: "Allokazzjoni FTA ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_61.fta_movement"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "fta_allocation"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "fta_allocation"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "mta_allocation"
+              field_code: "Box 7"
+              field_name_en: "Maltese Taxed Account (MTA)"
+              field_name_mt: "Kont Taxxat Malti"
+              field_description: "Profits from Malta sources taxed at 35%"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA63_021"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "mta_allocation >= 0"
+                  error_message_en: "MTA allocation cannot be negative"
+                  error_message_mt: "Allokazzjoni MTA ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "mta_allocation"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "mta_allocation"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "fia_allocation"
+              field_code: "Box 8"
+              field_name_en: "Foreign Income Account (FIA)"
+              field_name_mt: "Kont tal-Introjtu Barrani"
+              field_description: "Foreign-source income (eligible for participation exemption)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA63_022"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "fia_allocation >= 0"
+                  error_message_en: "FIA allocation cannot be negative"
+                  error_message_mt: "Allokazzjoni FIA ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_89.fia_election"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "fia_allocation"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "fia_allocation"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "ipa_allocation"
+              field_code: "Box 9"
+              field_name_en: "Immovable Property Account (IPA)"
+              field_name_mt: "Kont tal-ProprjetÃ  Immobbli"
+              field_description: "Income from Malta immovable property"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA63_023"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "ipa_allocation >= 0"
+                  error_message_en: "IPA allocation cannot be negative"
+                  error_message_mt: "Allokazzjoni IPA ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "ipa_allocation"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "ipa_allocation"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "ua_allocation"
+              field_code: "Box 10"
+              field_name_en: "Untaxed Account (UA)"
+              field_name_mt: "Kont Mhux Taxxat"
+              field_description: "Untaxed profits (exempt income, investment holding)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA63_024"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "ua_allocation >= 0"
+                  error_message_en: "UA allocation cannot be negative"
+                  error_message_mt: "Allokazzjoni UA ma tistax tkun negattiva"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "ua_allocation"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "ua_allocation"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_allocation"
+              field_code: "Box 11"
+              field_name_en: "Total Allocation"
+              field_name_mt: "Allokazzjoni Totali"
+              field_description: "Sum of all five account allocations"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "fta_allocation + mta_allocation + fia_allocation + ipa_allocation + ua_allocation"
+              validation_rules:
+                - rule_id: "TRA63_030"
+                  rule_type: "cross_field"
+                  rule_description: "Total allocation must equal distributable profits"
+                  rule_expression: "total_allocation = distributable_profits"
+                  error_message_en: "Allocations must equal distributable profits"
+                  error_message_mt: "Allokazzjonijiet iridu jkunu ugwali gÄ§all-profitti distribwibbli"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "total_allocation"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "total_allocation"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: NID Allocation (YA 2024 onwards)
+        # ----------------------------------------------------------------------
+        - section_id: "NID_ALLOCATION"
+          section_name: "NID Allocation to Tax Accounts"
+          section_description: "Allocation of NID deduction across tax accounts (YA 2024)"
+          repeatable: false
+          conditional: true
+          condition_logic: "If NID claimed in e-CO return"
+          fields:
+            - field_id: "nid_total"
+              field_code: "Box 12"
+              field_name_en: "Total NID Claimed"
+              field_name_mt: "NID Totali PretiÅ¼"
+              field_description: "As per TRA 100 and e-CO return"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: "If e-CO.nid_claimed > 0"
+              editable: false
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA63_040"
+                  rule_type: "cross_field"
+                  rule_description: "Must match e-CO NID claimed"
+                  rule_expression: "nid_total = e-CO.nid_claimed"
+                  error_message_en: "Must match e-CO NID claimed"
+                  error_message_mt: "Irid jaqbel mal-NID pretiÅ¼ fl-e-CO"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.nid_claimed"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "nid_total"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "nid_total"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "nid_to_mta"
+              field_code: "Box 13"
+              field_name_en: "NID Allocated to MTA"
+              field_name_mt: "NID Allokat gÄ§all-MTA"
+              field_description: "Portion of NID reducing MTA profits"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: "If nid_total > 0"
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "nid_to_mta"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "nid_to_mta"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "nid_to_fia"
+              field_code: "Box 14"
+              field_name_en: "NID Allocated to FIA"
+              field_name_mt: "NID Allokat gÄ§all-FIA"
+              field_description: "Portion of NID reducing FIA profits"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: false
+              required_condition: "If nid_total > 0"
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA63_041"
+                  rule_type: "cross_field"
+                  rule_description: "NID allocation must equal total NID"
+                  rule_expression: "nid_to_mta + nid_to_fia = nid_total"
+                  error_message_en: "NID allocations must sum to total NID"
+                  error_message_mt: "Allokazzjonijiet NID iridu jgÄ§oddu gÄ§an-NID totali"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra63"
+                column: "nid_to_fia"
+              ors_mapping:
+                table: "mtca_ors.tax_account_allocation"
+                column: "nid_to_fia"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "e-CO"
+          relationship_type: "parent"
+          relationship_description: "TRA 63 submitted as attachment to e-CO"
+        - form_code: "TRA_61"
+          relationship_type: "related"
+          relationship_description: "FTA movements tracked in TRA 61"
+        - form_code: "TRA_100"
+          relationship_type: "related"
+          relationship_description: "NID amounts flow from TRA 100"
+        - form_code: "Shareholder_Refund"
+          relationship_type: "child"
+          relationship_description: "Account balances determine refund entitlements"
+
+      submission_workflow:
+        authentication_required: "Via e-CO submission"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Included in e-CO submission receipt"
+
+  # ==========================================================================
+  # TRA 100: Notional Interest Deduction
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TRA_100"
+        form_name_en: "Notional Interest Deduction (NID)"
+        form_name_mt: "Tnaqqis ta' Interessi Nozzjonali"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123, Article 14(1)(p)"
+        subsidiary_legislation:
+          - "S.L.123.184 - Notional Interest Deduction Rules"
+        administering_authority: "CFR"
+        tax_type: "Corporate Income Tax"
+        taxpayer_category: "Company"
+        filing_frequency: "Annual"
+        filing_deadline: "With e-CO return"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/NID.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          NID provides a deduction for deemed interest on risk capital, aligning 
+          treatment of equity with debt financing. Rate based on Malta Government 
+          Stock yield plus 5% premium. Updated for pro-rata calculations.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Risk Capital Calculation
+        # ----------------------------------------------------------------------
+        - section_id: "RISK_CAPITAL"
+          section_name: "Risk Capital Calculation"
+          section_description: "Determination of equity base for NID calculation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "share_capital"
+              field_code: "Box 1"
+              field_name_en: "Share Capital"
+              field_name_mt: "Kapital tal-Ishma"
+              field_description: "Issued and paid-up share capital"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA100_001"
+                  rule_type: "cross_field"
+                  rule_description: "Must match TIFD share capital"
+                  rule_expression: "share_capital = TIFD.share_capital"
+                  error_message_en: "Must match TIFD share capital"
+                  error_message_mt: "Irid jaqbel mal-kapital tal-ishma fit-TIFD"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TIFD.share_capital"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100"
+                column: "share_capital"
+              ors_mapping:
+                table: "mtca_ors.nid_calculation"
+                column: "share_capital"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "share_premium"
+              field_code: "Box 2"
+              field_name_en: "Share Premium"
+              field_name_mt: "Premium tal-Ishma"
+              field_description: "Share premium account balance"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TIFD.share_premium"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100"
+                column: "share_premium"
+              ors_mapping:
+                table: "mtca_ors.nid_calculation"
+                column: "share_premium"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "positive_retained_earnings"
+              field_code: "Box 3"
+              field_name_en: "Positive Retained Earnings"
+              field_name_mt: "QligÄ§ MiÅ¼mum PoÅ¼ittiv"
+              field_description: "Retained earnings if positive (zero if negative)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA100_002"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative for NID purposes"
+                  rule_expression: "positive_retained_earnings >= 0"
+                  error_message_en: "Enter zero if retained earnings are negative"
+                  error_message_mt: "DaÄ§Ä§al Å¼ero jekk il-qligÄ§ miÅ¼mum huwa negattiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100"
+                column: "positive_retained_earnings"
+              ors_mapping:
+                table: "mtca_ors.nid_calculation"
+                column: "positive_retained_earnings"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_risk_capital"
+              field_code: "Box 4"
+              field_name_en: "Total Risk Capital"
+              field_name_mt: "Kapital tar-Riskju Totali"
+              field_description: "Sum of equity components eligible for NID"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "share_capital + share_premium + positive_retained_earnings"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100"
+                column: "total_risk_capital"
+              ors_mapping:
+                table: "mtca_ors.nid_calculation"
+                column: "total_risk_capital"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 2: NID Calculation
+        # ----------------------------------------------------------------------
+        - section_id: "NID_CALC"
+          section_name: "NID Calculation"
+          section_description: "Application of NID rate to risk capital"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "nid_rate"
+              field_code: "Box 5"
+              field_name_en: "Applicable NID Rate"
+              field_name_mt: "Rata NID Applikabbli"
+              field_description: "Reference rate + 5% premium (per Legal Notice)"
+              data_type: "PERCENTAGE"
+              format: "#.##%"
+              max_length: null
+              precision: 5
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA100_010"
+                  rule_type: "lookup"
+                  rule_description: "Rate must match published rate for year"
+                  rule_expression: "nid_rate = nid_rate_table[year_of_assessment]"
+                  error_message_en: "Rate must match official NID rate"
+                  error_message_mt: "Ir-rata trid taqbel mar-rata uffiÄ‹jali NID"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "nid_rate_table"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100"
+                column: "nid_rate"
+              ors_mapping:
+                table: "mtca_ors.nid_calculation"
+                column: "nid_rate"
+                data_type: "Decimal(5,2)"
+
+            - field_id: "days_in_period"
+              field_code: "Box 6"
+              field_name_en: "Days in Accounting Period"
+              field_name_mt: "Jiem fil-Perjodu ta' KontabilitÃ "
+              field_description: "Number of days in basis period (for pro-rata)"
+              data_type: "INTEGER"
+              format: "###"
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: 365
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA100_011"
+                  rule_type: "range"
+                  rule_description: "Period cannot exceed 548 days"
+                  rule_expression: "days_in_period >= 1 AND days_in_period <= 548"
+                  error_message_en: "Period must be 1-548 days"
+                  error_message_mt: "Il-perjodu irid ikun bejn jum 1 u 548"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100"
+                column: "days_in_period"
+              ors_mapping:
+                table: "mtca_ors.nid_calculation"
+                column: "days_in_period"
+                data_type: "UInt16"
+
+            - field_id: "nid_amount"
+              field_code: "Box 7"
+              field_name_en: "NID Amount"
+              field_name_mt: "Ammont NID"
+              field_description: "Calculated NID deduction"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_risk_capital * (nid_rate / 100) * (days_in_period / 365)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.nid_claimed"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100"
+                column: "nid_amount"
+              ors_mapping:
+                table: "mtca_ors.nid_calculation"
+                column: "nid_amount"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "nid_utilized"
+              field_code: "Box 8"
+              field_name_en: "NID Utilized in Current Year"
+              field_name_mt: "NID UÅ¼at fis-Sena Kurrenti"
+              field_description: "Portion of NID deducted against current year income"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA100_020"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed available income"
+                  rule_expression: "nid_utilized <= e-CO.gross_income"
+                  error_message_en: "NID cannot exceed gross income"
+                  error_message_mt: "NID ma jistax jaqbeÅ¼ l-introjtu gross"
+                  severity: "error"
+                - rule_id: "TRA100_021"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed calculated NID amount"
+                  rule_expression: "nid_utilized <= nid_amount"
+                  error_message_en: "Cannot utilize more than calculated NID"
+                  error_message_mt: "Ma tistax tuÅ¼a aktar mill-NID ikkalkulat"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.nid_claimed"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100"
+                column: "nid_utilized"
+              ors_mapping:
+                table: "mtca_ors.nid_calculation"
+                column: "nid_utilized"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "nid_carried_forward"
+              field_code: "Box 9"
+              field_name_en: "Excess NID Carried Forward"
+              field_name_mt: "NID EÄ‹Ä‹ess MiÄ¡jub 'l Quddiem"
+              field_description: "Unutilized NID to be carried to future years"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "nid_amount - nid_utilized"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "TRA_100A.nid_brought_forward"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100"
+                column: "nid_carried_forward"
+              ors_mapping:
+                table: "mtca_ors.nid_calculation"
+                column: "nid_carried_forward"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "e-CO"
+          relationship_type: "parent"
+          relationship_description: "TRA 100 submitted as attachment to e-CO"
+        - form_code: "TRA_100A"
+          relationship_type: "related"
+          relationship_description: "Excess NID tracked in TRA 100A"
+        - form_code: "TRA_63"
+          relationship_type: "related"
+          relationship_description: "NID allocation to tax accounts"
+        - form_code: "TIFD"
+          relationship_type: "source"
+          relationship_description: "Equity figures from TIFD"
+
+      submission_workflow:
+        authentication_required: "Via e-CO submission"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Included in e-CO submission receipt"
+
+  # ==========================================================================
+  # TRA 100A: NID Supplementary (Excess Carried Forward)
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TRA_100A"
+        form_name_en: "NID Supplementary - Excess Carried Forward"
+        form_name_mt: "NID Supplementarju - EÄ‹Ä‹ess MiÄ¡jub 'l Quddiem"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123, Article 14(1)(p)"
+        subsidiary_legislation:
+          - "S.L.123.184 - Notional Interest Deduction Rules"
+        administering_authority: "CFR"
+        tax_type: "Corporate Income Tax"
+        taxpayer_category: "Company"
+        filing_frequency: "Annual"
+        filing_deadline: "With e-CO return"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/NID.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Tracks excess NID from prior years that is brought forward 
+          and utilized in the current year.
+
+      sections:
+        - section_id: "EXCESS_NID"
+          section_name: "Excess NID Brought Forward"
+          section_description: "Tracking of prior year unutilized NID"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "year_of_origin"
+              field_code: "Column A"
+              field_name_en: "Year NID Arose"
+              field_name_mt: "Sena meta l-NID Qamet"
+              field_description: "Year of assessment when excess NID originated"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA100A_001"
+                  rule_type: "date_logic"
+                  rule_description: "Must be prior to current year"
+                  rule_expression: "year_of_origin < current_year_of_assessment"
+                  error_message_en: "Year must be prior to current year"
+                  error_message_mt: "Is-sena trid tkun qabel is-sena kurrenti"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100a_detail"
+                column: "year_of_origin"
+              ors_mapping:
+                table: "mtca_ors.nid_carried_forward"
+                column: "year_of_origin"
+                data_type: "UInt16"
+
+            - field_id: "nid_brought_forward"
+              field_code: "Column B"
+              field_name_en: "NID Brought Forward"
+              field_name_mt: "NID MiÄ¡jub 'l Quddiem"
+              field_description: "Excess NID available from that year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA100A_002"
+                  rule_type: "cross_field"
+                  rule_description: "Must match prior year TRA 100 carried forward"
+                  rule_expression: "nid_brought_forward = prior_TRA100.nid_carried_forward"
+                  error_message_en: "Must match prior year excess NID"
+                  error_message_mt: "Irid jaqbel mal-NID eÄ‹Ä‹ess tas-sena ta' qabel"
+                  severity: "warning"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100a_detail"
+                column: "nid_bf"
+              ors_mapping:
+                table: "mtca_ors.nid_carried_forward"
+                column: "nid_brought_forward"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "nid_utilized_this_year"
+              field_code: "Column C"
+              field_name_en: "NID Utilized This Year"
+              field_name_mt: "NID UÅ¼at Din is-Sena"
+              field_description: "Amount utilized against current year income"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA100A_003"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed brought forward amount"
+                  rule_expression: "nid_utilized_this_year <= nid_brought_forward"
+                  error_message_en: "Cannot utilize more than available"
+                  error_message_mt: "Ma tistax tuÅ¼a aktar minn dak disponibbli"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100a_detail"
+                column: "nid_utilized"
+              ors_mapping:
+                table: "mtca_ors.nid_carried_forward"
+                column: "nid_utilized_this_year"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "nid_remaining"
+              field_code: "Column D"
+              field_name_en: "NID Remaining"
+              field_name_mt: "NID li Baqa'"
+              field_description: "Balance to carry forward to next year"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "nid_brought_forward - nid_utilized_this_year"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra100a_detail"
+                column: "nid_remaining"
+              ors_mapping:
+                table: "mtca_ors.nid_carried_forward"
+                column: "nid_remaining"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "TRA_100"
+          relationship_type: "parent"
+          relationship_description: "Excess NID originates from TRA 100"
+        - form_code: "e-CO"
+          relationship_type: "parent"
+          relationship_description: "Submitted with e-CO return"
+
+      submission_workflow:
+        authentication_required: "Via e-CO submission"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Included in e-CO submission receipt"
+
+  # ==========================================================================
+  # TRA 107: Double Taxation Relief
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "TRA_107"
+        form_name_en: "Double Taxation Relief"
+        form_name_mt: "Rimedju kontra Taxxa Doppja"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "ITA Cap. 123, Articles 74-77"
+        subsidiary_legislation:
+          - "Various Double Taxation Agreements"
+        administering_authority: "CFR"
+        tax_type: "Corporate Income Tax"
+        taxpayer_category: "Company"
+        filing_frequency: "Annual"
+        filing_deadline: "With e-CO return"
+        submission_method: "Electronic-only"
+        electronic_portal: "CFR e-Services"
+        source_url: "https://cfr.gov.mt/en/Corporate/Pages/TRA-Forms.aspx"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Claims foreign tax credit for taxes paid abroad on income also taxable 
+          in Malta. Relief limited to lower of foreign tax or Malta tax on that income.
+          Updated YA 2024 for bilateral treaty amendments.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Foreign Income Details
+        # ----------------------------------------------------------------------
+        - section_id: "FOREIGN_INCOME"
+          section_name: "Foreign Income Details"
+          section_description: "Details of income subject to foreign tax"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "source_country"
+              field_code: "Column A"
+              field_name_en: "Source Country"
+              field_name_mt: "PajjiÅ¼ tas-Sors"
+              field_description: "Country where income arose"
+              data_type: "CODE"
+              format: "AA"
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA107_001"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid ISO country code"
+                  rule_expression: "EXISTS(country_codes.code)"
+                  error_message_en: "Invalid country code"
+                  error_message_mt: "KodiÄ‹i tal-pajjiÅ¼ mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "country_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107_detail"
+                column: "source_country"
+              ors_mapping:
+                table: "mtca_ors.dtr_claims"
+                column: "source_country"
+                data_type: "FixedString(2)"
+
+            - field_id: "income_type"
+              field_code: "Column B"
+              field_name_en: "Type of Income"
+              field_name_mt: "Tip ta' Introjtu"
+              field_description: "Category of foreign income"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA107_002"
+                  rule_type: "lookup"
+                  rule_description: "Must be valid income type"
+                  rule_expression: "EXISTS(income_type_codes.code)"
+                  error_message_en: "Invalid income type"
+                  error_message_mt: "Tip ta' introjtu mhux validu"
+                  severity: "error"
+              allowed_values:
+                - code: "DIV"
+                  description_en: "Dividends"
+                  description_mt: "Dividendi"
+                - code: "INT"
+                  description_en: "Interest"
+                  description_mt: "Interessi"
+                - code: "ROY"
+                  description_en: "Royalties"
+                  description_mt: "Royalties"
+                - code: "TRD"
+                  description_en: "Trading Profits"
+                  description_mt: "Profitti min-Negozju"
+                - code: "RNT"
+                  description_en: "Rental Income"
+                  description_mt: "Introjtu mill-Kera"
+                - code: "CAP"
+                  description_en: "Capital Gains"
+                  description_mt: "QligÄ§ Kapitali"
+                - code: "OTH"
+                  description_en: "Other"
+                  description_mt: "IeÄ§or"
+              reference_table: "income_type_codes"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107_detail"
+                column: "income_type"
+              ors_mapping:
+                table: "mtca_ors.dtr_claims"
+                column: "income_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "gross_foreign_income"
+              field_code: "Column C"
+              field_name_en: "Gross Foreign Income"
+              field_name_mt: "Introjtu Barrani Gross"
+              field_description: "Gross amount of foreign income (before foreign tax)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA107_010"
+                  rule_type: "range"
+                  rule_description: "Must be positive"
+                  rule_expression: "gross_foreign_income > 0"
+                  error_message_en: "Gross income must be positive"
+                  error_message_mt: "Introjtu gross irid ikun poÅ¼ittiv"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107_detail"
+                column: "gross_foreign_income"
+              ors_mapping:
+                table: "mtca_ors.dtr_claims"
+                column: "gross_foreign_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "foreign_tax_paid"
+              field_code: "Column D"
+              field_name_en: "Foreign Tax Paid"
+              field_name_mt: "Taxxa Barranija MÄ§allsa"
+              field_description: "Amount of tax paid in source country"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "TRA107_011"
+                  rule_type: "range"
+                  rule_description: "Cannot be negative"
+                  rule_expression: "foreign_tax_paid >= 0"
+                  error_message_en: "Foreign tax cannot be negative"
+                  error_message_mt: "Taxxa barranija ma tistax tkun negattiva"
+                  severity: "error"
+                - rule_id: "TRA107_012"
+                  rule_type: "cross_field"
+                  rule_description: "Cannot exceed gross income"
+                  rule_expression: "foreign_tax_paid <= gross_foreign_income"
+                  error_message_en: "Tax cannot exceed income"
+                  error_message_mt: "It-taxxa ma tistax taqbeÅ¼ l-introjtu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107_detail"
+                column: "foreign_tax_paid"
+              ors_mapping:
+                table: "mtca_ors.dtr_claims"
+                column: "foreign_tax_paid"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "malta_tax_on_foreign"
+              field_code: "Column E"
+              field_name_en: "Malta Tax on Foreign Income"
+              field_name_mt: "Taxxa Maltija fuq Introjtu Barrani"
+              field_description: "Malta tax attributable to foreign income (at 35%)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "gross_foreign_income * 0.35"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107_detail"
+                column: "malta_tax_on_foreign"
+              ors_mapping:
+                table: "mtca_ors.dtr_claims"
+                column: "malta_tax_on_foreign"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "dtr_claimed"
+              field_code: "Column F"
+              field_name_en: "DTR Claimed"
+              field_name_mt: "DTR PretiÅ¼"
+              field_description: "Relief claimed (lower of foreign tax or Malta tax)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "MIN(foreign_tax_paid, malta_tax_on_foreign)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107_detail"
+                column: "dtr_claimed"
+              ors_mapping:
+                table: "mtca_ors.dtr_claims"
+                column: "dtr_claimed"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "treaty_applicable"
+              field_code: "Column G"
+              field_name_en: "Treaty Applicable"
+              field_name_mt: "Trattat Applikabbli"
+              field_description: "Is double taxation agreement applicable?"
+              data_type: "BOOLEAN"
+              format: null
+              max_length: null
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: false
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "dta_countries"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107_detail"
+                column: "treaty_applicable"
+              ors_mapping:
+                table: "mtca_ors.dtr_claims"
+                column: "treaty_applicable"
+                data_type: "UInt8"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Summary
+        # ----------------------------------------------------------------------
+        - section_id: "SUMMARY"
+          section_name: "DTR Summary"
+          section_description: "Total double taxation relief claimed"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_foreign_income"
+              field_code: "Box 10"
+              field_name_en: "Total Foreign Income"
+              field_name_mt: "Introjtu Barrani Totali"
+              field_description: "Sum of all foreign income"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(gross_foreign_income)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107"
+                column: "total_foreign_income"
+              ors_mapping:
+                table: "mtca_ors.dtr_summary"
+                column: "total_foreign_income"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_foreign_tax"
+              field_code: "Box 11"
+              field_name_en: "Total Foreign Tax Paid"
+              field_name_mt: "Taxxa Barranija Totali MÄ§allsa"
+              field_description: "Sum of all foreign taxes"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(foreign_tax_paid)"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107"
+                column: "total_foreign_tax"
+              ors_mapping:
+                table: "mtca_ors.dtr_summary"
+                column: "total_foreign_tax"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "total_dtr_claimed"
+              field_code: "Box 12"
+              field_name_en: "Total DTR Claimed"
+              field_name_mt: "DTR Totali PretiÅ¼"
+              field_description: "Sum of all DTR claims"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "SUM(dtr_claimed)"
+              validation_rules:
+                - rule_id: "TRA107_020"
+                  rule_type: "cross_field"
+                  rule_description: "Must match e-CO double tax relief"
+                  rule_expression: "total_dtr_claimed = e-CO.double_tax_relief"
+                  error_message_en: "Total DTR must match e-CO claim"
+                  error_message_mt: "DTR totali irid jaqbel mal-pretensjoni fl-e-CO"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: "e-CO.double_tax_relief"
+              legacy_mapping:
+                database: "corporate_tax_db"
+                table: "tra107"
+                column: "total_dtr_claimed"
+              ors_mapping:
+                table: "mtca_ors.dtr_summary"
+                column: "total_dtr_claimed"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "FOREIGN_TAX_CERT"
+          attachment_name: "Foreign Tax Certificates"
+          required: true
+          required_condition: null
+          max_file_size_mb: 10
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "e-CO"
+          relationship_type: "parent"
+          relationship_description: "TRA 107 submitted with e-CO return"
+        - form_code: "TRA_63"
+          relationship_type: "related"
+          relationship_description: "Impacts FIA allocation"
+
+      submission_workflow:
+        authentication_required: "Via e-CO submission"
+        signature_required: false
+        payment_integration: false
+        acknowledgment_type: "Included in e-CO submission receipt"
+
+# ============================================================================
+# Reference Tables for Priority 1A Forms
+# ============================================================================
+reference_tables:
+  company_status_codes:
+    - code: "ACT"
+      description_en: "Active/Trading"
+    - code: "DOR"
+      description_en: "Dormant"
+    - code: "LIQ"
+      description_en: "In Liquidation"
+    - code: "STR"
+      description_en: "Struck Off"
+
+  income_type_codes:
+    - code: "DIV"
+      description_en: "Dividends"
+    - code: "INT"
+      description_en: "Interest"
+    - code: "ROY"
+      description_en: "Royalties"
+    - code: "TRD"
+      description_en: "Trading Profits"
+    - code: "RNT"
+      description_en: "Rental Income"
+    - code: "CAP"
+      description_en: "Capital Gains"
+    - code: "OTH"
+      description_en: "Other"
+
+  nid_rate_table:
+    - year: 2018
+      rate: 7.00
+    - year: 2019
+      rate: 6.50
+    - year: 2020
+      rate: 6.00
+    - year: 2021
+      rate: 5.50
+    - year: 2022
+      rate: 6.00
+    - year: 2023
+      rate: 6.50
+    - year: 2024
+      rate: 7.00
+
+# ============================================================================
+# Cross-Form Relationships Summary
+# ============================================================================
+form_relationships:
+  corporate_tax_chain:
+    description: "Corporate tax return filing chain"
+    flow:
+      - source: "TIFD"
+        target: "e-CO"
+        relationship: "Financial data feeds into return"
+      - source: "TRA_100"
+        target: "e-CO"
+        relationship: "NID deduction claimed"
+      - source: "TRA_100"
+        target: "TRA_100A"
+        relationship: "Excess NID carried forward"
+      - source: "TRA_107"
+        target: "e-CO"
+        relationship: "DTR credit claimed"
+      - source: "e-CO"
+        target: "TRA_63"
+        relationship: "Distributable profits allocated"
+      - source: "TRA_63"
+        target: "Shareholder_Refund"
+        relationship: "Account balances determine refunds"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping Summary
+# ============================================================================
+migration_mapping:
+  corporate_tax_db:
+    tables:
+      - legacy_table: "company"
+        ors_table: "mtca_ors.company"
+        key_columns:
+          - legacy: "company_tin"
+            ors: "company_tin"
+      - legacy_table: "tax_return"
+        ors_table: "mtca_ors.corporate_return"
+        key_columns:
+          - legacy: "company_tin"
+            ors: "company_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "tra63"
+        ors_table: "mtca_ors.tax_account_allocation"
+        key_columns:
+          - legacy: "company_tin"
+            ors: "company_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "tra100"
+        ors_table: "mtca_ors.nid_calculation"
+        key_columns:
+          - legacy: "company_tin"
+            ors: "company_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"
+      - legacy_table: "tra107"
+        ors_table: "mtca_ors.dtr_summary"
+        key_columns:
+          - legacy: "company_tin"
+            ors: "company_tin"
+          - legacy: "year_of_assessment"
+            ors: "year_of_assessment"

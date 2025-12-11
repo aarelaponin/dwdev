@@ -1,0 +1,667 @@
+# ==============================================================================
+# Malta L3 Warehouse Model: dim_customs_procedure
+# Step 10c: Reference & Analytical Dimensions
+# ==============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Purpose: Customs procedure classification dimension for fact_customs
+# ==============================================================================
+
+dimension:
+  name: "dim_customs_procedure"
+  schema: "warehouse"
+  display_name: "Customs Procedure Dimension"
+  description: |
+    EU Union Customs Code (UCC) procedure classification dimension.
+    Supports analysis of customs declarations by procedure type (import,
+    export, transit, processing, warehousing).
+    
+    Procedure codes follow the 4-digit format: first 2 digits = requested
+    procedure, last 2 digits = previous procedure. Used in SAD Box 37.
+    
+  scd_type: 1
+  scd_type_description: "Type 1 - Overwrite on change (EU codes change infrequently)"
+  
+  natural_key: ["procedure_code"]
+  surrogate_key: "customs_procedure_key"
+  
+  grain: "One row per customs procedure code"
+  estimated_rows: 60
+  
+  source_system:
+    primary_table: "reference.ref_customs_procedure"
+    
+  refresh_frequency: "Annual (or on UCC updates)"
+  
+  legal_basis: "Union Customs Code (EU) 952/2013"
+  
+  # ============================================================================
+  # COLUMNS
+  # ============================================================================
+  columns:
+    # --------------------------------------------------------------------------
+    # Surrogate Key
+    # --------------------------------------------------------------------------
+    - name: "customs_procedure_key"
+      display_name: "Customs Procedure Key"
+      data_type: "INT"
+      nullable: false
+      description: "Surrogate key for customs procedure dimension"
+      constraints:
+        primary_key: true
+        auto_increment: true
+
+    # --------------------------------------------------------------------------
+    # Procedure Code (Box 37)
+    # --------------------------------------------------------------------------
+    - name: "procedure_code"
+      display_name: "Procedure Code"
+      data_type: "VARCHAR(7)"
+      nullable: false
+      description: "4-digit procedure code (RRPP): requested (2) + previous (2)"
+      constraints:
+        unique: true
+      examples: ["4000", "4071", "1000", "5100", "7100"]
+      
+    - name: "requested_procedure"
+      display_name: "Requested Procedure"
+      data_type: "VARCHAR(2)"
+      nullable: false
+      description: "First 2 digits - the requested customs procedure"
+      examples: ["40", "10", "51", "71"]
+      
+    - name: "previous_procedure"
+      display_name: "Previous Procedure"
+      data_type: "VARCHAR(2)"
+      nullable: false
+      description: "Last 2 digits - the previous procedure (00 if none)"
+      examples: ["00", "71", "51"]
+
+    # --------------------------------------------------------------------------
+    # Names & Descriptions
+    # --------------------------------------------------------------------------
+    - name: "procedure_name"
+      display_name: "Procedure Name"
+      data_type: "VARCHAR(200)"
+      nullable: false
+      description: "Full name of the customs procedure"
+      examples: ["Release for free circulation", "Outright export", "Inward processing"]
+      
+    - name: "procedure_name_mt"
+      display_name: "Procedure Name (Maltese)"
+      data_type: "VARCHAR(200)"
+      nullable: true
+      description: "Procedure name in Maltese"
+      
+    - name: "procedure_description"
+      display_name: "Procedure Description"
+      data_type: "VARCHAR(500)"
+      nullable: true
+      description: "Detailed description of when this procedure is used"
+
+    # --------------------------------------------------------------------------
+    # Classification
+    # --------------------------------------------------------------------------
+    - name: "procedure_category"
+      display_name: "Procedure Category"
+      data_type: "VARCHAR(50)"
+      nullable: false
+      description: "High-level category: IMPORT, EXPORT, TRANSIT, PROCESSING, WAREHOUSE, RE_EXPORT, OTHER"
+      constraints:
+        check: "procedure_category IN ('IMPORT', 'EXPORT', 'TRANSIT', 'PROCESSING', 'WAREHOUSE', 'RE_EXPORT', 'OTHER')"
+      examples: ["IMPORT", "EXPORT", "PROCESSING", "WAREHOUSE"]
+      
+    - name: "procedure_category_name"
+      display_name: "Procedure Category Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Display name for procedure category"
+      examples: ["Import", "Export", "Processing", "Customs Warehouse"]
+      
+    - name: "regime_type"
+      display_name: "Regime Type"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "UCC regime classification"
+      constraints:
+        check: "regime_type IN ('STANDARD', 'SPECIAL', 'TRANSIT', 'FREE_ZONE')"
+      examples: ["STANDARD", "SPECIAL", "TRANSIT"]
+      
+    - name: "flow_direction"
+      display_name: "Flow Direction"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Goods movement direction"
+      constraints:
+        check: "flow_direction IN ('INWARD', 'OUTWARD', 'INTERNAL')"
+      examples: ["INWARD", "OUTWARD", "INTERNAL"]
+
+    # --------------------------------------------------------------------------
+    # Procedure Flags
+    # --------------------------------------------------------------------------
+    - name: "is_import"
+      display_name: "Import Procedure"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether this is an import procedure (goods entering free circulation)"
+      
+    - name: "is_export"
+      display_name: "Export Procedure"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether this is an export procedure (goods leaving EU)"
+      
+    - name: "is_transit"
+      display_name: "Transit Procedure"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether this is a transit procedure (T1/T2)"
+      
+    - name: "is_suspensive"
+      display_name: "Suspensive Procedure"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether duty payment is suspended under this procedure"
+      
+    - name: "is_special_procedure"
+      display_name: "Special Procedure"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this is a special customs procedure (processing, warehousing, etc.)"
+      
+    - name: "is_discharge_procedure"
+      display_name: "Discharge Procedure"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this procedure discharges a previous special procedure"
+
+    # --------------------------------------------------------------------------
+    # Requirements
+    # --------------------------------------------------------------------------
+    - name: "requires_guarantee"
+      display_name: "Requires Guarantee"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether a customs guarantee is required"
+      
+    - name: "requires_authorization"
+      display_name: "Requires Authorization"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether prior authorization from customs is required"
+      
+    - name: "requires_previous_procedure"
+      display_name: "Requires Previous Procedure"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether a previous procedure reference is required"
+      
+    - name: "generates_statistics"
+      display_name: "Generates Statistics"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether this procedure contributes to trade statistics (Intrastat)"
+      
+    - name: "vat_applicable"
+      display_name: "VAT Applicable"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether VAT is applicable on this procedure"
+      
+    - name: "duty_applicable"
+      display_name: "Duty Applicable"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether customs duty is applicable on this procedure"
+
+    # --------------------------------------------------------------------------
+    # Documentation
+    # --------------------------------------------------------------------------
+    - name: "documentation_required"
+      display_name: "Documentation Required"
+      data_type: "VARCHAR(500)"
+      nullable: true
+      description: "List of typical documentation required for this procedure"
+      
+    - name: "legal_reference"
+      display_name: "Legal Reference"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "UCC article reference for this procedure"
+
+    # --------------------------------------------------------------------------
+    # Display
+    # --------------------------------------------------------------------------
+    - name: "sort_order"
+      display_name: "Sort Order"
+      data_type: "INT"
+      nullable: false
+      description: "Display sort order"
+      
+    - name: "is_active"
+      display_name: "Active Flag"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether procedure code is currently valid"
+
+    # --------------------------------------------------------------------------
+    # ETL Metadata
+    # --------------------------------------------------------------------------
+    - name: "etl_batch_id"
+      display_name: "ETL Batch ID"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for audit trail"
+      
+    - name: "etl_load_timestamp"
+      display_name: "ETL Load Timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when record was loaded"
+
+  # ============================================================================
+  # INDEXES
+  # ============================================================================
+  indexes:
+    - name: "pk_dim_customs_procedure"
+      columns: ["customs_procedure_key"]
+      primary: true
+      
+    - name: "uk_dim_customs_procedure_code"
+      columns: ["procedure_code"]
+      unique: true
+      
+    - name: "idx_dim_customs_category"
+      columns: ["procedure_category"]
+      description: "Support queries by procedure category"
+      
+    - name: "idx_dim_customs_requested"
+      columns: ["requested_procedure"]
+      description: "Support queries by requested procedure"
+      
+    - name: "idx_dim_customs_suspensive"
+      columns: ["is_suspensive"]
+      description: "Support suspensive procedure analysis"
+
+  # ============================================================================
+  # REFERENCE DATA
+  # ============================================================================
+  reference_data:
+    # -------------------------------------------------------------------------
+    # IMPORT PROCEDURES (40xx)
+    # -------------------------------------------------------------------------
+    - code: "4000"
+      name: "Release for free circulation (no previous)"
+      name_mt: "Rilaxx għaċ-ċirkolazzjoni libera"
+      category: "IMPORT"
+      regime: "STANDARD"
+      direction: "INWARD"
+      import: true
+      export: false
+      transit: false
+      suspensive: false
+      requires_guarantee: false
+      requires_authorization: false
+      documentation: "Invoice, transport docs, origin cert (if applicable)"
+      legal_reference: "UCC Art. 201"
+      sort_order: 100
+      
+    - code: "4051"
+      name: "Release after inward processing"
+      name_mt: "Rilaxx wara pproċessar intern"
+      category: "IMPORT"
+      regime: "STANDARD"
+      direction: "INWARD"
+      import: true
+      export: false
+      transit: false
+      suspensive: false
+      requires_previous: true
+      requires_guarantee: false
+      requires_authorization: false
+      discharge_procedure: true
+      documentation: "IPR authorization, discharge bill"
+      legal_reference: "UCC Art. 256"
+      sort_order: 110
+      
+    - code: "4053"
+      name: "Release after temporary admission"
+      name_mt: "Rilaxx wara ammissjoni temporanja"
+      category: "IMPORT"
+      regime: "STANDARD"
+      direction: "INWARD"
+      import: true
+      export: false
+      transit: false
+      suspensive: false
+      requires_previous: true
+      requires_guarantee: false
+      requires_authorization: false
+      discharge_procedure: true
+      documentation: "TA authorization"
+      legal_reference: "UCC Art. 250"
+      sort_order: 120
+      
+    - code: "4071"
+      name: "Release from customs warehousing"
+      name_mt: "Rilaxx mill-maħżen doganali"
+      category: "IMPORT"
+      regime: "STANDARD"
+      direction: "INWARD"
+      import: true
+      export: false
+      transit: false
+      suspensive: false
+      requires_previous: true
+      requires_guarantee: false
+      requires_authorization: false
+      discharge_procedure: true
+      documentation: "CW authorization, warehouse records"
+      legal_reference: "UCC Art. 240"
+      sort_order: 130
+      
+    - code: "4200"
+      name: "Simultaneous release and home use"
+      name_mt: "Rilaxx u użu domestiku simultanju"
+      category: "IMPORT"
+      regime: "STANDARD"
+      direction: "INWARD"
+      import: true
+      export: false
+      transit: false
+      suspensive: false
+      documentation: "Standard import docs"
+      legal_reference: "UCC Art. 201"
+      sort_order: 140
+      
+    - code: "4400"
+      name: "Release with duty exemption"
+      name_mt: "Rilaxx b'eżenzjoni minn dazju"
+      category: "IMPORT"
+      regime: "STANDARD"
+      direction: "INWARD"
+      import: true
+      export: false
+      transit: false
+      suspensive: false
+      duty_applicable: false
+      documentation: "Exemption certificate"
+      legal_reference: "Council Regulation 1186/2009"
+      sort_order: 150
+
+    # -------------------------------------------------------------------------
+    # INWARD PROCESSING (51xx)
+    # -------------------------------------------------------------------------
+    - code: "5100"
+      name: "Inward processing"
+      name_mt: "Ipproċessar Intern"
+      category: "PROCESSING"
+      regime: "SPECIAL"
+      direction: "INWARD"
+      import: false
+      export: false
+      transit: false
+      suspensive: true
+      special_procedure: true
+      requires_guarantee: true
+      requires_authorization: true
+      documentation: "IPR authorization"
+      legal_reference: "UCC Art. 256"
+      sort_order: 200
+      
+    - code: "5111"
+      name: "Inward processing after transit"
+      name_mt: "Ipproċessar intern wara tranżitu"
+      category: "PROCESSING"
+      regime: "SPECIAL"
+      direction: "INWARD"
+      import: false
+      export: false
+      transit: false
+      suspensive: true
+      special_procedure: true
+      requires_previous: true
+      requires_guarantee: true
+      requires_authorization: true
+      documentation: "IPR + T1 document"
+      legal_reference: "UCC Art. 256"
+      sort_order: 210
+
+    # -------------------------------------------------------------------------
+    # TEMPORARY ADMISSION (53xx)
+    # -------------------------------------------------------------------------
+    - code: "5300"
+      name: "Temporary admission"
+      name_mt: "Ammissjoni Temporanja"
+      category: "PROCESSING"
+      regime: "SPECIAL"
+      direction: "INWARD"
+      import: false
+      export: false
+      transit: false
+      suspensive: true
+      special_procedure: true
+      requires_guarantee: true
+      requires_authorization: true
+      documentation: "ATA carnet or TA authorization"
+      legal_reference: "UCC Art. 250"
+      sort_order: 300
+
+    # -------------------------------------------------------------------------
+    # RE-IMPORT (61xx)
+    # -------------------------------------------------------------------------
+    - code: "6100"
+      name: "Re-importation unchanged state"
+      name_mt: "Ri-importazzjoni stat mhux mibdul"
+      category: "IMPORT"
+      regime: "STANDARD"
+      direction: "INWARD"
+      import: true
+      export: false
+      transit: false
+      suspensive: false
+      requires_previous: true
+      duty_applicable: false
+      documentation: "Proof of prior export"
+      legal_reference: "UCC Art. 203"
+      sort_order: 400
+      
+    - code: "6110"
+      name: "Re-import after outward processing"
+      name_mt: "Ri-importazzjoni wara pproċessar estern"
+      category: "IMPORT"
+      regime: "STANDARD"
+      direction: "INWARD"
+      import: true
+      export: false
+      transit: false
+      suspensive: false
+      requires_previous: true
+      discharge_procedure: true
+      documentation: "OPR authorization"
+      legal_reference: "UCC Art. 259"
+      sort_order: 410
+
+    # -------------------------------------------------------------------------
+    # CUSTOMS WAREHOUSING (71xx)
+    # -------------------------------------------------------------------------
+    - code: "7100"
+      name: "Customs warehousing"
+      name_mt: "Maħżen Doganali"
+      category: "WAREHOUSE"
+      regime: "SPECIAL"
+      direction: "INWARD"
+      import: false
+      export: false
+      transit: false
+      suspensive: true
+      special_procedure: true
+      requires_guarantee: true
+      requires_authorization: true
+      generates_statistics: false
+      documentation: "CW authorization"
+      legal_reference: "UCC Art. 240"
+      sort_order: 500
+      
+    - code: "7110"
+      name: "Customs warehousing after transit"
+      name_mt: "Maħżen doganali wara tranżitu"
+      category: "WAREHOUSE"
+      regime: "SPECIAL"
+      direction: "INWARD"
+      import: false
+      export: false
+      transit: false
+      suspensive: true
+      special_procedure: true
+      requires_previous: true
+      requires_guarantee: true
+      requires_authorization: true
+      generates_statistics: false
+      documentation: "CW auth + T1 document"
+      legal_reference: "UCC Art. 240"
+      sort_order: 510
+
+    # -------------------------------------------------------------------------
+    # EXPORT PROCEDURES (10xx)
+    # -------------------------------------------------------------------------
+    - code: "1000"
+      name: "Permanent export"
+      name_mt: "Esportazzjoni Permanenti"
+      category: "EXPORT"
+      regime: "STANDARD"
+      direction: "OUTWARD"
+      import: false
+      export: true
+      transit: false
+      suspensive: false
+      duty_applicable: false
+      vat_applicable: false
+      documentation: "Export invoice, transport docs"
+      legal_reference: "UCC Art. 269"
+      sort_order: 600
+      
+    - code: "1040"
+      name: "Export after free circulation"
+      name_mt: "Esportazzjoni wara ċirkolazzjoni libera"
+      category: "EXPORT"
+      regime: "STANDARD"
+      direction: "OUTWARD"
+      import: false
+      export: true
+      transit: false
+      suspensive: false
+      requires_previous: true
+      duty_applicable: false
+      documentation: "Proof of EU status"
+      legal_reference: "UCC Art. 269"
+      sort_order: 610
+      
+    - code: "1100"
+      name: "Export for outward processing"
+      name_mt: "Esportazzjoni għall pproċessar estern"
+      category: "PROCESSING"
+      regime: "SPECIAL"
+      direction: "OUTWARD"
+      import: false
+      export: true
+      transit: false
+      suspensive: true
+      special_procedure: true
+      requires_authorization: true
+      duty_applicable: false
+      documentation: "OPR authorization"
+      legal_reference: "UCC Art. 259"
+      sort_order: 620
+
+    # -------------------------------------------------------------------------
+    # RE-EXPORT (31xx)
+    # -------------------------------------------------------------------------
+    - code: "3100"
+      name: "Re-export"
+      name_mt: "Ri-esportazzjoni"
+      category: "RE_EXPORT"
+      regime: "STANDARD"
+      direction: "OUTWARD"
+      import: false
+      export: true
+      transit: false
+      suspensive: false
+      requires_previous: true
+      duty_applicable: false
+      documentation: "Proof of entry"
+      legal_reference: "UCC Art. 270"
+      sort_order: 700
+      
+    - code: "3151"
+      name: "Re-export after inward processing"
+      name_mt: "Ri-esportazzjoni wara pproċessar intern"
+      category: "RE_EXPORT"
+      regime: "STANDARD"
+      direction: "OUTWARD"
+      import: false
+      export: true
+      transit: false
+      suspensive: false
+      requires_previous: true
+      discharge_procedure: true
+      duty_applicable: false
+      documentation: "IPR authorization, compensating products"
+      legal_reference: "UCC Art. 256"
+      sort_order: 710
+      
+    - code: "3171"
+      name: "Re-export from customs warehouse"
+      name_mt: "Ri-esportazzjoni mill-maħżen doganali"
+      category: "RE_EXPORT"
+      regime: "STANDARD"
+      direction: "OUTWARD"
+      import: false
+      export: true
+      transit: false
+      suspensive: false
+      requires_previous: true
+      discharge_procedure: true
+      duty_applicable: false
+      documentation: "CW authorization, warehouse records"
+      legal_reference: "UCC Art. 270"
+      sort_order: 720
+
+  # ============================================================================
+  # USAGE NOTES
+  # ============================================================================
+  usage_notes:
+    fact_tables:
+      - fact_customs: "Primary dimension for customs declaration analysis"
+      
+    common_queries:
+      - name: "Import vs Export Volume"
+        pattern: "GROUP BY procedure_category WHERE is_import OR is_export"
+        
+      - name: "Suspensive Procedure Analysis"
+        pattern: "WHERE is_suspensive = true GROUP BY procedure_name"
+        
+      - name: "Special Procedure Authorization Tracking"
+        pattern: "WHERE is_special_procedure = true GROUP BY requires_authorization"
+        
+    analysis_patterns:
+      - name: "Trade Balance"
+        description: "Compare import (40xx) vs export (10xx) procedures"
+        
+      - name: "Processing Trade"
+        description: "Track inward (51xx) and outward (11xx) processing volumes"
+        
+      - name: "Warehouse Utilization"
+        description: "Monitor goods entering (71xx) and leaving (4071) warehouses"
+
+# ==============================================================================
+# END OF SPECIFICATION
+# ==============================================================================

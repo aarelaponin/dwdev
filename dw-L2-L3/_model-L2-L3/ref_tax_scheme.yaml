@@ -1,0 +1,1297 @@
+# =============================================================================
+# TA-RDM L2 - Reference Tax Scheme Table
+# =============================================================================
+# File: ref_tax_scheme.yaml
+# Purpose: Define tax registration schemes per country with thresholds and rules
+# Pattern: Tax Scheme Pattern (Pattern 5 from Generalization Catalog)
+# Version: 1.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L2 Generalization Process
+# =============================================================================
+#
+# This reference table supports flexible tax scheme architecture enabling:
+# - Country-specific registration schemes without schema changes
+# - Runtime threshold validation and eligibility determination
+# - Temporal validity for scheme introduction and retirement
+# - Self-documenting compliance requirements (filing, recovery, invoicing)
+#
+# Design Principles:
+# - Each scheme is unique globally via scheme_code
+# - country_code + tax_type_code enables efficient filtering
+# - One default scheme per country/tax type combination
+# - Temporal validity tracks scheme lifecycle (effective_from/to)
+# - Retired schemes link to replacement schemes for migration
+#
+# =============================================================================
+
+metadata:
+  table_name: ref_tax_scheme
+  schema: reference
+  version: "1.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L2 Generalization"
+  description: |
+    Master reference table defining tax registration schemes across all countries.
+    A tax scheme represents a specific registration category with its own rules for
+    thresholds, filing frequency, input tax recovery, and invoicing requirements.
+    
+    Examples of scheme types:
+    - Malta VAT Article 10 (Standard registration with full input recovery)
+    - Malta VAT Article 11 (Small undertakings exemption, no input recovery)
+    - Malta VAT Article 12 (Intra-community acquisitions only)
+    - Sri Lanka Standard VAT (LKR 80M threshold, monthly filing)
+    - Sri Lanka SVAT (Simplified VAT - abolished October 2025)
+    
+    Key design principles:
+    - scheme_code is globally unique for unambiguous reference
+    - country_code + tax_type_code enables efficient lookups
+    - Thresholds use country-specific currencies with period definitions
+    - Filing requirements are fully configurable per scheme
+    - Temporal validity supports scheme introduction and retirement
+
+# -----------------------------------------------------------------------------
+# TABLE DEFINITION
+# -----------------------------------------------------------------------------
+table:
+  name: ref_tax_scheme
+  schema: reference
+  type: reference
+  
+  description: |
+    Tax scheme definitions with country-specific rules. Each scheme defines:
+    - Eligibility criteria (registration thresholds, party types, activities)
+    - Compliance requirements (filing frequency, return/payment due dates)
+    - Tax recovery rules (input tax percentage, partial exemption method)
+    - Invoicing requirements (tax invoice mandate, simplified invoice threshold)
+    - Reporting obligations (Intrastat, EC Sales List, OSS eligibility)
+    - Temporal validity (effective dates, retirement, replacement)
+  
+  business_rules:
+    - "Each country/tax_type combination must have exactly one is_default = TRUE scheme"
+    - "Threshold currency should match country's official currency or EUR for EU members"
+    - "exit_threshold must be less than or equal to registration_threshold when both specified"
+    - "Retired schemes (effective_to set) should specify replacement_scheme_code when applicable"
+    - "input_recovery_percentage must be between 0 and 100 inclusive"
+    - "Filing frequency determines period alignment: MONTHLY=calendar months, QUARTERLY=calendar quarters"
+  
+  columns:
+    # -------------------------------------------------------------------------
+    # Primary Key
+    # -------------------------------------------------------------------------
+    - name: tax_scheme_id
+      type: integer
+      constraints:
+        primary_key: true
+        auto_increment: true
+      description: "Surrogate primary key for foreign key references"
+    
+    # -------------------------------------------------------------------------
+    # Natural Key / Unique Identifier
+    # -------------------------------------------------------------------------
+    - name: scheme_code
+      type: varchar(30)
+      constraints:
+        not_null: true
+        unique: true
+      description: |
+        Globally unique scheme identifier following pattern:
+        {COUNTRY}_{TAX_TYPE}_{SCHEME}
+        Examples: MLT_VAT_ART10, LKA_VAT_STD, MDA_VAT_STD
+      validation:
+        pattern: "^[A-Z]{3}_[A-Z]{2,10}_[A-Z0-9_]{2,15}$"
+    
+    # -------------------------------------------------------------------------
+    # Classification Keys
+    # -------------------------------------------------------------------------
+    - name: country_code
+      type: char(3)
+      constraints:
+        not_null: true
+      description: "ISO 3166-1 alpha-3 country code"
+      reference_data: ref_country
+    
+    - name: tax_type_code
+      type: varchar(20)
+      constraints:
+        not_null: true
+      description: |
+        Tax type this scheme applies to:
+        VAT, CIT, PIT, WHT, SSC, EXCISE, CUSTOMS, etc.
+      reference_data: ref_tax_type
+    
+    # -------------------------------------------------------------------------
+    # Display Names
+    # -------------------------------------------------------------------------
+    - name: scheme_name
+      type: varchar(200)
+      constraints:
+        not_null: true
+      description: "Human-readable name in English for UI display and reports"
+    
+    - name: scheme_name_local
+      type: varchar(200)
+      description: |
+        Name in local language using UTF-8 encoding.
+        Examples: "Artikolu 10 - Reġistrazzjoni Standard tal-VAT" (Maltese)
+    
+    - name: scheme_description
+      type: text
+      description: |
+        Detailed description of the scheme including purpose, eligibility,
+        and key characteristics. Used for documentation and tooltips.
+    
+    # -------------------------------------------------------------------------
+    # Legal Reference
+    # -------------------------------------------------------------------------
+    - name: legal_reference
+      type: varchar(200)
+      description: |
+        Legislation reference: act, article, section.
+        Examples: "VAT Act Cap. 406, Article 10", "Tax Code Title III"
+    
+    - name: legal_reference_url
+      type: varchar(500)
+      description: |
+        URL to official legislation text.
+        Should link to government or official legal database.
+    
+    # -------------------------------------------------------------------------
+    # Scheme Classification
+    # -------------------------------------------------------------------------
+    - name: is_default
+      type: boolean
+      default: false
+      constraints:
+        not_null: true
+      description: |
+        TRUE if this is the default scheme for new registrations of this
+        tax type in this country. Only one scheme per country/tax_type
+        combination should have is_default = TRUE and is_active = TRUE.
+    
+    - name: is_voluntary
+      type: boolean
+      default: false
+      constraints:
+        not_null: true
+      description: |
+        TRUE if taxpayer can voluntarily elect this scheme even when
+        not mandatory (e.g., below threshold but wanting input recovery).
+    
+    - name: is_mandatory
+      type: boolean
+      default: false
+      constraints:
+        not_null: true
+      description: |
+        TRUE if registration is mandatory when eligibility criteria are met.
+        Typically TRUE when registration_threshold is exceeded.
+    
+    # -------------------------------------------------------------------------
+    # Eligibility Criteria
+    # -------------------------------------------------------------------------
+    - name: eligible_party_types
+      type: varchar(100)
+      default: "'ALL'"
+      description: |
+        Party types eligible for this scheme:
+        - ALL: Any party type
+        - INDIVIDUAL: Natural persons only
+        - ENTERPRISE: Legal entities only
+        - Comma-separated list: "INDIVIDUAL,ENTERPRISE"
+    
+    - name: eligible_activities
+      type: text
+      description: |
+        NACE codes or activity descriptions eligible for this scheme.
+        NULL means all activities are eligible.
+        Format: JSON array or comma-separated codes.
+        Example: '["47.11","47.19"]' or "47.11,47.19,47.2*"
+    
+    - name: excluded_activities
+      type: text
+      description: |
+        NACE codes or activities explicitly excluded from this scheme
+        even if otherwise eligible. Takes precedence over eligible_activities.
+        Example: Financial services for VAT schemes.
+    
+    # -------------------------------------------------------------------------
+    # Registration Thresholds
+    # -------------------------------------------------------------------------
+    - name: registration_threshold
+      type: decimal(19,2)
+      description: |
+        Minimum turnover for mandatory registration. NULL means no minimum
+        threshold (registration based on other criteria or always required).
+    
+    - name: registration_threshold_currency
+      type: char(3)
+      default: "'EUR'"
+      description: |
+        ISO 4217 currency code for threshold amounts.
+        Should match country's official currency.
+    
+    - name: registration_threshold_period
+      type: varchar(20)
+      default: "'ANNUAL'"
+      description: |
+        Period over which threshold is measured:
+        ANNUAL, QUARTERLY, MONTHLY, ROLLING_12M
+    
+    - name: entry_threshold
+      type: decimal(19,2)
+      description: |
+        Turnover above which taxpayer must enter this scheme.
+        Often equals registration_threshold but can differ for transition rules.
+    
+    - name: exit_threshold
+      type: decimal(19,2)
+      description: |
+        Turnover below which taxpayer may exit this scheme.
+        Typically lower than registration_threshold to prevent churn
+        at boundary (hysteresis band).
+    
+    - name: exit_threshold_consecutive_periods
+      type: integer
+      default: 1
+      description: |
+        Number of consecutive periods below exit_threshold required
+        before taxpayer can deregister. Prevents premature exit.
+    
+    # -------------------------------------------------------------------------
+    # Filing Requirements
+    # -------------------------------------------------------------------------
+    - name: filing_frequency_code
+      type: varchar(20)
+      constraints:
+        not_null: true
+      description: |
+        How often returns must be filed:
+        MONTHLY, QUARTERLY, SEMI_ANNUAL, ANNUAL, ON_DEMAND
+      validation:
+        allowed_values: ["MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "ON_DEMAND"]
+    
+    - name: return_due_day
+      type: integer
+      description: |
+        Day of month when return is due. NULL means end of month.
+        Example: 15 means return due on 15th of due month.
+      validation:
+        range: [1, 31]
+    
+    - name: return_due_months_after
+      type: integer
+      default: 1
+      description: |
+        Number of months after period end when return is due.
+        Example: 1 means return for Q1 (Jan-Mar) is due in April.
+    
+    - name: payment_due_day
+      type: integer
+      description: |
+        Day of month when payment is due. NULL means end of month.
+        Can differ from return_due_day.
+      validation:
+        range: [1, 31]
+    
+    - name: payment_due_months_after
+      type: integer
+      default: 1
+      description: |
+        Number of months after period end when payment is due.
+        Often equals return_due_months_after but can differ.
+    
+    # -------------------------------------------------------------------------
+    # Tax Recovery Rules
+    # -------------------------------------------------------------------------
+    - name: allows_input_recovery
+      type: boolean
+      default: true
+      constraints:
+        not_null: true
+      description: |
+        TRUE if input tax can be recovered under this scheme.
+        FALSE for exempt schemes like Malta VAT Article 11.
+    
+    - name: input_recovery_percentage
+      type: decimal(5,2)
+      default: 100.00
+      description: |
+        Percentage of input tax recoverable (0.00 to 100.00).
+        100.00 = full recovery, 0.00 = no recovery.
+        Intermediate values for partial exemption schemes.
+      validation:
+        range: [0.00, 100.00]
+    
+    - name: partial_exemption_method
+      type: varchar(50)
+      description: |
+        Method for calculating recoverable input tax when making
+        both taxable and exempt supplies:
+        PRO_RATA: Based on turnover ratio
+        DIRECT_ALLOCATION: Direct attribution to outputs
+        SPECIAL: Country-specific special method
+        COMBINED: Pro rata with direct allocation for specific items
+        NULL: Not applicable (100% taxable or 100% exempt)
+    
+    # -------------------------------------------------------------------------
+    # Invoicing Requirements
+    # -------------------------------------------------------------------------
+    - name: requires_tax_invoices
+      type: boolean
+      default: true
+      constraints:
+        not_null: true
+      description: |
+        TRUE if registrant must issue tax invoices (invoices showing VAT).
+        FALSE for exempt schemes where invoices must not show VAT.
+    
+    - name: simplified_invoice_threshold
+      type: decimal(19,2)
+      description: |
+        Transaction value below which simplified invoices are permitted
+        instead of full tax invoices. NULL means no simplified invoices.
+    
+    - name: simplified_invoice_currency
+      type: char(3)
+      default: "'EUR'"
+      description: "Currency for simplified_invoice_threshold"
+    
+    # -------------------------------------------------------------------------
+    # EU-Specific Reporting Requirements
+    # -------------------------------------------------------------------------
+    - name: requires_intrastat
+      type: boolean
+      default: false
+      description: |
+        TRUE if subject to Intrastat reporting for EU trade statistics.
+        Applies to EU member states with threshold-based obligations.
+    
+    - name: requires_recapitulative
+      type: boolean
+      default: false
+      description: |
+        TRUE if subject to EC Sales List (recapitulative statement)
+        for intra-EU supplies of goods and services.
+    
+    - name: requires_oss
+      type: boolean
+      default: false
+      description: |
+        TRUE if eligible for One-Stop Shop for B2C e-commerce.
+        Applies to EU member states under OSS/IOSS regimes.
+    
+    # -------------------------------------------------------------------------
+    # Temporal Validity
+    # -------------------------------------------------------------------------
+    - name: effective_from
+      type: date
+      constraints:
+        not_null: true
+      description: |
+        Date from which this scheme is/was effective.
+        New schemes can have future effective_from for planning.
+    
+    - name: effective_to
+      type: date
+      description: |
+        Date on which this scheme was/will be retired.
+        NULL means currently active with no planned retirement.
+    
+    - name: replacement_scheme_code
+      type: varchar(30)
+      description: |
+        If this scheme is retired, the scheme_code of its replacement.
+        Used for migration guidance when scheme is abolished.
+        Must reference existing scheme_code.
+    
+    # -------------------------------------------------------------------------
+    # Status and Display
+    # -------------------------------------------------------------------------
+    - name: is_active
+      type: boolean
+      default: true
+      constraints:
+        not_null: true
+      description: |
+        Administrative active flag. FALSE to soft-delete or suspend.
+        Different from temporal validity (effective_from/to).
+    
+    - name: display_order
+      type: integer
+      default: 100
+      description: |
+        Sort order for UI display within country/tax_type.
+        Lower numbers appear first. Default scheme typically has lowest value.
+    
+    - name: notes
+      type: text
+      description: |
+        Additional notes, implementation guidance, or historical context.
+        Not shown in UI but useful for administrators and documentation.
+
+  # ---------------------------------------------------------------------------
+  # INDEXES
+  # ---------------------------------------------------------------------------
+  indexes:
+    - name: idx_tax_scheme_country_type
+      columns: [country_code, tax_type_code]
+      description: "Primary lookup: schemes for a country and tax type"
+    
+    - name: idx_tax_scheme_default
+      columns: [country_code, tax_type_code, is_default]
+      where: "is_default = TRUE AND is_active = TRUE"
+      description: "Find default scheme for country/tax_type (filtered index)"
+    
+    - name: idx_tax_scheme_active
+      columns: [country_code, tax_type_code, effective_from]
+      where: "is_active = TRUE AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)"
+      description: "Currently effective schemes (filtered index)"
+    
+    - name: idx_tax_scheme_replacement
+      columns: [replacement_scheme_code]
+      where: "replacement_scheme_code IS NOT NULL"
+      description: "Find schemes being replaced (for migration queries)"
+
+  # ---------------------------------------------------------------------------
+  # CONSTRAINTS
+  # ---------------------------------------------------------------------------
+  constraints:
+    - name: chk_tax_scheme_dates
+      type: check
+      condition: "effective_to IS NULL OR effective_to >= effective_from"
+      description: "Effective end date must not precede start date"
+    
+    - name: chk_tax_scheme_thresholds
+      type: check
+      condition: "exit_threshold IS NULL OR registration_threshold IS NULL OR exit_threshold <= registration_threshold"
+      description: "Exit threshold must not exceed registration threshold (hysteresis band)"
+    
+    - name: chk_tax_scheme_recovery
+      type: check
+      condition: "input_recovery_percentage >= 0 AND input_recovery_percentage <= 100"
+      description: "Input recovery percentage must be between 0 and 100"
+    
+    - name: chk_filing_frequency
+      type: check
+      condition: "filing_frequency_code IN ('MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL', 'ON_DEMAND')"
+      description: "Filing frequency must be a valid enumerated value"
+    
+    - name: chk_tax_scheme_due_day
+      type: check
+      condition: "(return_due_day IS NULL OR (return_due_day >= 1 AND return_due_day <= 31)) AND (payment_due_day IS NULL OR (payment_due_day >= 1 AND payment_due_day <= 31))"
+      description: "Due days must be valid day of month"
+    
+    - name: chk_tax_scheme_recovery_consistency
+      type: check
+      condition: "allows_input_recovery = TRUE OR input_recovery_percentage = 0"
+      description: "If input recovery not allowed, percentage must be 0"
+
+  # ---------------------------------------------------------------------------
+  # BUSINESS RULES
+  # ---------------------------------------------------------------------------
+  business_rules:
+    - rule_id: BR_TS_001
+      description: "Only one default scheme per country/tax_type combination when active"
+      severity: ERROR
+      validation_query: |
+        SELECT country_code, tax_type_code, COUNT(*) as default_count
+        FROM reference.ref_tax_scheme
+        WHERE is_default = TRUE 
+          AND is_active = TRUE
+          AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+        GROUP BY country_code, tax_type_code
+        HAVING COUNT(*) > 1
+    
+    - rule_id: BR_TS_002
+      description: "Replacement scheme must exist and be for same country/tax_type"
+      severity: ERROR
+      validation_query: |
+        SELECT ts.scheme_code, ts.replacement_scheme_code
+        FROM reference.ref_tax_scheme ts
+        WHERE ts.replacement_scheme_code IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM reference.ref_tax_scheme r
+            WHERE r.scheme_code = ts.replacement_scheme_code
+              AND r.country_code = ts.country_code
+              AND r.tax_type_code = ts.tax_type_code
+          )
+    
+    - rule_id: BR_TS_003
+      description: "Each country/tax_type should have at least one default scheme"
+      severity: WARNING
+      validation_query: |
+        SELECT DISTINCT country_code, tax_type_code
+        FROM reference.ref_tax_scheme ts1
+        WHERE is_active = TRUE
+          AND NOT EXISTS (
+            SELECT 1 FROM reference.ref_tax_scheme ts2
+            WHERE ts2.country_code = ts1.country_code
+              AND ts2.tax_type_code = ts1.tax_type_code
+              AND ts2.is_default = TRUE
+              AND ts2.is_active = TRUE
+          )
+    
+    - rule_id: BR_TS_004
+      description: "Mandatory scheme should have registration_threshold or always apply"
+      severity: WARNING
+      validation_query: |
+        SELECT scheme_code, scheme_name
+        FROM reference.ref_tax_scheme
+        WHERE is_mandatory = TRUE
+          AND registration_threshold IS NULL
+          AND entry_threshold IS NULL
+          AND is_active = TRUE
+
+# -----------------------------------------------------------------------------
+# SAMPLE DATA
+# -----------------------------------------------------------------------------
+sample_data:
+  # ===========================================================================
+  # MALTA (MLT) - VAT Schemes
+  # ===========================================================================
+  # Malta VAT Article 10 - Standard Registration
+  - scheme_code: "MLT_VAT_ART10"
+    country_code: "MLT"
+    tax_type_code: "VAT"
+    scheme_name: "Article 10 - Standard VAT Registration"
+    scheme_name_local: "Artikolu 10 - Reġistrazzjoni Standard tal-VAT"
+    scheme_description: |
+      Standard VAT registration for taxable persons exceeding the registration
+      threshold or voluntarily registering. Full input tax recovery allowed.
+      Quarterly filing required with detailed VAT returns.
+      
+      Applicable to all taxable supplies of goods and services in Malta,
+      intra-EU acquisitions, and imports. Subject to standard 18% rate
+      with reduced rates (7%, 5%) for specific categories.
+    legal_reference: "VAT Act Cap. 406, Article 10"
+    legal_reference_url: "https://legislation.mt/eli/cap/406/eng"
+    is_default: true
+    is_voluntary: true
+    is_mandatory: true
+    eligible_party_types: "ALL"
+    registration_threshold: 20000.00
+    registration_threshold_currency: "EUR"
+    registration_threshold_period: "ANNUAL"
+    entry_threshold: 20000.00
+    exit_threshold: 14000.00
+    exit_threshold_consecutive_periods: 2
+    filing_frequency_code: "QUARTERLY"
+    return_due_day: 15
+    return_due_months_after: 1
+    payment_due_day: 15
+    payment_due_months_after: 1
+    allows_input_recovery: true
+    input_recovery_percentage: 100.00
+    requires_tax_invoices: true
+    simplified_invoice_threshold: 100.00
+    simplified_invoice_currency: "EUR"
+    requires_intrastat: true
+    requires_recapitulative: true
+    requires_oss: true
+    effective_from: "2004-05-01"
+    is_active: true
+    display_order: 10
+    notes: |
+      Introduced with Malta's EU accession. Threshold aligned with EU SME
+      exemption provisions. Entry/exit threshold differential prevents
+      registration churn at boundary.
+  
+  # Malta VAT Article 11 - Small Undertakings Exemption
+  - scheme_code: "MLT_VAT_ART11"
+    country_code: "MLT"
+    tax_type_code: "VAT"
+    scheme_name: "Article 11 - Small Undertakings Exemption"
+    scheme_name_local: "Artikolu 11 - Eżenzjoni għal Intrapriżi Żgħar"
+    scheme_description: |
+      Exemption for small undertakings with turnover below the registration
+      threshold. No VAT charged on supplies, no input tax recovery.
+      
+      Must monitor turnover and register under Article 10 when threshold
+      is exceeded. Annual declaration required for monitoring purposes.
+      Cannot issue tax invoices showing VAT.
+    legal_reference: "VAT Act Cap. 406, Article 11"
+    legal_reference_url: "https://legislation.mt/eli/cap/406/eng"
+    is_default: false
+    is_voluntary: true
+    is_mandatory: false
+    eligible_party_types: "ALL"
+    registration_threshold: null
+    entry_threshold: 20000.00
+    exit_threshold: 14000.00
+    filing_frequency_code: "ANNUAL"
+    return_due_day: 15
+    return_due_months_after: 3
+    payment_due_day: null
+    payment_due_months_after: null
+    allows_input_recovery: false
+    input_recovery_percentage: 0.00
+    requires_tax_invoices: false
+    requires_intrastat: false
+    requires_recapitulative: false
+    requires_oss: false
+    effective_from: "2004-05-01"
+    is_active: true
+    display_order: 20
+    notes: |
+      EU SME exemption scheme. Voluntary registration under Art 10 available
+      if input recovery desired (e.g., high capital investment). Annual
+      monitoring return due by 15 March following calendar year.
+  
+  # Malta VAT Article 12 - Intra-Community Acquisitions Only
+  - scheme_code: "MLT_VAT_ART12"
+    country_code: "MLT"
+    tax_type_code: "VAT"
+    scheme_name: "Article 12 - Intra-Community Acquisitions"
+    scheme_name_local: "Artikolu 12 - Akkwisti Intra-Komunitarji"
+    scheme_description: |
+      Registration for persons making intra-Community acquisitions
+      exceeding EUR 10,000 per calendar year, or voluntarily electing
+      to be taxed on acquisitions.
+      
+      Applies to non-taxable legal persons (government, exempt entities)
+      and to taxable persons below Article 10 threshold who exceed
+      the acquisition threshold.
+    legal_reference: "VAT Act Cap. 406, Article 12"
+    legal_reference_url: "https://legislation.mt/eli/cap/406/eng"
+    is_default: false
+    is_voluntary: true
+    is_mandatory: true
+    eligible_party_types: "ALL"
+    registration_threshold: 10000.00
+    registration_threshold_currency: "EUR"
+    registration_threshold_period: "ANNUAL"
+    entry_threshold: 10000.00
+    exit_threshold: null
+    filing_frequency_code: "QUARTERLY"
+    return_due_day: 15
+    return_due_months_after: 1
+    payment_due_day: 15
+    payment_due_months_after: 1
+    allows_input_recovery: true
+    input_recovery_percentage: 100.00
+    requires_tax_invoices: true
+    requires_intrastat: true
+    requires_recapitulative: true
+    requires_oss: false
+    effective_from: "2004-05-01"
+    is_active: true
+    display_order: 30
+    notes: |
+      EU intra-community acquisition threshold. Lower threshold than
+      Article 10 reflects policy to capture cross-border B2B transactions.
+      Recovery limited to acquisition VAT only.
+  
+  # Malta VAT - Exempt Without Credit
+  - scheme_code: "MLT_VAT_EXEMPT"
+    country_code: "MLT"
+    tax_type_code: "VAT"
+    scheme_name: "Exempt Without Credit Registration"
+    scheme_name_local: "Reġistrazzjoni Eżenti Mingħajr Kreditu"
+    scheme_description: |
+      Registration for persons making only exempt supplies without
+      right to deduct (e.g., financial services, insurance, medical).
+      
+      Required for exempt suppliers exceeding threshold or making
+      intra-EU acquisitions. No input recovery on general overhead.
+    legal_reference: "VAT Act Cap. 406, Fifth Schedule"
+    legal_reference_url: "https://legislation.mt/eli/cap/406/eng"
+    is_default: false
+    is_voluntary: false
+    is_mandatory: true
+    eligible_party_types: "ALL"
+    eligible_activities: "64,65,66,86"
+    registration_threshold: 20000.00
+    registration_threshold_currency: "EUR"
+    registration_threshold_period: "ANNUAL"
+    filing_frequency_code: "ANNUAL"
+    return_due_day: 15
+    return_due_months_after: 3
+    allows_input_recovery: false
+    input_recovery_percentage: 0.00
+    partial_exemption_method: null
+    requires_tax_invoices: false
+    requires_intrastat: false
+    requires_recapitulative: false
+    requires_oss: false
+    effective_from: "2004-05-01"
+    is_active: true
+    display_order: 40
+    notes: |
+      NACE codes 64 (Financial), 65 (Insurance), 66 (Auxiliary financial),
+      86 (Human health). Partial exemption applies if mixed supplies.
+  
+  # ===========================================================================
+  # SRI LANKA (LKA) - VAT Schemes
+  # ===========================================================================
+  # Sri Lanka Standard VAT
+  - scheme_code: "LKA_VAT_STD"
+    country_code: "LKA"
+    tax_type_code: "VAT"
+    scheme_name: "Standard VAT Registration"
+    scheme_description: |
+      Standard VAT registration for persons with taxable supplies
+      exceeding LKR 80 million per annum or LKR 20 million per quarter.
+      
+      Full input tax recovery for taxable supplies. Monthly returns
+      required with payment by 20th of following month.
+    legal_reference: "Value Added Tax Act No. 14 of 2002"
+    legal_reference_url: "https://www.ird.gov.lk"
+    is_default: true
+    is_voluntary: true
+    is_mandatory: true
+    eligible_party_types: "ALL"
+    registration_threshold: 80000000.00
+    registration_threshold_currency: "LKR"
+    registration_threshold_period: "ANNUAL"
+    entry_threshold: 80000000.00
+    exit_threshold: 60000000.00
+    exit_threshold_consecutive_periods: 2
+    filing_frequency_code: "MONTHLY"
+    return_due_day: null
+    return_due_months_after: 1
+    payment_due_day: 20
+    payment_due_months_after: 1
+    allows_input_recovery: true
+    input_recovery_percentage: 100.00
+    requires_tax_invoices: true
+    simplified_invoice_threshold: 25000.00
+    simplified_invoice_currency: "LKR"
+    requires_intrastat: false
+    requires_recapitulative: false
+    requires_oss: false
+    effective_from: "2024-01-01"
+    is_active: true
+    display_order: 10
+    notes: |
+      Threshold increased from LKR 75M to LKR 80M effective 2024.
+      Return due end of month, payment by 20th. NBT abolished 2019.
+  
+  # Sri Lanka SVAT (Simplified VAT) - Abolished
+  - scheme_code: "LKA_SVAT"
+    country_code: "LKA"
+    tax_type_code: "VAT"
+    scheme_name: "Simplified VAT (SVAT)"
+    scheme_description: |
+      Simplified VAT scheme allowing registered suppliers to defer
+      VAT payment until goods are sold to end consumer.
+      
+      Being abolished effective October 2025 per Amendment Act No. 4
+      of 2025. Existing registrants must transition to Standard VAT.
+    legal_reference: "Value Added Tax Act, Section 25C"
+    legal_reference_url: "https://www.ird.gov.lk"
+    is_default: false
+    is_voluntary: true
+    is_mandatory: false
+    eligible_party_types: "ENTERPRISE"
+    registration_threshold: null
+    filing_frequency_code: "MONTHLY"
+    return_due_day: null
+    return_due_months_after: 1
+    payment_due_day: 20
+    payment_due_months_after: 1
+    allows_input_recovery: false
+    input_recovery_percentage: 0.00
+    requires_tax_invoices: false
+    effective_from: "2016-01-01"
+    effective_to: "2025-09-30"
+    replacement_scheme_code: "LKA_VAT_STD"
+    is_active: false
+    display_order: 20
+    notes: |
+      SVAT scheme abolished per Amendment Act No. 4 of 2025 effective
+      1 October 2025. All SVAT registrants must migrate to Standard VAT.
+      Grace period for existing certificates until end of certificate period.
+  
+  # Sri Lanka Tourism VAT
+  - scheme_code: "LKA_VAT_TOUR"
+    country_code: "LKA"
+    tax_type_code: "VAT"
+    scheme_name: "Tourism Sector VAT Registration"
+    scheme_description: |
+      Special VAT registration for tourism sector with preferential
+      treatment. Applies to hotels, tour operators, and related services.
+      
+      Subject to standard registration threshold but eligible for
+      specific input recovery on capital goods and tourism infrastructure.
+    legal_reference: "Value Added Tax Act, Tourism Sector Provisions"
+    legal_reference_url: "https://www.ird.gov.lk"
+    is_default: false
+    is_voluntary: false
+    is_mandatory: true
+    eligible_party_types: "ENTERPRISE"
+    eligible_activities: "55,79"
+    registration_threshold: 80000000.00
+    registration_threshold_currency: "LKR"
+    registration_threshold_period: "ANNUAL"
+    filing_frequency_code: "MONTHLY"
+    return_due_day: null
+    return_due_months_after: 1
+    payment_due_day: 20
+    payment_due_months_after: 1
+    allows_input_recovery: true
+    input_recovery_percentage: 100.00
+    requires_tax_invoices: true
+    effective_from: "2018-01-01"
+    is_active: true
+    display_order: 15
+    notes: |
+      NACE 55 (Accommodation), 79 (Travel agencies/tour operators).
+      Special capital goods treatment for hotel construction/renovation.
+  
+  # ===========================================================================
+  # MOLDOVA (MDA) - VAT Schemes
+  # ===========================================================================
+  # Moldova Standard VAT
+  - scheme_code: "MDA_VAT_STD"
+    country_code: "MDA"
+    tax_type_code: "VAT"
+    scheme_name: "Standard VAT Registration"
+    scheme_name_local: "Înregistrare standard TVA"
+    scheme_description: |
+      Standard VAT registration for taxable persons with turnover
+      exceeding MDL 1.2 million per annum.
+      
+      Monthly returns required. Standard rate 20% with reduced rates
+      (8%) for specific categories.
+    legal_reference: "Tax Code, Title III"
+    legal_reference_url: "https://www.fisc.md"
+    is_default: true
+    is_voluntary: true
+    is_mandatory: true
+    eligible_party_types: "ALL"
+    registration_threshold: 1200000.00
+    registration_threshold_currency: "MDL"
+    registration_threshold_period: "ANNUAL"
+    entry_threshold: 1200000.00
+    exit_threshold: 1000000.00
+    exit_threshold_consecutive_periods: 2
+    filing_frequency_code: "MONTHLY"
+    return_due_day: 25
+    return_due_months_after: 1
+    payment_due_day: 25
+    payment_due_months_after: 1
+    allows_input_recovery: true
+    input_recovery_percentage: 100.00
+    requires_tax_invoices: true
+    simplified_invoice_threshold: 1000.00
+    simplified_invoice_currency: "MDL"
+    requires_intrastat: false
+    requires_recapitulative: false
+    requires_oss: false
+    effective_from: "2020-01-01"
+    is_active: true
+    display_order: 10
+    notes: |
+      Threshold stable since 2020. AA+ agreement with EU does not include
+      VAT harmonization. e-Invoice mandate phased in from 2024.
+  
+  # Moldova Agricultural VAT
+  - scheme_code: "MDA_VAT_AGRI"
+    country_code: "MDA"
+    tax_type_code: "VAT"
+    scheme_name: "Agricultural Flat-Rate Scheme"
+    scheme_name_local: "Schema forfetară pentru agricultură"
+    scheme_description: |
+      Simplified flat-rate scheme for agricultural producers.
+      Fixed percentage deemed input recovery without detailed tracking.
+      
+      Available to primary agricultural producers meeting specific
+      criteria for agricultural activity share.
+    legal_reference: "Tax Code, Title III, Chapter 3"
+    legal_reference_url: "https://www.fisc.md"
+    is_default: false
+    is_voluntary: true
+    is_mandatory: false
+    eligible_party_types: "ALL"
+    eligible_activities: "01,02,03"
+    registration_threshold: 600000.00
+    registration_threshold_currency: "MDL"
+    registration_threshold_period: "ANNUAL"
+    filing_frequency_code: "SEMI_ANNUAL"
+    return_due_day: 25
+    return_due_months_after: 1
+    payment_due_day: 25
+    payment_due_months_after: 1
+    allows_input_recovery: true
+    input_recovery_percentage: 8.00
+    partial_exemption_method: "SPECIAL"
+    requires_tax_invoices: true
+    effective_from: "2015-01-01"
+    is_active: true
+    display_order: 20
+    notes: |
+      NACE 01 (Crop/animal), 02 (Forestry), 03 (Fishing). 8% flat-rate
+      input recovery replaces actual input tracking. Semi-annual
+      filing eases compliance burden for small farmers.
+  
+  # ===========================================================================
+  # LEBANON (LBN) - VAT Schemes
+  # ===========================================================================
+  # Lebanon Standard VAT
+  - scheme_code: "LBN_VAT_STD"
+    country_code: "LBN"
+    tax_type_code: "VAT"
+    scheme_name: "Standard VAT Registration"
+    scheme_name_local: "التسجيل القياسي في ضريبة القيمة المضافة"
+    scheme_description: |
+      Standard VAT registration for persons with taxable supplies
+      exceeding LBP 100 million per annum.
+      
+      Quarterly returns with standard 11% rate. Full input recovery
+      for taxable supplies.
+    legal_reference: "VAT Law No. 379/2001"
+    legal_reference_url: "https://www.finance.gov.lb"
+    is_default: true
+    is_voluntary: true
+    is_mandatory: true
+    eligible_party_types: "ALL"
+    registration_threshold: 100000000.00
+    registration_threshold_currency: "LBP"
+    registration_threshold_period: "ANNUAL"
+    entry_threshold: 100000000.00
+    exit_threshold: 75000000.00
+    exit_threshold_consecutive_periods: 2
+    filing_frequency_code: "QUARTERLY"
+    return_due_day: 20
+    return_due_months_after: 1
+    payment_due_day: 20
+    payment_due_months_after: 1
+    allows_input_recovery: true
+    input_recovery_percentage: 100.00
+    requires_tax_invoices: true
+    simplified_invoice_threshold: 500000.00
+    simplified_invoice_currency: "LBP"
+    requires_intrastat: false
+    requires_recapitulative: false
+    requires_oss: false
+    effective_from: "2002-02-01"
+    is_active: true
+    display_order: 10
+    notes: |
+      VAT introduced 2002 at 10%, increased to 11% in 2017. Threshold
+      in LBP subject to significant currency devaluation effects.
+      Electronic filing available through MOF portal.
+  
+  # Lebanon Small Enterprise Exemption
+  - scheme_code: "LBN_VAT_SMALL"
+    country_code: "LBN"
+    tax_type_code: "VAT"
+    scheme_name: "Small Enterprise Exemption"
+    scheme_name_local: "إعفاء المنشآت الصغيرة"
+    scheme_description: |
+      Exemption for small enterprises with turnover below registration
+      threshold. No VAT charged, no input recovery.
+      
+      Must monitor turnover and register when threshold exceeded.
+      Annual declaration for monitoring purposes.
+    legal_reference: "VAT Law No. 379/2001, Article 4"
+    legal_reference_url: "https://www.finance.gov.lb"
+    is_default: false
+    is_voluntary: true
+    is_mandatory: false
+    eligible_party_types: "ALL"
+    registration_threshold: null
+    entry_threshold: 100000000.00
+    exit_threshold: 75000000.00
+    filing_frequency_code: "ANNUAL"
+    return_due_day: 31
+    return_due_months_after: 3
+    allows_input_recovery: false
+    input_recovery_percentage: 0.00
+    requires_tax_invoices: false
+    effective_from: "2002-02-01"
+    is_active: true
+    display_order: 20
+    notes: |
+      Voluntary registration available for input recovery. Annual
+      declaration due by 31 March. Currency instability affects
+      real threshold value significantly.
+  
+  # ===========================================================================
+  # UKRAINE (UKR) - VAT Schemes (Additional Coverage)
+  # ===========================================================================
+  # Ukraine Standard VAT
+  - scheme_code: "UKR_VAT_STD"
+    country_code: "UKR"
+    tax_type_code: "VAT"
+    scheme_name: "Standard VAT Registration"
+    scheme_name_local: "Стандартна реєстрація ПДВ"
+    scheme_description: |
+      Standard VAT registration for taxable persons with turnover
+      exceeding UAH 1 million per annum.
+      
+      Monthly returns required. Standard rate 20% with 7% for certain
+      goods. Full input recovery for taxable supplies.
+    legal_reference: "Tax Code of Ukraine, Section V"
+    legal_reference_url: "https://tax.gov.ua"
+    is_default: true
+    is_voluntary: true
+    is_mandatory: true
+    eligible_party_types: "ALL"
+    registration_threshold: 1000000.00
+    registration_threshold_currency: "UAH"
+    registration_threshold_period: "ANNUAL"
+    entry_threshold: 1000000.00
+    exit_threshold: 800000.00
+    exit_threshold_consecutive_periods: 2
+    filing_frequency_code: "MONTHLY"
+    return_due_day: 20
+    return_due_months_after: 1
+    payment_due_day: 30
+    payment_due_months_after: 1
+    allows_input_recovery: true
+    input_recovery_percentage: 100.00
+    requires_tax_invoices: true
+    simplified_invoice_threshold: 500.00
+    simplified_invoice_currency: "UAH"
+    requires_intrastat: false
+    requires_recapitulative: false
+    requires_oss: false
+    effective_from: "2011-01-01"
+    is_active: true
+    display_order: 10
+    notes: |
+      Mandatory e-invoicing (electronic VAT invoice) since 2017.
+      Special regime considerations during martial law period.
+
+# -----------------------------------------------------------------------------
+# DATA QUALITY RULES
+# -----------------------------------------------------------------------------
+data_quality_rules:
+  - rule_id: "DQ_TS_001"
+    rule_name: "One Default Scheme Per Country/Tax Type"
+    rule_type: "uniqueness"
+    severity: "error"
+    condition: |
+      Each country_code + tax_type_code combination should have exactly
+      one record where is_default = TRUE AND is_active = TRUE
+    validation_query: |
+      SELECT country_code, tax_type_code, COUNT(*) as default_count
+      FROM reference.ref_tax_scheme
+      WHERE is_default = TRUE
+        AND is_active = TRUE
+        AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+      GROUP BY country_code, tax_type_code
+      HAVING COUNT(*) != 1
+  
+  - rule_id: "DQ_TS_002"
+    rule_name: "Valid Filing Frequency"
+    rule_type: "domain"
+    severity: "error"
+    condition: "filing_frequency_code must be a valid enumerated value"
+    validation_query: |
+      SELECT scheme_code, filing_frequency_code
+      FROM reference.ref_tax_scheme
+      WHERE filing_frequency_code NOT IN 
+        ('MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL', 'ON_DEMAND')
+  
+  - rule_id: "DQ_TS_003"
+    rule_name: "Threshold Currency Matches Country"
+    rule_type: "consistency"
+    severity: "warning"
+    condition: |
+      registration_threshold_currency should match expected currency
+      for country (EUR for Eurozone, local currency otherwise)
+    validation_query: |
+      -- Manual review recommended; automated validation requires currency reference
+      SELECT scheme_code, country_code, registration_threshold_currency
+      FROM reference.ref_tax_scheme
+      WHERE registration_threshold_currency IS NOT NULL
+        AND country_code NOT IN (
+          -- Eurozone countries
+          'MLT', 'DEU', 'FRA', 'ITA', 'ESP', 'NLD', 'BEL', 'AUT', 'IRL',
+          'PRT', 'FIN', 'GRC', 'SVK', 'SVN', 'EST', 'LVA', 'LTU', 'CYP', 'LUX'
+        )
+        AND registration_threshold_currency = 'EUR'
+  
+  - rule_id: "DQ_TS_004"
+    rule_name: "Recovery Consistency"
+    rule_type: "consistency"
+    severity: "error"
+    condition: |
+      If allows_input_recovery = FALSE then input_recovery_percentage
+      must be 0.00
+    validation_query: |
+      SELECT scheme_code, allows_input_recovery, input_recovery_percentage
+      FROM reference.ref_tax_scheme
+      WHERE allows_input_recovery = FALSE
+        AND input_recovery_percentage != 0
+  
+  - rule_id: "DQ_TS_005"
+    rule_name: "Replacement Scheme Validity"
+    rule_type: "referential"
+    severity: "error"
+    condition: |
+      replacement_scheme_code must reference an existing scheme_code
+      for the same country and tax type
+    validation_query: |
+      SELECT ts.scheme_code, ts.replacement_scheme_code
+      FROM reference.ref_tax_scheme ts
+      WHERE ts.replacement_scheme_code IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM reference.ref_tax_scheme r
+          WHERE r.scheme_code = ts.replacement_scheme_code
+            AND r.country_code = ts.country_code
+            AND r.tax_type_code = ts.tax_type_code
+        )
+  
+  - rule_id: "DQ_TS_006"
+    rule_name: "Temporal Validity Logic"
+    rule_type: "consistency"
+    severity: "error"
+    condition: "effective_to must be >= effective_from when both specified"
+    validation_query: |
+      SELECT scheme_code, effective_from, effective_to
+      FROM reference.ref_tax_scheme
+      WHERE effective_to IS NOT NULL
+        AND effective_to < effective_from
+
+# -----------------------------------------------------------------------------
+# VIEWS
+# -----------------------------------------------------------------------------
+views:
+  - name: v_active_tax_schemes
+    schema: reference
+    description: "Currently active tax schemes (not expired, is_active = TRUE)"
+    definition: |
+      SELECT 
+        ts.tax_scheme_id,
+        ts.scheme_code,
+        ts.country_code,
+        ts.tax_type_code,
+        ts.scheme_name,
+        ts.scheme_name_local,
+        ts.is_default,
+        ts.is_voluntary,
+        ts.is_mandatory,
+        ts.registration_threshold,
+        ts.registration_threshold_currency,
+        ts.filing_frequency_code,
+        ts.allows_input_recovery,
+        ts.input_recovery_percentage,
+        ts.effective_from,
+        ts.display_order
+      FROM reference.ref_tax_scheme ts
+      WHERE ts.is_active = TRUE
+        AND (ts.effective_to IS NULL OR ts.effective_to >= CURRENT_DATE)
+      ORDER BY ts.country_code, ts.tax_type_code, ts.display_order
+  
+  - name: v_default_tax_schemes
+    schema: reference
+    description: "Default scheme for each country/tax_type combination"
+    definition: |
+      SELECT 
+        ts.scheme_code,
+        ts.country_code,
+        ts.tax_type_code,
+        ts.scheme_name,
+        ts.registration_threshold,
+        ts.registration_threshold_currency,
+        ts.filing_frequency_code
+      FROM reference.ref_tax_scheme ts
+      WHERE ts.is_default = TRUE
+        AND ts.is_active = TRUE
+        AND (ts.effective_to IS NULL OR ts.effective_to >= CURRENT_DATE)
+  
+  - name: v_vat_scheme_summary
+    schema: reference
+    description: "VAT schemes summary for all countries"
+    definition: |
+      SELECT 
+        ts.country_code,
+        ts.scheme_code,
+        ts.scheme_name,
+        ts.registration_threshold,
+        ts.registration_threshold_currency,
+        ts.filing_frequency_code,
+        ts.allows_input_recovery,
+        ts.input_recovery_percentage,
+        CASE 
+          WHEN ts.is_default THEN 'DEFAULT'
+          WHEN ts.is_mandatory THEN 'MANDATORY'
+          WHEN ts.is_voluntary THEN 'VOLUNTARY'
+          ELSE 'OTHER'
+        END as scheme_type,
+        ts.effective_from,
+        ts.effective_to
+      FROM reference.ref_tax_scheme ts
+      WHERE ts.tax_type_code = 'VAT'
+        AND ts.is_active = TRUE
+      ORDER BY ts.country_code, ts.display_order
+
+# -----------------------------------------------------------------------------
+# INTEGRATION POINTS
+# -----------------------------------------------------------------------------
+integration:
+  foreign_key_references:
+    - table: registration.registration
+      column: tax_scheme_id
+      description: "Links registration to applicable tax scheme"
+    
+    - table: registration.vat_registration
+      column: tax_scheme_id
+      description: "Malta/country-specific VAT registration scheme"
+    
+    - table: party.party_registration
+      column: current_scheme_code
+      description: "Current tax scheme for party's registration"
+  
+  lookup_service:
+    endpoint: "/api/v1/reference/tax-scheme"
+    description: |
+      REST endpoint for tax scheme lookup and validation.
+      
+      GET /tax-scheme?country=MLT&tax_type=VAT
+      Returns: List of applicable schemes with thresholds and requirements
+      
+      GET /tax-scheme/{scheme_code}
+      Returns: Full scheme details including filing requirements
+      
+      POST /tax-scheme/determine-eligibility
+      Accepts: {country_code, tax_type_code, turnover, party_type, activity_codes}
+      Returns: {eligible_schemes: [], mandatory_scheme: null|string, recommended_scheme: string}
+  
+  threshold_service:
+    endpoint: "/api/v1/compliance/threshold-check"
+    description: |
+      Service to check if party has exceeded registration threshold
+      
+      POST /threshold-check
+      Accepts: {party_id, country_code, tax_type_code, turnover_period, turnover_amount}
+      Returns: {
+        exceeds_threshold: boolean,
+        applicable_scheme: string,
+        threshold_amount: decimal,
+        headroom: decimal,
+        mandatory_registration: boolean
+      }
+  
+  migration_notes:
+    - note: |
+        Existing Malta ref_vat_scheme table should be migrated to ref_tax_scheme
+        with scheme_code mapping: ART10->MLT_VAT_ART10, ART11->MLT_VAT_ART11,
+        ART12->MLT_VAT_ART12
+    - note: |
+        Registration tables referencing scheme by code should be updated to use
+        tax_scheme_id foreign key for referential integrity
+    - note: |
+        Application logic hardcoding scheme rules (thresholds, filing frequency)
+        should be refactored to use ref_tax_scheme lookups
+
+# -----------------------------------------------------------------------------
+# CHANGE LOG
+# -----------------------------------------------------------------------------
+change_log:
+  - version: "1.0.0"
+    date: "2025-12-10"
+    author: "TA-RDM L2 Generalization"
+    changes:
+      - "Initial table creation"
+      - "Added Malta VAT schemes: ART10, ART11, ART12, EXEMPT"
+      - "Added Sri Lanka VAT schemes: STD, SVAT (retired), TOUR"
+      - "Added Moldova VAT schemes: STD, AGRI"
+      - "Added Lebanon VAT schemes: STD, SMALL"
+      - "Added Ukraine VAT scheme: STD"
+      - "Defined comprehensive filing and recovery rules"
+      - "Created views for active and default scheme lookups"
+      - "Defined data quality rules for consistency validation"

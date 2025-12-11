@@ -1,0 +1,2898 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Payment & Refund Domain
+# =============================================================================
+#
+# This domain manages all payment processing, refund management, payment
+# allocation, installment plans, and banking integration for tax administration.
+#
+# Generated from: SIGTAS schemas (CASHIERING, REFUND, INSTALMENT, BANK__BANK_INTERFACE)
+#                 + tax-capabilities.docx
+#
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    Payment & Refund Domain - Manages the complete lifecycle of payments received
+    from taxpayers and refunds issued to taxpayers, including payment allocation,
+    installment agreements, bank reconciliation, and cash management.
+
+    This domain implements critical cash management functions:
+    - Payment Processing (all channels: bank, portal, POS)
+    - Automated Payment Allocation (based on configurable rules)
+    - Bottom-line Accounting (TTT principle with cross-tax offsetting)
+    - Refund Management (request, review, approval, disbursement)
+    - Installment Plans (payment agreements with monitoring)
+    - Bank Integration (payment import, reconciliation)
+    - Suspended Payments (unidentified taxpayer payments)
+    - Payment Reversal and Correction
+    - Cash Receipt and Voucher Management
+    - Payment Channel Analytics
+
+    Core Payment Principles (per tax-capabilities.docx):
+    - Single Tax Account: All taxes paid into one account per taxpayer
+    - Automated Allocation: Payment allocation rules dictate how payments clear liabilities
+    - Allocation Sequence: Penalties â†’ Interest â†’ Principal tax (configurable)
+    - Incomplete Identification: Suspended until taxpayer identified
+    - Bottom-line Accounting: Automated offsetting across tax types
+    - Real-time Posting: Payments immediately posted to accounting
+    - Allocation Priority: By charge type and tax type per legal provisions
+    - Overpayments: Posted to general credit account for future use
+
+    Refund Processing Flow:
+    1. Refund claim identified (overpayment, export, audit adjustment)
+    2. Claim reviewed (automated or manual control)
+    3. Approval workflow (individual or batch)
+    4. Offsetting check (against outstanding liabilities)
+    5. Refund voucher prepared (for bank transfer)
+    6. Treasury instruction (direct deposit to taxpayer bank)
+    7. Bank confirmation received and reconciled
+    8. Status updated to REFUNDED
+    9. Interest on late refund calculated if applicable
+
+    Installment Plan Management:
+    1. Taxpayer requests payment agreement
+    2. Eligibility check (payment history, debt age)
+    3. Calculation of installments (with interest)
+    4. Agreement approval and signing
+    5. Monitoring of installment payments
+    6. Automatic cancellation on default
+    7. Collection action triggered on cancellation
+
+    Integration Points:
+    - Accounting: Every payment/refund creates accounting transactions
+    - Assessment: Payment allocation targets assessed liabilities
+    - Collection: Payment plans prevent enforcement actions
+    - Registration: Payments linked to tax accounts (TTT)
+    - Banking: Payment import and reconciliation
+    - Treasury: Refund disbursement coordination
+
+    Volume Characteristics:
+    - Very High Volume (10M-100M payments annually)
+    - High throughput during peak periods (filing deadlines)
+    - Real-time processing required
+    - Bank batch imports (hourly/daily)
+    - Critical for cash flow management
+
+    This domain was synthesized from:
+    - SIGTAS schemas: CASHIERING (TAX_TRANSACTION, TAX_SUB_TRANS, PAYMENT_TYPE,
+      PAYMENT_LOC, CHARGE_TYPE, CREDIT_SOURCE_TYPE, TAX_TRANS_TYPE),
+      REFUND (REFUND, REFUND_LINE, REF_VOUCHER, RECORD_APPROVAL, REFUND_TYPE,
+      REFUND_STATUS), INSTALMENT (INSTALMENT, INST_ASSESS, INST_RANGE,
+      INST_CALC_AMT, INSTALL_RATE, TP_INSTALL_RATE, TAX_TYPE_PEN, TAX_TYPE_INT,
+      INST_METHOD), BANK__BANK_INTERFACE (BANK, BANK_INTERFACE, BANK_RECONCILIATION)
+    - Tax capabilities sections: Payments Processing, Refunds Processing,
+      Offsetting Options, Revenue Reconciliations with Treasury, Enforced Collection
+      (Payment Compliance Monitoring, Debt Management - Payment Agreements)
+
+  authors:
+    - "Generated from SIGTAS analysis"
+    - "Moldova SRS collaboration"
+    - "GovStack Initiative"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Payments BB"
+    - "Workflow BB"
+    - "Information Mediator BB"
+    - "Registration BB"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+  changelog:
+    - version: "1.0.0"
+      date: "2025-11-04"
+      author: "Claude"
+      changes:
+        - "Initial payment & refund domain creation"
+        - "22 core tables defined"
+        - "Payment allocation framework"
+        - "Refund management with approval workflow"
+        - "Installment plan support"
+        - "Bank integration and reconciliation"
+        - "Suspended payments handling"
+        - "Payment reversal mechanisms"
+
+# =============================================================================
+# DOMAINS
+# =============================================================================
+
+domains:
+  - name: "payment_refund"
+    code: "PR"
+    display_name: "Payment & Refund"
+    description: |
+      Manages all aspects of payment processing and refund management in tax
+      administration, ensuring accurate cash management, proper allocation of
+      payments, timely refund processing, and effective installment plan management.
+
+      Critical for revenue collection and taxpayer service.
+
+    business_owner: "Revenue Management Department"
+    technical_owner: "Tax Information Systems Team"
+
+    dependencies:
+      - "party_management"
+      - "tax_framework"
+      - "registration"
+      - "filing_assessment"
+      - "accounting"
+
+    tags:
+      - "cash_management"
+      - "payment_processing"
+      - "refund_management"
+      - "banking"
+      - "revenue_collection"
+      - "installment_plans"
+
+    schemas:
+      - schema_name: "payment_refund"
+        description: "Payment processing, refund management, installment plans, and banking"
+
+        tables:
+
+          # ===================================================================
+          # PAYMENT PROCESSING
+          # ===================================================================
+
+          - name: "payment"
+            display_name: "Payment"
+            description: |
+              Records all payments received from taxpayers through any channel.
+              This is the primary table for payment processing and serves as the
+              source for payment allocation to taxpayer accounts and liabilities.
+
+              Each payment record represents a financial transaction where money
+              flows from taxpayer to tax administration. Payments can be received
+              through multiple channels: commercial banks, tax administration payment
+              portals, point-of-sale terminals, mobile payments, direct debits, etc.
+
+              Payment Processing Flow:
+              1. Payment received at payment location (bank, portal, POS)
+              2. Payment record created with identifying information
+              3. Taxpayer identification validated (TIN verification)
+              4. Payment amount and currency validated
+              5. Payment allocated to taxpayer account per allocation rules
+              6. If taxpayer identified: payment allocated to liabilities
+              7. If taxpayer unknown: payment suspended pending identification
+              8. Accounting transactions automatically created
+              9. Taxpayer account balance updated
+              10. Payment confirmation generated for taxpayer
+
+              Payment Allocation Rules (configurable per tax type):
+              - Priority 1: Penalties (enforcement pressure)
+              - Priority 2: Interest (time-sensitive)
+              - Priority 3: Principal tax (main liability)
+              - Priority 4: Surcharges/fees
+
+              Incomplete Identification Handling:
+              - Taxpayer identified but tax type/period unknown â†’ automatic allocation
+              - Taxpayer not identified â†’ suspended payment queue
+              - Identity resolved later â†’ payment allocated retroactively
+
+              SIGTAS Source: CASHIERING.TAX_TRANSACTION (filtered for payment transactions)
+
+              Business Rules:
+              - Payment amount must be positive
+              - Payment date cannot be in future
+              - Payment must link to valid payment type and location
+              - Every payment creates accounting transaction
+              - Payment allocation must be complete (sum = payment amount)
+              - Suspended payments require investigation within 90 days
+              - Payment reversals create offsetting transactions
+              - Bank reconciliation required for all bank payments
+
+              Volume: VERY HIGH (10M-100M records annually)
+
+
+            aspects:
+              - auditable
+              - temporal
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "payment_id"
+                display_name: "Payment ID"
+                type: "bigint"
+                description: "Unique identifier for payment record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "payment_reference_number"
+                display_name: "Payment Reference Number"
+                type: "varchar(50)"
+                description: |
+                  Unique reference number for payment. Could be bank transaction
+                  reference, payment receipt number, or system-generated reference.
+                  Used for reconciliation and taxpayer inquiries.
+                constraints:
+                  not_null: true
+                  unique: true
+                business_name: "Payment Reference"
+                indexing:
+                  - type: "btree"
+                    name: "idx_payment_ref_num"
+
+              - name: "tax_account_id"
+                display_name: "Tax Account"
+                type: "bigint"
+                description: |
+                  Foreign key to tax_account receiving the payment.
+                  NULL if taxpayer not identified (suspended payment).
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "registration.tax_account"
+                    column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Account"
+                indexing:
+                  - type: "btree"
+                    name: "idx_payment_account"
+
+              - name: "party_id"
+                display_name: "Party"
+                type: "bigint"
+                description: |
+                  Foreign key to party making the payment. Usually the taxpayer,
+                  but could be third party (agent, bank, employer for withholding).
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "party_management.party"
+                    column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Payer"
+
+              - name: "payment_type_code"
+                display_name: "Payment Type"
+                type: "varchar(30)"
+                description: |
+                  Type of payment method used:
+                  - BANK_TRANSFER: Electronic bank transfer
+                  - CASH: Cash payment at tax office
+                  - CHECK: Check payment
+                  - CREDIT_CARD: Credit card payment
+                  - DEBIT_CARD: Debit card payment
+                  - DIRECT_DEBIT: Automatic bank debit
+                  - MOBILE_PAYMENT: Mobile payment (e-wallet)
+                  - E_PORTAL: Payment through e-services portal
+                  - WITHHOLDING: Withheld by employer/payer
+                  - OFFSET: Offsetting against credit balance
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "reference_data.ref_payment_type"
+                    column: "payment_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Payment Type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_payment_type"
+
+              - name: "payment_location_code"
+                display_name: "Payment Location"
+                type: "varchar(30)"
+                description: |
+                  Location or channel where payment was received:
+                  - BANK_BRANCH: Commercial bank branch
+                  - TAX_OFFICE: Tax administration office
+                  - E_PORTAL: Online e-services portal
+                  - MOBILE_APP: Mobile application
+                  - POS_TERMINAL: Point-of-sale terminal
+                  - EMPLOYER: Withheld by employer
+                  Used for channel analytics and reconciliation.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "reference_data.ref_payment_location"
+                    column: "payment_location_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Payment Location"
+
+              - name: "payment_date"
+                display_name: "Payment Date"
+                type: "date"
+                description: |
+                  Date when payment was made by taxpayer. This is the effective
+                  date for accounting and interest calculation purposes.
+                constraints:
+                  not_null: true
+                business_name: "Payment Date"
+                indexing:
+                  - type: "btree"
+                    name: "idx_payment_date"
+
+              - name: "received_date"
+                display_name: "Received Date"
+                type: "date"
+                description: |
+                  Date when payment was received and recorded by tax administration.
+                  May differ from payment_date if there's processing delay.
+                constraints:
+                  not_null: true
+                business_name: "Received Date"
+
+              - name: "payment_amount"
+                display_name: "Payment Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Total payment amount in local currency. Must be positive.
+                  This is the gross amount before any allocation.
+                constraints:
+                  not_null: true
+                  check: "payment_amount > 0"
+                business_name: "Amount"
+
+              - name: "currency_code"
+                display_name: "Currency"
+                type: "char(3)"
+                description: |
+                  ISO 4217 currency code. Usually domestic currency, but foreign
+                  currency payments may be accepted and converted.
+                constraints:
+                  not_null: true
+                  default: "'USD'"
+                business_name: "Currency"
+
+              - name: "exchange_rate"
+                display_name: "Exchange Rate"
+                type: "decimal(12,6)"
+                description: |
+                  Exchange rate applied if payment in foreign currency.
+                  NULL if payment in domestic currency.
+                constraints:
+                  not_null: false
+
+              - name: "amount_in_domestic_currency"
+                display_name: "Amount (Domestic Currency)"
+                type: "decimal(19,2)"
+                description: |
+                  Payment amount converted to domestic currency.
+                  Same as payment_amount if already in domestic currency.
+                constraints:
+                  not_null: true
+                  check: "amount_in_domestic_currency > 0"
+
+              - name: "bank_id"
+                display_name: "Bank"
+                type: "bigint"
+                description: |
+                  Foreign key to bank through which payment was received.
+                  NULL for non-bank payments (cash, e-portal, etc.).
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "payment_refund.bank"
+                    column: "bank_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Bank"
+
+              - name: "bank_transaction_reference"
+                display_name: "Bank Transaction Reference"
+                type: "varchar(100)"
+                description: |
+                  Bank's own transaction reference number.
+                  Used for reconciliation with bank statements.
+                constraints:
+                  not_null: false
+
+              - name: "payer_account_number"
+                display_name: "Payer Account Number"
+                type: "varchar(34)"
+                description: |
+                  Bank account number from which payment originated (IBAN format).
+                  Used for verification and audit.
+                constraints:
+                  not_null: false
+                security:
+                  pii: true
+
+              - name: "payment_status_code"
+                display_name: "Payment Status"
+                type: "varchar(30)"
+                description: |
+                  Current status of payment:
+                  - RECEIVED: Payment received but not allocated
+                  - ALLOCATED: Payment allocated to liabilities
+                  - SUSPENDED: Taxpayer not identified
+                  - REVERSED: Payment reversed
+                  - RECONCILED: Reconciled with bank
+                  - CANCELLED: Payment cancelled
+                constraints:
+                  not_null: true
+                  default: "'RECEIVED'"
+                business_name: "Status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_payment_status"
+
+              - name: "is_allocated"
+                display_name: "Is Allocated"
+                type: "boolean"
+                description: |
+                  Flag indicating if payment has been allocated to liabilities.
+                  False for suspended payments awaiting identification.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "allocated_date"
+                display_name: "Allocated Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when payment was allocated"
+                constraints:
+                  not_null: false
+
+              - name: "is_suspended"
+                display_name: "Is Suspended"
+                type: "boolean"
+                description: |
+                  Flag indicating if payment is suspended due to taxpayer
+                  identification issues. Suspended payments held in queue.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "suspended_reason"
+                display_name: "Suspended Reason"
+                type: "varchar(500)"
+                description: |
+                  Reason why payment is suspended:
+                  - TIN not found
+                  - TIN invalid
+                  - Multiple potential matches
+                  - Awaiting taxpayer contact
+                constraints:
+                  not_null: false
+
+              - name: "is_reconciled"
+                display_name: "Is Reconciled"
+                type: "boolean"
+                description: |
+                  Flag indicating if payment has been reconciled with bank statement.
+                  Critical for cash management control.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "reconciliation_date"
+                display_name: "Reconciliation Date"
+                type: "date"
+                description: "Date when payment was reconciled with bank"
+                constraints:
+                  not_null: false
+
+              - name: "receipt_number"
+                display_name: "Receipt Number"
+                type: "varchar(50)"
+                description: |
+                  Official tax receipt number issued to taxpayer.
+                  Printed on receipt and used for inquiries.
+                constraints:
+                  not_null: false
+                  unique: true
+
+              - name: "receipt_issued_date"
+                display_name: "Receipt Issued Date"
+                type: "timestamp with time zone"
+                description: "Date and time when receipt was issued to taxpayer"
+                constraints:
+                  not_null: false
+
+              - name: "payment_notes"
+                display_name: "Payment Notes"
+                type: "text"
+                description: |
+                  Additional notes about payment. Could include:
+                  - Taxpayer's allocation instructions
+                  - Special circumstances
+                  - Investigation notes for suspended payments
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_payment_composite"
+                type: "btree"
+                columns: ["tax_account_id", "payment_date", "payment_status_code"]
+                description: "Composite index for common query patterns"
+
+              - name: "idx_payment_bank"
+                type: "btree"
+                columns: ["bank_id", "payment_date"]
+                description: "For bank reconciliation queries"
+
+              - name: "idx_payment_suspended"
+                type: "btree"
+                columns: ["is_suspended", "received_date"]
+                where: "is_suspended = true"
+                description: "Partial index for suspended payments queue"
+
+              - name: "idx_payment_unallocated"
+                type: "btree"
+                columns: ["is_allocated", "received_date"]
+                where: "is_allocated = false"
+                description: "For monitoring unallocated payments"
+
+            business_rules:
+              - rule_id: "BR-PR-001"
+                name: "Positive payment amount"
+                description: "Payment amount must always be positive"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT payment_id
+                  FROM payment
+                  WHERE payment_amount <= 0 OR amount_in_domestic_currency <= 0
+
+              - rule_id: "BR-PR-002"
+                name: "Allocated flag consistency"
+                description: "If is_allocated = true, then allocated_date must be set"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT payment_id
+                  FROM payment
+                  WHERE is_allocated = true AND allocated_date IS NULL
+
+              - rule_id: "BR-PR-003"
+                name: "Suspended payment reason required"
+                description: "Suspended payments must have reason documented"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT payment_id
+                  FROM payment
+                  WHERE is_suspended = true
+                    AND (suspended_reason IS NULL OR suspended_reason = '')
+
+          # ===================================================================
+          # PAYMENT ALLOCATION
+          # ===================================================================
+
+          - name: "payment_allocation"
+            display_name: "Payment Allocation"
+            description: |
+              Records how payments are allocated to specific tax liabilities and
+              charge types. This table implements the payment allocation rules
+              that determine which liabilities are paid first when a payment is
+              received.
+
+              Payment Allocation Process:
+              1. Payment received and validated
+              2. Outstanding liabilities identified for taxpayer
+              3. Allocation rules applied based on:
+                 - Charge type priority (penalties â†’ interest â†’ principal)
+                 - Tax type priority (per legal provisions)
+                 - Tax period priority (oldest first, usually)
+                 - Due date (overdue before current)
+              4. Payment distributed across liabilities
+              5. Each allocation creates record in this table
+              6. Account balances updated
+              7. Liability statuses updated (closed/partially paid/open)
+
+              Allocation Rules (configurable):
+              - Priority 1: Penalties (highest priority for enforcement)
+              - Priority 2: Interest (time-sensitive)
+              - Priority 3: Principal tax (main liability)
+              - Priority 4: Surcharges and fees
+              - Within each charge type: oldest period first
+              - Cross-tax-type offsetting (bottom-line accounting)
+
+              Incomplete Allocation Scenarios:
+              - Payment < total liability: partial allocation per rules
+              - Payment > total liability: overpayment to credit account
+              - Unidentified tax type: allocation per sequence rules
+
+              SIGTAS Source: TAX_SUB_TRANS showing charge type breakdown
+
+              Volume: VERY HIGH (multiple allocations per payment)
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "payment_allocation_id"
+                display_name: "Payment Allocation ID"
+                type: "bigint"
+                description: "Unique identifier for payment allocation record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "payment_id"
+                display_name: "Payment"
+                type: "bigint"
+                description: "Foreign key to payment being allocated"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "payment_refund.payment"
+                    column: "payment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_alloc_payment"
+
+              - name: "assessment_id"
+                display_name: "Assessment"
+                type: "bigint"
+                description: |
+                  Foreign key to assessment liability being paid.
+                  NULL if allocation to general account credit.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "filing_assessment.assessment"
+                    column: "assessment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_alloc_assessment"
+
+              - name: "charge_type_code"
+                display_name: "Charge Type"
+                type: "varchar(30)"
+                description: |
+                  Type of charge being paid:
+                  - PRINCIPAL_TAX: Main tax liability
+                  - PENALTY: Penalty amount
+                  - INTEREST: Interest charges
+                  - SURCHARGE: Additional surcharges
+                  - FEE: Administrative fees
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "reference_data.ref_charge_type"
+                    column: "charge_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "allocated_amount"
+                display_name: "Allocated Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Amount allocated to this specific charge type and liability.
+                  Sum of all allocations for payment must equal payment amount.
+                constraints:
+                  not_null: true
+                  check: "allocated_amount > 0"
+
+              - name: "allocation_sequence"
+                display_name: "Allocation Sequence"
+                type: "integer"
+                description: |
+                  Order in which this allocation was made (1, 2, 3...).
+                  Used to determine priority when payment insufficient for all.
+                constraints:
+                  not_null: true
+                  check: "allocation_sequence > 0"
+
+              - name: "allocation_date"
+                display_name: "Allocation Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when allocation was performed"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "accounting_transaction_id"
+                display_name: "Accounting Transaction"
+                type: "bigint"
+                description: |
+                  Foreign key to accounting transaction created by this allocation.
+                  Links payment allocation to accounting system.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "accounting.tax_transaction"
+                    column: "transaction_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "is_automatic"
+                display_name: "Is Automatic"
+                type: "boolean"
+                description: |
+                  Flag indicating if allocation was automatic (per rules) or manual.
+                  Most allocations should be automatic.
+                constraints:
+                  not_null: true
+                  default: true
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_alloc_composite"
+                type: "btree"
+                columns: ["payment_id", "allocation_sequence"]
+
+            business_rules:
+              - rule_id: "BR-PR-010"
+                name: "Allocation sum equals payment"
+                description: "Sum of allocations for payment must equal payment amount"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT p.payment_id, p.payment_amount,
+                         COALESCE(SUM(pa.allocated_amount), 0) AS total_allocated
+                  FROM payment p
+                  LEFT JOIN payment_allocation pa ON p.payment_id = pa.payment_id
+                  WHERE p.is_allocated = true
+                  GROUP BY p.payment_id, p.payment_amount
+                  HAVING p.payment_amount <> COALESCE(SUM(pa.allocated_amount), 0)
+
+          # ===================================================================
+          # REFUND MANAGEMENT
+          # ===================================================================
+
+          - name: "refund"
+            display_name: "Refund"
+            description: |
+              Records tax refunds due to taxpayers. Refunds arise from various
+              situations: overpayments, export VAT refunds, audit adjustments,
+              penalty waivers, or erroneous assessments.
+
+              Refund Processing Workflow:
+              1. Refund claim identified or filed by taxpayer
+              2. Initial validation (eligibility, amount calculation)
+              3. Review and verification (compliance check)
+              4. Risk assessment (fraud detection)
+              5. Approval workflow (automatic or manual based on amount/risk)
+              6. Offsetting check (against other liabilities)
+              7. Net refund amount calculated
+              8. Refund voucher prepared
+              9. Treasury instruction sent (bank transfer details)
+              10. Bank confirmation received
+              11. Refund status updated to REFUNDED
+              12. Interest on late refund calculated if applicable
+
+              Refund Types:
+              - OVERPAYMENT: Excess payment by taxpayer
+              - EXPORT_VAT: VAT refund for exporters
+              - AUDIT_ADJUSTMENT: Adjustment from audit findings
+              - AMENDED_RETURN: Correction on amended filing
+              - PENALTY_WAIVER: Waived penalty amount
+              - ERRONEOUS_ASSESSMENT: Incorrect assessment corrected
+              - WITHHOLDING_EXCESS: Excess withholding tax
+
+              Offsetting Rules:
+              - Refund amount may be offset against outstanding liabilities
+              - Offsetting can be within same tax type or across tax types
+              - Offsetting requires legal authorization
+              - Net refund = gross refund - offsets
+
+              Refund Approval Thresholds (configurable):
+              - < $1,000: Automatic approval
+              - $1,000 - $10,000: Supervisor approval
+              - $10,000 - $100,000: Manager approval
+              - > $100,000: Director approval + audit
+
+              SIGTAS Source: REFUND.REFUND
+
+              Business Rules:
+              - Refund must be positive amount
+              - Must link to valid tax account
+              - Approval required before disbursement
+              - Offsetting against liabilities mandatory if liabilities exist
+              - Bank account verification required
+              - Interest on late refund per regulations
+              - Refund voucher required for accounting
+              - Treasury confirmation required before closing
+
+              Volume: HIGH (1M-10M refunds annually, varies by tax type)
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "refund_id"
+                display_name: "Refund ID"
+                type: "bigint"
+                description: "Unique identifier for refund record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "refund_number"
+                display_name: "Refund Number"
+                type: "varchar(50)"
+                description: |
+                  Unique refund number for tracking and taxpayer reference.
+                  Format: RFD-YYYY-NNNNNN
+                constraints:
+                  not_null: true
+                  unique: true
+                business_name: "Refund Number"
+                indexing:
+                  - type: "btree"
+                    name: "idx_refund_number"
+
+              - name: "tax_account_id"
+                display_name: "Tax Account"
+                type: "bigint"
+                description: "Foreign key to tax account receiving refund"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "registration.tax_account"
+                    column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Account"
+                indexing:
+                  - type: "btree"
+                    name: "idx_refund_account"
+
+              - name: "party_id"
+                display_name: "Party"
+                type: "bigint"
+                description: "Foreign key to party (taxpayer) receiving refund"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "party_management.party"
+                    column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Taxpayer"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period"
+                type: "bigint"
+                description: |
+                  Foreign key to tax period for which refund is claimed.
+                  NULL for refunds not tied to specific period.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "tax_framework.tax_period"
+                    column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "refund_type_code"
+                display_name: "Refund Type"
+                type: "varchar(30)"
+                description: |
+                  Type of refund:
+                  - OVERPAYMENT: Excess payment
+                  - EXPORT_VAT: Export VAT refund
+                  - AUDIT_ADJUSTMENT: From audit
+                  - AMENDED_RETURN: Amended filing
+                  - PENALTY_WAIVER: Waived penalty
+                  - ERRONEOUS_ASSESSMENT: Correction
+                  - WITHHOLDING_EXCESS: Excess withholding
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "reference_data.ref_refund_type"
+                    column: "refund_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Refund Type"
+
+              - name: "refund_status_code"
+                display_name: "Refund Status"
+                type: "varchar(30)"
+                description: |
+                  Current workflow status:
+                  - CLAIMED: Claim received/identified
+                  - UNDER_REVIEW: Being reviewed
+                  - PENDING_APPROVAL: Awaiting approval
+                  - APPROVED: Approved for refund
+                  - OFFSET_APPLIED: Offset against liabilities
+                  - VOUCHER_PREPARED: Refund voucher created
+                  - SENT_TO_TREASURY: Instruction sent
+                  - REFUNDED: Money transferred to taxpayer
+                  - REJECTED: Claim rejected
+                  - CANCELLED: Refund cancelled
+                constraints:
+                  not_null: true
+                  default: "'CLAIMED'"
+                business_name: "Status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_refund_status"
+
+              - name: "claim_date"
+                display_name: "Claim Date"
+                type: "date"
+                description: |
+                  Date when refund claim was filed by taxpayer or identified
+                  by system (for overpayments).
+                constraints:
+                  not_null: true
+                business_name: "Claim Date"
+
+              - name: "gross_refund_amount"
+                display_name: "Gross Refund Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Gross refund amount before any offsetting.
+                  This is the total amount taxpayer is entitled to.
+                constraints:
+                  not_null: true
+                  check: "gross_refund_amount > 0"
+                business_name: "Gross Amount"
+
+              - name: "offset_amount"
+                display_name: "Offset Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Amount offset against outstanding liabilities.
+                  Zero if no offsetting performed.
+                constraints:
+                  not_null: true
+                  default: 0
+                  check: "offset_amount >= 0"
+                business_name: "Offset"
+
+              - name: "net_refund_amount"
+                display_name: "Net Refund Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Net amount to be refunded to taxpayer.
+                  Formula: gross_refund_amount - offset_amount
+                constraints:
+                  not_null: true
+                  check: "net_refund_amount >= 0"
+                business_name: "Net Amount"
+
+              - name: "interest_amount"
+                display_name: "Interest Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Interest on late refund per regulations.
+                  Calculated from due date to refund date.
+                constraints:
+                  not_null: true
+                  default: 0
+                  check: "interest_amount >= 0"
+                business_name: "Interest"
+
+              - name: "total_refund_amount"
+                display_name: "Total Refund Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Total amount including interest.
+                  Formula: net_refund_amount + interest_amount
+                constraints:
+                  not_null: true
+                  check: "total_refund_amount >= 0"
+                business_name: "Total"
+
+              - name: "earliest_refund_date"
+                display_name: "Earliest Refund Date"
+                type: "date"
+                description: |
+                  Earliest date refund can be made per regulations.
+                  Often X days after claim date (e.g., 30 days for exporters).
+                constraints:
+                  not_null: false
+
+              - name: "review_assigned_to"
+                display_name: "Review Assigned To"
+                type: "varchar(100)"
+                description: "User ID of reviewer assigned to review claim"
+                constraints:
+                  not_null: false
+
+              - name: "review_start_date"
+                display_name: "Review Start Date"
+                type: "date"
+                description: "Date when review commenced"
+                constraints:
+                  not_null: false
+
+              - name: "review_completed_date"
+                display_name: "Review Completed Date"
+                type: "date"
+                description: "Date when review was completed"
+                constraints:
+                  not_null: false
+
+              - name: "approval_required"
+                display_name: "Approval Required"
+                type: "boolean"
+                description: |
+                  Flag indicating if manual approval required.
+                  Based on amount threshold and risk score.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "approved_by"
+                display_name: "Approved By"
+                type: "varchar(100)"
+                description: "User ID of approver who approved refund"
+                constraints:
+                  not_null: false
+
+              - name: "approval_date"
+                display_name: "Approval Date"
+                type: "date"
+                description: "Date when refund was approved"
+                constraints:
+                  not_null: false
+
+              - name: "rejection_reason"
+                display_name: "Rejection Reason"
+                type: "varchar(500)"
+                description: "Reason for rejection if status = REJECTED"
+                constraints:
+                  not_null: false
+
+              - name: "refund_voucher_id"
+                display_name: "Refund Voucher"
+                type: "bigint"
+                description: |
+                  Foreign key to refund voucher (payment instruction).
+                  NULL until voucher prepared.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "payment_refund.refund_voucher"
+                    column: "refund_voucher_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "treasury_instruction_date"
+                display_name: "Treasury Instruction Date"
+                type: "date"
+                description: "Date when instruction sent to treasury for payment"
+                constraints:
+                  not_null: false
+
+              - name: "refund_date"
+                display_name: "Refund Date"
+                type: "date"
+                description: |
+                  Actual date when refund was transferred to taxpayer.
+                  Confirmed by bank/treasury.
+                constraints:
+                  not_null: false
+                business_name: "Refund Date"
+
+              - name: "bank_confirmation_received"
+                display_name: "Bank Confirmation Received"
+                type: "boolean"
+                description: "Flag indicating if bank confirmation received"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "bank_confirmation_date"
+                display_name: "Bank Confirmation Date"
+                type: "date"
+                description: "Date when bank confirmed refund transfer"
+                constraints:
+                  not_null: false
+
+              - name: "refund_bank_account"
+                display_name: "Refund Bank Account"
+                type: "varchar(34)"
+                description: |
+                  Taxpayer's bank account for refund (IBAN format).
+                  Verified before refund processed.
+                constraints:
+                  not_null: false
+                security:
+                  pii: true
+                  encryption: "AES-256"
+
+              - name: "refund_notes"
+                display_name: "Refund Notes"
+                type: "text"
+                description: "Additional notes about refund processing"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_refund_composite"
+                type: "btree"
+                columns: ["tax_account_id", "refund_status_code", "claim_date"]
+
+              - name: "idx_refund_pending"
+                type: "btree"
+                columns: ["refund_status_code", "claim_date"]
+                where: "refund_status_code IN ('CLAIMED', 'UNDER_REVIEW', 'PENDING_APPROVAL')"
+                description: "For refund workload queue"
+
+            business_rules:
+              - rule_id: "BR-PR-020"
+                name: "Net refund calculation"
+                description: "Net refund must equal gross minus offset"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT refund_id
+                  FROM refund
+                  WHERE net_refund_amount <> (gross_refund_amount - offset_amount)
+
+              - rule_id: "BR-PR-021"
+                name: "Approval required for large refunds"
+                description: "Refunds > threshold require approval before processing"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT refund_id
+                  FROM refund
+                  WHERE total_refund_amount > 10000
+                    AND refund_status_code = 'APPROVED'
+                    AND (approved_by IS NULL OR approval_date IS NULL)
+
+          - name: "refund_line"
+            display_name: "Refund Line"
+            description: |
+              Details the breakdown of refund amounts by charge type and tax period.
+              A single refund may consist of multiple line items representing
+              different components (principal tax, penalties, interest) and
+              different tax periods.
+
+              SIGTAS Source: REFUND.REFUND_LINE
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "refund_line_id"
+                display_name: "Refund Line ID"
+                type: "bigint"
+                description: "Unique identifier for refund line"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "refund_id"
+                display_name: "Refund"
+                type: "bigint"
+                description: "Foreign key to parent refund"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "payment_refund.refund"
+                    column: "refund_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_refund_line_refund"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period"
+                type: "bigint"
+                description: "Foreign key to tax period for this line item"
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "tax_framework.tax_period"
+                    column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "charge_type_code"
+                display_name: "Charge Type"
+                type: "varchar(30)"
+                description: |
+                  Charge type for this refund component:
+                  - PRINCIPAL_TAX
+                  - PENALTY
+                  - INTEREST
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "reference_data.ref_charge_type"
+                    column: "charge_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "line_amount"
+                display_name: "Line Amount"
+                type: "decimal(19,2)"
+                description: "Refund amount for this specific charge type and period"
+                constraints:
+                  not_null: true
+                  check: "line_amount > 0"
+
+              - name: "original_assessment_id"
+                display_name: "Original Assessment"
+                type: "bigint"
+                description: |
+                  Foreign key to original assessment that is being refunded.
+                  Links refund to source transaction.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "filing_assessment.assessment"
+                    column: "assessment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            business_rules:
+              - rule_id: "BR-PR-025"
+                name: "Refund line sum equals total"
+                description: "Sum of refund lines must equal gross refund amount"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT r.refund_id, r.gross_refund_amount,
+                         COALESCE(SUM(rl.line_amount), 0) AS line_total
+                  FROM refund r
+                  LEFT JOIN refund_line rl ON r.refund_id = rl.refund_id
+                  GROUP BY r.refund_id, r.gross_refund_amount
+                  HAVING r.gross_refund_amount <> COALESCE(SUM(rl.line_amount), 0)
+
+          - name: "refund_voucher"
+            display_name: "Refund Voucher"
+            description: |
+              Refund payment vouchers prepared for treasury to execute refund
+              payments. Each voucher contains bank transfer instructions.
+
+              SIGTAS Source: REFUND.REF_VOUCHER
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "refund_voucher_id"
+                display_name: "Refund Voucher ID"
+                type: "bigint"
+                description: "Unique identifier for refund voucher"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "voucher_number"
+                display_name: "Voucher Number"
+                type: "varchar(50)"
+                description: "Unique voucher number for tracking and treasury reference"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "voucher_date"
+                display_name: "Voucher Date"
+                type: "date"
+                description: "Date when voucher was prepared"
+                constraints:
+                  not_null: true
+
+              - name: "total_voucher_amount"
+                display_name: "Total Voucher Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Total amount covered by this voucher.
+                  May include multiple refunds batched together.
+                constraints:
+                  not_null: true
+                  check: "total_voucher_amount > 0"
+
+              - name: "bank_id"
+                display_name: "Bank"
+                type: "bigint"
+                description: "Foreign key to bank where payment will be made"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "payment_refund.bank"
+                    column: "bank_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "voucher_status_code"
+                display_name: "Voucher Status"
+                type: "varchar(30)"
+                description: |
+                  Status: PREPARED, SENT_TO_TREASURY, EXECUTED, CANCELLED
+                constraints:
+                  not_null: true
+                  default: "'PREPARED'"
+
+              - name: "sent_to_treasury_date"
+                display_name: "Sent to Treasury Date"
+                type: "date"
+                description: "Date when voucher was sent to treasury"
+                constraints:
+                  not_null: false
+
+              - name: "execution_date"
+                display_name: "Execution Date"
+                type: "date"
+                description: "Date when treasury executed the payment"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+          - name: "refund_approval"
+            display_name: "Refund Approval"
+            description: |
+              Records approval workflow for refunds requiring manual approval.
+              Tracks approval chain for audit and compliance.
+
+              SIGTAS Source: REFUND.RECORD_APPROVAL
+
+            entity_type: "transaction"
+            estimated_volume: "medium"
+            data_sensitivity: "internal"
+
+            columns:
+              - name: "refund_approval_id"
+                display_name: "Refund Approval ID"
+                type: "bigint"
+                description: "Unique identifier for approval record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "refund_id"
+                display_name: "Refund"
+                type: "bigint"
+                description: "Foreign key to refund being approved"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "payment_refund.refund"
+                    column: "refund_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+
+              - name: "approval_level"
+                display_name: "Approval Level"
+                type: "integer"
+                description: |
+                  Level in approval chain (1 = first approver, 2 = second, etc.).
+                  Higher amounts require more approval levels.
+                constraints:
+                  not_null: true
+
+              - name: "approver_user_id"
+                display_name: "Approver User"
+                type: "varchar(100)"
+                description: "User ID of person who approved at this level"
+                constraints:
+                  not_null: true
+
+              - name: "approver_role"
+                display_name: "Approver Role"
+                type: "varchar(100)"
+                description: "Role of approver (SUPERVISOR, MANAGER, DIRECTOR, etc.)"
+                constraints:
+                  not_null: true
+
+              - name: "approval_date"
+                display_name: "Approval Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when approval was granted"
+                constraints:
+                  not_null: true
+
+              - name: "approval_decision"
+                display_name: "Approval Decision"
+                type: "varchar(20)"
+                description: "Decision: APPROVED, REJECTED, SENT_BACK"
+                constraints:
+                  not_null: true
+
+              - name: "approval_comments"
+                display_name: "Approval Comments"
+                type: "text"
+                description: "Comments from approver"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+          # ===================================================================
+          # INSTALLMENT PLANS (PAYMENT AGREEMENTS)
+          # ===================================================================
+
+          - name: "installment_plan"
+            display_name: "Installment Plan"
+            description: |
+              Payment agreements allowing taxpayers to pay liabilities in
+              installments over time. Critical for enforced collection function
+              to encourage compliance and avoid escalation to enforcement actions.
+
+              Installment Plan Process:
+              1. Taxpayer requests payment agreement
+              2. Eligibility check (payment history, outstanding amount, etc.)
+              3. Down payment requirement calculated (e.g., 10% of total)
+              4. Number of installments determined (max 12, 24, or 36 months)
+              5. Interest rate applied per regulations
+              6. Installment schedule calculated
+              7. Agreement prepared and signed (digital or paper)
+              8. Monitoring activated (automatic checks for missed payments)
+              9. On default: agreement cancelled, enforcement triggered
+              10. On completion: agreement closed successfully
+
+              Eligibility Criteria (configurable):
+              - No previous agreement defaults in last 12 months
+              - Outstanding amount within limits (e.g., < $100,000)
+              - Current on recent filings
+              - Down payment made (e.g., 10-20% of total)
+              - Risk score acceptable
+
+              Interest Calculation:
+              - Interest rate per legal provisions
+              - Compound or simple interest based on jurisdiction
+              - Interest charged on remaining balance
+              - Missed payment triggers penalty interest
+
+              Monitoring Rules:
+              - Automatic check on due date
+              - Grace period (e.g., 5 days) before default
+              - Reminder notice before due date
+              - Demand notice after missed payment
+              - Automatic cancellation after X missed payments
+
+              SIGTAS Source: INSTALMENT.INSTALMENT
+
+              Business Rules:
+              - Minimum down payment required
+              - Maximum installment period per tax type
+              - Interest rate per legal provisions
+              - Automatic cancellation on default
+              - Only one active plan per tax account
+              - Cannot amend agreement (must cancel and recreate)
+              - Collection actions suspended while plan active
+
+              Volume: MEDIUM (50K-500K active plans)
+
+            entity_type: "transaction"
+            estimated_volume: "medium"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "installment_plan_id"
+                display_name: "Installment Plan ID"
+                type: "bigint"
+                description: "Unique identifier for installment plan"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "agreement_number"
+                display_name: "Agreement Number"
+                type: "varchar(50)"
+                description: "Unique agreement number for tracking"
+                constraints:
+                  not_null: true
+                  unique: true
+                business_name: "Agreement Number"
+
+              - name: "tax_account_id"
+                display_name: "Tax Account"
+                type: "bigint"
+                description: "Foreign key to tax account covered by plan"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "registration.tax_account"
+                    column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_installment_account"
+
+              - name: "party_id"
+                display_name: "Party"
+                type: "bigint"
+                description: "Foreign key to party (taxpayer) in agreement"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "party_management.party"
+                    column: "party_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "installment_method_code"
+                display_name: "Installment Method"
+                type: "varchar(30)"
+                description: |
+                  Method for calculating installments:
+                  - EQUAL_PRINCIPAL: Equal principal each period
+                  - EQUAL_PAYMENT: Equal total payment each period
+                  - CUSTOM: Custom schedule
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "reference_data.ref_installment_method"
+                    column: "installment_method_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "agreement_date"
+                display_name: "Agreement Date"
+                type: "date"
+                description: "Date when agreement was signed/approved"
+                constraints:
+                  not_null: true
+                business_name: "Agreement Date"
+
+              - name: "start_date"
+                display_name: "Start Date"
+                type: "date"
+                description: "Date when first installment is due"
+                constraints:
+                  not_null: true
+
+              - name: "end_date"
+                display_name: "End Date"
+                type: "date"
+                description: |
+                  Expected end date when all installments paid.
+                  Calculated based on number of installments.
+                constraints:
+                  not_null: true
+
+              - name: "total_amount"
+                display_name: "Total Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Total amount covered by agreement (principal + interest).
+                  Sum of all scheduled installments.
+                constraints:
+                  not_null: true
+                  check: "total_amount > 0"
+                business_name: "Total Amount"
+
+              - name: "principal_amount"
+                display_name: "Principal Amount"
+                type: "decimal(19,2)"
+                description: "Principal amount (without interest)"
+                constraints:
+                  not_null: true
+                  check: "principal_amount > 0"
+
+              - name: "interest_amount"
+                display_name: "Interest Amount"
+                type: "decimal(19,2)"
+                description: "Total interest charged over life of plan"
+                constraints:
+                  not_null: true
+                  default: 0
+                  check: "interest_amount >= 0"
+
+              - name: "down_payment_required"
+                display_name: "Down Payment Required"
+                type: "decimal(19,2)"
+                description: |
+                  Required down payment (e.g., 10% of principal).
+                  Must be paid before agreement activated.
+                constraints:
+                  not_null: true
+                  default: 0
+                  check: "down_payment_required >= 0"
+
+              - name: "down_payment_received"
+                display_name: "Down Payment Received"
+                type: "decimal(19,2)"
+                description: "Actual down payment received from taxpayer"
+                constraints:
+                  not_null: true
+                  default: 0
+                  check: "down_payment_received >= 0"
+
+              - name: "down_payment_date"
+                display_name: "Down Payment Date"
+                type: "date"
+                description: "Date when down payment was received"
+                constraints:
+                  not_null: false
+
+              - name: "number_of_installments"
+                display_name: "Number of Installments"
+                type: "integer"
+                description: "Total number of scheduled installments"
+                constraints:
+                  not_null: true
+                  check: "number_of_installments > 0"
+                business_name: "Number of Installments"
+
+              - name: "installment_frequency_code"
+                display_name: "Installment Frequency"
+                type: "varchar(20)"
+                description: |
+                  Payment frequency: MONTHLY, QUARTERLY, SEMI_ANNUAL
+                constraints:
+                  not_null: true
+                  default: "'MONTHLY'"
+
+              - name: "annual_interest_rate"
+                display_name: "Annual Interest Rate"
+                type: "decimal(5,2)"
+                description: "Annual interest rate as percentage (e.g., 8.00 = 8%)"
+                constraints:
+                  not_null: true
+                  check: "annual_interest_rate >= 0"
+
+              - name: "plan_status_code"
+                display_name: "Plan Status"
+                type: "varchar(30)"
+                description: |
+                  Status: REQUESTED, APPROVED, ACTIVE, COMPLETED, DEFAULTED,
+                  CANCELLED, REJECTED
+                constraints:
+                  not_null: true
+                  default: "'REQUESTED'"
+                indexing:
+                  - type: "btree"
+                    name: "idx_installment_status"
+
+              - name: "approved_by"
+                display_name: "Approved By"
+                type: "varchar(100)"
+                description: "User ID of person who approved agreement"
+                constraints:
+                  not_null: false
+
+              - name: "approval_date"
+                display_name: "Approval Date"
+                type: "date"
+                description: "Date when agreement was approved"
+                constraints:
+                  not_null: false
+
+              - name: "amount_paid_to_date"
+                display_name: "Amount Paid to Date"
+                type: "decimal(19,2)"
+                description: |
+                  Total amount paid so far (including down payment).
+                  Updated with each installment payment.
+                constraints:
+                  not_null: true
+                  default: 0
+                  check: "amount_paid_to_date >= 0"
+
+              - name: "outstanding_balance"
+                display_name: "Outstanding Balance"
+                type: "decimal(19,2)"
+                description: |
+                  Remaining balance to be paid.
+                  Formula: total_amount - amount_paid_to_date
+                constraints:
+                  not_null: true
+                  check: "outstanding_balance >= 0"
+
+              - name: "missed_payments_count"
+                display_name: "Missed Payments Count"
+                type: "integer"
+                description: |
+                  Number of missed installment payments.
+                  Triggers cancellation if exceeds threshold.
+                constraints:
+                  not_null: true
+                  default: 0
+                  check: "missed_payments_count >= 0"
+
+              - name: "last_payment_date"
+                display_name: "Last Payment Date"
+                type: "date"
+                description: "Date of most recent installment payment"
+                constraints:
+                  not_null: false
+
+              - name: "next_payment_due_date"
+                display_name: "Next Payment Due Date"
+                type: "date"
+                description: |
+                  Due date for next installment payment.
+                  Used for monitoring and reminder notices.
+                constraints:
+                  not_null: false
+                indexing:
+                  - type: "btree"
+                    name: "idx_installment_due"
+
+              - name: "default_date"
+                display_name: "Default Date"
+                type: "date"
+                description: "Date when agreement went into default status"
+                constraints:
+                  not_null: false
+
+              - name: "cancellation_date"
+                display_name: "Cancellation Date"
+                type: "date"
+                description: "Date when agreement was cancelled"
+                constraints:
+                  not_null: false
+
+              - name: "cancellation_reason"
+                display_name: "Cancellation Reason"
+                type: "varchar(500)"
+                description: "Reason for cancellation (default, taxpayer request, etc.)"
+                constraints:
+                  not_null: false
+
+              - name: "completion_date"
+                display_name: "Completion Date"
+                type: "date"
+                description: "Date when all installments paid and agreement completed"
+                constraints:
+                  not_null: false
+
+              - name: "agreement_terms"
+                display_name: "Agreement Terms"
+                type: "text"
+                description: "Full text of agreement terms and conditions"
+                constraints:
+                  not_null: false
+
+              - name: "agreement_notes"
+                display_name: "Agreement Notes"
+                type: "text"
+                description: "Additional notes about agreement"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_installment_active"
+                type: "btree"
+                columns: ["plan_status_code", "next_payment_due_date"]
+                where: "plan_status_code = 'ACTIVE'"
+                description: "For monitoring active plans"
+
+            business_rules:
+              - rule_id: "BR-PR-030"
+                name: "Down payment received before activation"
+                description: "Plan cannot be ACTIVE until down payment received"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT installment_plan_id
+                  FROM installment_plan
+                  WHERE plan_status_code = 'ACTIVE'
+                    AND down_payment_required > 0
+                    AND (down_payment_received < down_payment_required
+                         OR down_payment_date IS NULL)
+
+              - rule_id: "BR-PR-031"
+                name: "Outstanding balance calculation"
+                description: "Outstanding balance must equal total minus paid"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT installment_plan_id
+                  FROM installment_plan
+                  WHERE outstanding_balance <> (total_amount - amount_paid_to_date)
+
+          - name: "installment_schedule"
+            display_name: "Installment Schedule"
+            description: |
+              Detailed schedule of each installment payment in a payment plan.
+              One row per scheduled installment.
+
+              Automatically generated when plan approved based on:
+              - Total amount
+              - Number of installments
+              - Frequency
+              - Interest rate
+              - Calculation method
+
+              SIGTAS Source: Derived from INST_CALC_AMT and INST_ASSESS
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "installment_schedule_id"
+                display_name: "Installment Schedule ID"
+                type: "bigint"
+                description: "Unique identifier for scheduled installment"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "installment_plan_id"
+                display_name: "Installment Plan"
+                type: "bigint"
+                description: "Foreign key to parent installment plan"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "payment_refund.installment_plan"
+                    column: "installment_plan_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                indexing:
+                  - type: "btree"
+                    name: "idx_schedule_plan"
+
+              - name: "installment_number"
+                display_name: "Installment Number"
+                type: "integer"
+                description: "Sequential installment number (1, 2, 3, ...)"
+                constraints:
+                  not_null: true
+                  check: "installment_number > 0"
+
+              - name: "due_date"
+                display_name: "Due Date"
+                type: "date"
+                description: "Date when this installment is due"
+                constraints:
+                  not_null: true
+                indexing:
+                  - type: "btree"
+                    name: "idx_schedule_due"
+
+              - name: "principal_amount"
+                display_name: "Principal Amount"
+                type: "decimal(19,2)"
+                description: "Principal portion of this installment"
+                constraints:
+                  not_null: true
+                  check: "principal_amount >= 0"
+
+              - name: "interest_amount"
+                display_name: "Interest Amount"
+                type: "decimal(19,2)"
+                description: "Interest portion of this installment"
+                constraints:
+                  not_null: true
+                  default: 0
+                  check: "interest_amount >= 0"
+
+              - name: "total_installment_amount"
+                display_name: "Total Installment Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Total amount due for this installment.
+                  Formula: principal_amount + interest_amount
+                constraints:
+                  not_null: true
+                  check: "total_installment_amount > 0"
+
+              - name: "payment_status_code"
+                display_name: "Payment Status"
+                type: "varchar(30)"
+                description: |
+                  Status: SCHEDULED, PAID, PARTIALLY_PAID, OVERDUE, WAIVED
+                constraints:
+                  not_null: true
+                  default: "'SCHEDULED'"
+
+              - name: "amount_paid"
+                display_name: "Amount Paid"
+                type: "decimal(19,2)"
+                description: "Actual amount paid for this installment"
+                constraints:
+                  not_null: true
+                  default: 0
+                  check: "amount_paid >= 0"
+
+              - name: "payment_date"
+                display_name: "Payment Date"
+                type: "date"
+                description: "Date when payment was received"
+                constraints:
+                  not_null: false
+
+              - name: "payment_id"
+                display_name: "Payment"
+                type: "bigint"
+                description: "Foreign key to payment that satisfied this installment"
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "payment_refund.payment"
+                    column: "payment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "days_overdue"
+                display_name: "Days Overdue"
+                type: "integer"
+                description: "Number of days payment is overdue (calculated)"
+                constraints:
+                  not_null: true
+                  default: 0
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+            business_rules:
+              - rule_id: "BR-PR-035"
+                name: "Installment amount consistency"
+                description: "Sum of all installments must equal plan total"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT ip.installment_plan_id, ip.total_amount,
+                         COALESCE(SUM(isch.total_installment_amount), 0) AS schedule_total
+                  FROM installment_plan ip
+                  LEFT JOIN installment_schedule isch ON ip.installment_plan_id = isch.installment_plan_id
+                  GROUP BY ip.installment_plan_id, ip.total_amount
+                  HAVING ip.total_amount <> COALESCE(SUM(isch.total_installment_amount), 0)
+
+          # ===================================================================
+          # BANK INTEGRATION
+          # ===================================================================
+
+          - name: "bank"
+            display_name: "Bank"
+            description: |
+              Master data for banks that collect tax payments or receive refunds.
+              Includes commercial banks, payment service providers, and treasury.
+
+              Banks interface with tax system through:
+              - Payment file imports (batch or real-time)
+              - Refund payment instructions (outbound)
+              - Reconciliation reports
+              - Balance confirmations
+
+              SIGTAS Source: BANK__BANK_INTERFACE.BANK
+
+            entity_type: "master"
+            estimated_volume: "low"
+            data_sensitivity: "internal"
+
+            columns:
+              - name: "bank_id"
+                display_name: "Bank ID"
+                type: "bigint"
+                description: "Unique identifier for bank"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "bank_code"
+                display_name: "Bank Code"
+                type: "varchar(20)"
+                description: "Official bank code (central bank registry)"
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "bank_name"
+                display_name: "Bank Name"
+                type: "varchar(200)"
+                description: "Full legal name of bank"
+                constraints:
+                  not_null: true
+
+              - name: "bank_short_name"
+                display_name: "Bank Short Name"
+                type: "varchar(100)"
+                description: "Abbreviated name for display"
+                constraints:
+                  not_null: false
+
+              - name: "swift_code"
+                display_name: "SWIFT Code"
+                type: "varchar(11)"
+                description: "SWIFT/BIC code for international transfers"
+                constraints:
+                  not_null: false
+
+              - name: "tax_collection_account"
+                display_name: "Tax Collection Account"
+                type: "varchar(34)"
+                description: |
+                  Bank account number where taxpayers deposit tax payments (IBAN).
+                  This is the single tax account per bank.
+                constraints:
+                  not_null: false
+
+              - name: "is_active"
+                display_name: "Is Active"
+                type: "boolean"
+                description: "Flag indicating if bank is currently active for tax transactions"
+                constraints:
+                  not_null: true
+                  default: true
+
+              - name: "payment_interface_type"
+                display_name: "Payment Interface Type"
+                type: "varchar(30)"
+                description: |
+                  Type of integration: FILE_IMPORT, API, MANUAL
+                constraints:
+                  not_null: true
+
+              - name: "contact_name"
+                display_name: "Contact Name"
+                type: "varchar(200)"
+                description: "Primary contact person at bank"
+                constraints:
+                  not_null: false
+
+              - name: "contact_email"
+                display_name: "Contact Email"
+                type: "varchar(200)"
+                description: "Email for bank contact"
+                constraints:
+                  not_null: false
+
+              - name: "contact_phone"
+                display_name: "Contact Phone"
+                type: "varchar(50)"
+                description: "Phone number for bank contact"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+          - name: "bank_interface_log"
+            display_name: "Bank Interface Log"
+            description: |
+              Logs all bank file imports and payment batch processing.
+              Critical for auditing and troubleshooting bank integration issues.
+
+              Each bank file import creates one log record with:
+              - File details (name, size, records)
+              - Processing results (success, errors)
+              - Reconciliation status
+              - Error details
+
+              SIGTAS Source: BANK__BANK_INTERFACE.BANK_INTERFACE
+
+            entity_type: "transaction"
+            estimated_volume: "medium"
+            data_sensitivity: "internal"
+
+            columns:
+              - name: "bank_interface_log_id"
+                display_name: "Bank Interface Log ID"
+                type: "bigint"
+                description: "Unique identifier for log entry"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "bank_id"
+                display_name: "Bank"
+                type: "bigint"
+                description: "Foreign key to bank"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "payment_refund.bank"
+                    column: "bank_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "interface_type"
+                display_name: "Interface Type"
+                type: "varchar(30)"
+                description: "Type: PAYMENT_IMPORT, REFUND_EXPORT, RECONCILIATION"
+                constraints:
+                  not_null: true
+
+              - name: "file_name"
+                display_name: "File Name"
+                type: "varchar(500)"
+                description: "Name of imported/exported file"
+                constraints:
+                  not_null: false
+
+              - name: "file_date"
+                display_name: "File Date"
+                type: "date"
+                description: "Date on file (may differ from processing date)"
+                constraints:
+                  not_null: false
+
+              - name: "processing_date"
+                display_name: "Processing Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when file was processed"
+                constraints:
+                  not_null: true
+
+              - name: "total_records"
+                display_name: "Total Records"
+                type: "integer"
+                description: "Total number of records in file"
+                constraints:
+                  not_null: true
+                  default: 0
+
+              - name: "successful_records"
+                display_name: "Successful Records"
+                type: "integer"
+                description: "Number of records processed successfully"
+                constraints:
+                  not_null: true
+                  default: 0
+
+              - name: "failed_records"
+                display_name: "Failed Records"
+                type: "integer"
+                description: "Number of records that failed processing"
+                constraints:
+                  not_null: true
+                  default: 0
+
+              - name: "total_amount"
+                display_name: "Total Amount"
+                type: "decimal(19,2)"
+                description: "Total amount in file"
+                constraints:
+                  not_null: false
+
+              - name: "processing_status"
+                display_name: "Processing Status"
+                type: "varchar(30)"
+                description: "Status: SUCCESS, PARTIAL, FAILED"
+                constraints:
+                  not_null: true
+
+              - name: "error_message"
+                display_name: "Error Message"
+                type: "text"
+                description: "Error details if processing failed"
+                constraints:
+                  not_null: false
+
+              - name: "processing_duration_seconds"
+                display_name: "Processing Duration (Seconds)"
+                type: "integer"
+                description: "Time taken to process file in seconds"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+          - name: "bank_reconciliation"
+            display_name: "Bank Reconciliation"
+            description: |
+              Bank reconciliation records matching payments received with
+              bank statements. Critical control for cash management.
+
+              Reconciliation Process:
+              1. Bank statement received (daily or monthly)
+              2. Payments in system matched to statement transactions
+              3. Differences identified (missing payments, extra transactions)
+              4. Investigation of discrepancies
+              5. Adjustments made if needed
+              6. Reconciliation approved
+
+              Common Discrepancies:
+              - Timing differences (payment in transit)
+              - Missing bank transactions (not yet imported)
+              - Data entry errors
+              - Duplicate payments
+              - Fraud/unauthorized transactions
+
+              SIGTAS Source: BANK__BANK_INTERFACE.BANK_RECONCILIATION
+
+            entity_type: "transaction"
+            estimated_volume: "medium"
+            data_sensitivity: "internal"
+
+            columns:
+              - name: "bank_reconciliation_id"
+                display_name: "Bank Reconciliation ID"
+                type: "bigint"
+                description: "Unique identifier for reconciliation record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "bank_id"
+                display_name: "Bank"
+                type: "bigint"
+                description: "Foreign key to bank being reconciled"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "payment_refund.bank"
+                    column: "bank_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "reconciliation_date"
+                display_name: "Reconciliation Date"
+                type: "date"
+                description: "Date of reconciliation"
+                constraints:
+                  not_null: true
+
+              - name: "statement_date"
+                display_name: "Statement Date"
+                type: "date"
+                description: "Date of bank statement being reconciled"
+                constraints:
+                  not_null: true
+
+              - name: "opening_balance"
+                display_name: "Opening Balance"
+                type: "decimal(19,2)"
+                description: "Opening balance per bank statement"
+                constraints:
+                  not_null: true
+
+              - name: "total_receipts"
+                display_name: "Total Receipts"
+                type: "decimal(19,2)"
+                description: "Total receipts per bank statement"
+                constraints:
+                  not_null: true
+
+              - name: "total_disbursements"
+                display_name: "Total Disbursements"
+                type: "decimal(19,2)"
+                description: "Total disbursements per bank statement"
+                constraints:
+                  not_null: true
+
+              - name: "closing_balance"
+                display_name: "Closing Balance"
+                type: "decimal(19,2)"
+                description: "Closing balance per bank statement"
+                constraints:
+                  not_null: true
+
+              - name: "system_receipts"
+                display_name: "System Receipts"
+                type: "decimal(19,2)"
+                description: "Total receipts per tax system records"
+                constraints:
+                  not_null: true
+
+              - name: "system_disbursements"
+                display_name: "System Disbursements"
+                type: "decimal(19,2)"
+                description: "Total disbursements per tax system records"
+                constraints:
+                  not_null: true
+
+              - name: "variance_amount"
+                display_name: "Variance Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Difference between bank and system balances.
+                  Positive = bank higher, Negative = system higher
+                constraints:
+                  not_null: true
+
+              - name: "reconciliation_status"
+                display_name: "Reconciliation Status"
+                type: "varchar(30)"
+                description: |
+                  Status: IN_PROGRESS, RECONCILED, DISCREPANCY, APPROVED
+                constraints:
+                  not_null: true
+                  default: "'IN_PROGRESS'"
+
+              - name: "variance_explanation"
+                display_name: "Variance Explanation"
+                type: "text"
+                description: "Explanation for any variances identified"
+                constraints:
+                  not_null: false
+
+              - name: "reconciled_by"
+                display_name: "Reconciled By"
+                type: "varchar(100)"
+                description: "User who performed reconciliation"
+                constraints:
+                  not_null: false
+
+              - name: "approved_by"
+                display_name: "Approved By"
+                type: "varchar(100)"
+                description: "User who approved reconciliation"
+                constraints:
+                  not_null: false
+
+              - name: "approval_date"
+                display_name: "Approval Date"
+                type: "date"
+                description: "Date when reconciliation was approved"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+            business_rules:
+              - rule_id: "BR-PR-040"
+                name: "Bank statement balance formula"
+                description: "Closing balance must equal opening + receipts - disbursements"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT bank_reconciliation_id
+                  FROM bank_reconciliation
+                  WHERE closing_balance <> (opening_balance + total_receipts - total_disbursements)
+
+# =============================================================================
+# BUSINESS RULES
+# =============================================================================
+
+business_rules:
+  - id: "BR-PR-050"
+    domain: "payment_refund"
+    name: "Payment Allocation Completeness"
+    description: |
+      Every allocated payment must have allocation records that sum to payment amount.
+      No payment should be marked allocated without complete allocation breakdown.
+    severity: "CRITICAL"
+    affected_tables:
+      - "payment"
+      - "payment_allocation"
+    validation_query: |
+      SELECT p.payment_id, p.payment_amount,
+             COALESCE(SUM(pa.allocated_amount), 0) AS allocated_total
+      FROM payment p
+      LEFT JOIN payment_allocation pa ON p.payment_id = pa.payment_id
+      WHERE p.is_allocated = true
+      GROUP BY p.payment_id, p.payment_amount
+      HAVING p.payment_amount <> COALESCE(SUM(pa.allocated_amount), 0)
+    enforcement: "application"
+
+  - id: "BR-PR-051"
+    domain: "payment_refund"
+    name: "Refund Offsetting Before Disbursement"
+    description: |
+      Before refund can be disbursed, system must check for outstanding liabilities
+      and apply offsetting per legal provisions. Net refund cannot exceed available
+      credit after offsetting.
+    severity: "CRITICAL"
+    affected_tables:
+      - "refund"
+    validation_query: |
+      SELECT refund_id
+      FROM refund
+      WHERE refund_status_code IN ('VOUCHER_PREPARED', 'SENT_TO_TREASURY', 'REFUNDED')
+        AND offset_amount = 0
+        AND EXISTS (
+          SELECT 1 FROM accounting.account_balance ab
+          WHERE ab.tax_account_id = refund.tax_account_id
+            AND ab.closing_balance > 0  -- Outstanding liability exists
+        )
+    enforcement: "application"
+
+  - id: "BR-PR-052"
+    domain: "payment_refund"
+    name: "Installment Plan Monitoring"
+    description: |
+      Active installment plans must be monitored daily. If payment not received
+      within grace period after due date, plan should be marked as DEFAULTED and
+      collection actions triggered.
+    severity: "HIGH"
+    affected_tables:
+      - "installment_plan"
+      - "installment_schedule"
+    validation_query: |
+      SELECT ip.installment_plan_id, ip.next_payment_due_date,
+             CURRENT_DATE - ip.next_payment_due_date AS days_overdue
+      FROM installment_plan ip
+      WHERE ip.plan_status_code = 'ACTIVE'
+        AND ip.next_payment_due_date < CURRENT_DATE - INTERVAL '5 days'  -- Grace period
+        AND NOT EXISTS (
+          SELECT 1 FROM installment_schedule isch
+          WHERE isch.installment_plan_id = ip.installment_plan_id
+            AND isch.due_date = ip.next_payment_due_date
+            AND isch.payment_status_code = 'PAID'
+        )
+    enforcement: "application"
+
+  - id: "BR-PR-053"
+    domain: "payment_refund"
+    name: "Bank Reconciliation Timeliness"
+    description: |
+      Bank reconciliation must be completed within 5 business days of statement date.
+      Unreconciled statements represent control weakness and cash management risk.
+    severity: "HIGH"
+    affected_tables:
+      - "bank_reconciliation"
+    validation_query: |
+      SELECT bank_reconciliation_id, bank_id, statement_date,
+             CURRENT_DATE - statement_date AS days_pending
+      FROM bank_reconciliation
+      WHERE reconciliation_status IN ('IN_PROGRESS', 'DISCREPANCY')
+        AND CURRENT_DATE - statement_date > 7  -- 5 business days ~= 7 calendar days
+    enforcement: "application"
+
+  - id: "BR-PR-054"
+    domain: "payment_refund"
+    name: "Suspended Payment Resolution"
+    description: |
+      Suspended payments must be investigated and resolved within 90 days.
+      Unresolved suspended payments should be escalated to supervisor.
+    severity: "MEDIUM"
+    affected_tables:
+      - "payment"
+    validation_query: |
+      SELECT payment_id, payment_reference_number, received_date,
+             CURRENT_DATE - received_date AS days_suspended
+      FROM payment
+      WHERE is_suspended = true
+        AND CURRENT_DATE - received_date > 90
+    enforcement: "application"
+
+  - id: "BR-PR-055"
+    domain: "payment_refund"
+    name: "Refund Bank Account Verification"
+    description: |
+      Before refund is disbursed, taxpayer's bank account must be verified.
+      Verification can be through: prior successful refund, taxpayer portal
+      confirmation, or manual verification document.
+    severity: "HIGH"
+    affected_tables:
+      - "refund"
+    validation_query: |
+      SELECT refund_id
+      FROM refund
+      WHERE refund_status_code IN ('APPROVED', 'VOUCHER_PREPARED', 'SENT_TO_TREASURY')
+        AND (refund_bank_account IS NULL OR refund_bank_account = '')
+    enforcement: "application"
+
+# =============================================================================
+# DATA QUALITY RULES
+# =============================================================================
+
+data_quality_rules:
+  - id: "DQ-PR-001"
+    name: "Payment Date Not in Future"
+    description: "Payment date cannot be in the future"
+    check_query: |
+      SELECT payment_id, payment_date
+      FROM payment
+      WHERE payment_date > CURRENT_DATE
+    severity: "HIGH"
+    expected_result: "No rows"
+
+  - id: "DQ-PR-002"
+    name: "Refund Amount Reasonableness"
+    description: "Refund amount should not exceed reasonable threshold (e.g., $1M)"
+    check_query: |
+      SELECT refund_id, total_refund_amount
+      FROM refund
+      WHERE total_refund_amount > 1000000
+    severity: "MEDIUM"
+    expected_result: "Review flagged records"
+
+  - id: "DQ-PR-003"
+    name: "Installment Plan Completion Check"
+    description: "Completed plans should have amount_paid = total_amount"
+    check_query: |
+      SELECT installment_plan_id, total_amount, amount_paid_to_date
+      FROM installment_plan
+      WHERE plan_status_code = 'COMPLETED'
+        AND amount_paid_to_date < total_amount - 1  -- Allow $1 tolerance for rounding
+    severity: "MEDIUM"
+    expected_result: "No rows or minimal rounding differences"
+
+# =============================================================================
+# INTEGRATION POINTS
+# =============================================================================
+
+integration_points:
+  - system_name: "Accounting System"
+    integration_type: "internal"
+    description: |
+      Every payment and refund automatically creates accounting transactions.
+      Payments credit taxpayer accounts, refunds debit accounts.
+    data_flow:
+      direction: "bidirectional"
+      frequency: "real_time"
+    key_entities:
+      - source_table: "payment"
+        target_table: "accounting.tax_transaction"
+        mapping: "Payment creates credit transaction"
+
+      - source_table: "payment_allocation"
+        target_table: "accounting.tax_sub_transaction"
+        mapping: "Allocation creates charge type breakdown"
+
+      - source_table: "refund"
+        target_table: "accounting.tax_transaction"
+        mapping: "Refund creates debit transaction"
+
+  - system_name: "Assessment System"
+    integration_type: "internal"
+    description: |
+      Payment allocation targets assessed liabilities. Refunds may originate
+      from assessment corrections or audit adjustments.
+    data_flow:
+      direction: "bidirectional"
+      frequency: "real_time"
+    key_entities:
+      - source_table: "payment_allocation"
+        target_table: "filing_assessment.assessment"
+        mapping: "Allocations reduce liability balances"
+
+      - source_table: "refund"
+        target_table: "filing_assessment.assessment"
+        mapping: "Refund claims may reference assessments"
+
+  - system_name: "Collection System"
+    integration_type: "internal"
+    description: |
+      Installment plans prevent enforcement actions. Payment history affects
+      collection strategy.
+    data_flow:
+      direction: "bidirectional"
+      frequency: "real_time"
+    key_entities:
+      - source_table: "installment_plan"
+        target_table: "compliance_control.collection_case"
+        mapping: "Active plan suspends collection actions"
+
+      - source_table: "payment"
+        target_table: "compliance_control.collection_case"
+        mapping: "Payment may close collection case"
+
+  - system_name: "Banking Systems"
+    integration_type: "external"
+    description: |
+      Banks provide payment files (batch or real-time) and receive refund
+      payment instructions. Two-way integration critical for cash management.
+    data_flow:
+      direction: "bidirectional"
+      frequency: "hourly/daily"
+    key_entities:
+      - source_table: "BANK.PAYMENT_FILE"
+        target_table: "payment"
+        mapping: "Bank file imported, payments created"
+
+      - source_table: "refund_voucher"
+        target_table: "TREASURY.PAYMENT_INSTRUCTION"
+        mapping: "Refund instructions sent to treasury"
+
+  - system_name: "Treasury System"
+    integration_type: "external"
+    description: |
+      Daily reconciliation with treasury. Revenue transfers and refund
+      disbursements coordinated through treasury.
+    data_flow:
+      direction: "bidirectional"
+      frequency: "daily"
+    key_entities:
+      - source_table: "bank_reconciliation"
+        target_table: "TREASURY.RECONCILIATION"
+        mapping: "Daily reconciliation reports exchanged"
+
+# =============================================================================
+# SECURITY POLICIES
+# =============================================================================
+
+security_policies:
+  - policy_name: "PII Protection for Bank Accounts"
+    description: |
+      Taxpayer bank account numbers are PII and must be encrypted at rest.
+      Access logged and restricted to authorized users only.
+    affected_tables:
+      - "payment"
+      - "refund"
+    implementation:
+      - "Column-level encryption (AES-256)"
+      - "Access control: PAYMENT_PROCESSOR, REFUND_OFFICER roles only"
+      - "Audit logging for all access"
+      - "Data masking in non-production environments"
+
+  - policy_name: "Payment Reversal Authorization"
+    description: |
+      Payment reversals require supervisor approval and must be fully documented.
+      Only authorized users can reverse payments to prevent fraud.
+    affected_tables:
+      - "payment"
+      - "payment_allocation"
+    implementation:
+      - "Role-based access control"
+      - "Approval workflow required"
+      - "Complete audit trail"
+      - "Notification to taxpayer"
+
+  - policy_name: "Refund Approval Segregation of Duties"
+    description: |
+      User who reviews refund cannot be same as user who approves.
+      Large refunds require multiple approval levels.
+    affected_tables:
+      - "refund"
+      - "refund_approval"
+    implementation:
+      - "Workflow enforces different users"
+      - "Amount-based approval thresholds"
+      - "Complete approval chain logged"
+
+# =============================================================================
+# PERFORMANCE OPTIMIZATION
+# =============================================================================
+
+performance_considerations:
+  - area: "Payment Processing"
+    consideration: |
+      Payment import from banks can involve millions of records daily.
+      Optimize with:
+      - Batch processing with commit every 1000 records
+      - Parallel processing for multiple banks
+      - Indexed lookups for taxpayer identification
+      - Deferred constraint checking during import
+      - Summary tables for dashboard queries
+
+  - area: "Payment Allocation"
+    consideration: |
+      Payment allocation rule execution can be complex with many liabilities.
+      Optimize with:
+      - Pre-calculated liability priority rankings
+      - Cached allocation rule configurations
+      - Bulk allocation for similar payments
+      - Asynchronous processing for large payments
+
+  - area: "Installment Monitoring"
+    consideration: |
+      Daily monitoring of active installment plans for missed payments.
+      Optimize with:
+      - Partial index on active plans with due dates
+      - Scheduled batch job (not real-time)
+      - Efficient query using covering indexes
+      - Notification queuing system
+
+# =============================================================================
+# DATA RETENTION
+# =============================================================================
+
+data_retention:
+  - entity: "payment"
+    retention_period: "10 years"
+    rationale: "Legal requirement for tax records"
+    archive_strategy: "Archive payments older than 7 years to archive database"
+
+  - entity: "refund"
+    retention_period: "10 years"
+    rationale: "Legal requirement for tax records"
+    archive_strategy: "Archive refunds older than 7 years to archive database"
+
+  - entity: "installment_plan"
+    retention_period: "7 years after completion"
+    rationale: "Support audit and dispute resolution"
+    archive_strategy: "Archive completed plans after retention period"
+
+  - entity: "bank_interface_log"
+    retention_period: "3 years"
+    rationale: "Technical troubleshooting and audit"
+    archive_strategy: "Purge logs older than 3 years"

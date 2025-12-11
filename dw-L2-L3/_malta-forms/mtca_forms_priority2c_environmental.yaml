@@ -1,0 +1,2572 @@
+# ============================================================================
+# MTCA Forms - Priority 2C: Environmental Taxes
+# Forms: ECO Products Return, ECO Accommodation Return, BCRS Registration, VEH 007
+# Version: 1.0
+# Date: 2025-12-05
+# Purpose: ORS Database Schema Design and Informix Data Migration
+# ============================================================================
+
+forms:
+  # ==========================================================================
+  # ECO Products Return: Eco-Contribution on Products
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "ECO_PRODUCTS"
+        form_name_en: "Eco-Contribution on Products Return"
+        form_name_mt: "Dikjarazzjoni tal-Eko-Kontribuzzjoni fuq Prodotti"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "Eco-Contribution Act Cap. 473"
+        subsidiary_legislation:
+          - "S.L.473.01 - Eco-Contribution (Plastic and Glass Containers) Regulations"
+          - "S.L.473.02 - Eco-Contribution (Tyres) Regulations"
+          - "S.L.473.03 - Eco-Contribution (Electrical and Electronic Equipment) Regulations"
+          - "S.L.473.04 - Eco-Contribution (Batteries) Regulations"
+        administering_authority: "CFR"
+        tax_type: "Environmental Tax"
+        taxpayer_category: "Company, Individual (Importer/Manufacturer)"
+        filing_frequency: "Quarterly"
+        filing_deadline: "With VAT return (following month after quarter end)"
+        submission_method: "Electronic"
+        electronic_portal: "CFR VAT Portal"
+        source_url: "https://cfr.gov.mt/en/eServices/Pages/Eco-Contribution.aspx"
+        pdf_available: false
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Eco-contribution payable on specified products placed on Malta market.
+          Filed quarterly alongside VAT return for VAT-registered persons.
+          Covers plastic/glass containers, tyres, EEE, and batteries.
+          Rates vary by product category and weight/unit.
+
+      sections:
+        # ----------------------------------------------------------------------
+        # Section 1: Declarant Identification
+        # ----------------------------------------------------------------------
+        - section_id: "DECLARANT"
+          section_name: "Declarant Details"
+          section_description: "Importer or manufacturer liable for eco-contribution"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "declarant_tin"
+              field_code: "Box 1"
+              field_name_en: "TIN"
+              field_name_mt: "TIN"
+              field_description: "Tax identification number"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_001"
+                  rule_type: "pattern"
+                  rule_description: "Valid TIN format"
+                  rule_expression: "^([0-9]{7}[MGAPLHBZ]|[0-9]{9})$"
+                  error_message_en: "Invalid TIN format"
+                  error_message_mt: "Format tal-TIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: "VAT_Return.declarant_tin"
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "declarant_tin"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "declarant_tin"
+                data_type: "String"
+
+            - field_id: "vat_number"
+              field_code: "Box 2"
+              field_name_en: "VAT Number"
+              field_name_mt: "Numru tal-VAT"
+              field_description: "VAT registration number"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_002"
+                  rule_type: "pattern"
+                  rule_description: "Valid Malta VAT format"
+                  rule_expression: "^MT[0-9]{8}$"
+                  error_message_en: "Invalid VAT number format"
+                  error_message_mt: "Format tan-numru tal-VAT mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: "vat_register"
+              cross_form_reference: "VAT_Return.vat_number"
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "vat_number"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "vat_number"
+                data_type: "FixedString(10)"
+
+            - field_id: "business_name"
+              field_code: "Box 3"
+              field_name_en: "Business Name"
+              field_name_mt: "Isem tan-Negozju"
+              field_description: "Trading or legal name"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "business_name"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "business_name"
+                data_type: "String"
+
+        # ----------------------------------------------------------------------
+        # Section 2: Period
+        # ----------------------------------------------------------------------
+        - section_id: "PERIOD"
+          section_name: "Return Period"
+          section_description: "Quarterly period covered"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "return_year"
+              field_code: "Box 5"
+              field_name_en: "Year"
+              field_name_mt: "Sena"
+              field_description: "Calendar year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "return_year"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "return_year"
+                data_type: "UInt16"
+
+            - field_id: "return_quarter"
+              field_code: "Box 6"
+              field_name_en: "Quarter"
+              field_name_mt: "Kwart"
+              field_description: "Calendar quarter (Q1-Q4)"
+              data_type: "CODE"
+              format: null
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "Q1"
+                  description_en: "January - March"
+                  description_mt: "Jannar - Marzu"
+                - code: "Q2"
+                  description_en: "April - June"
+                  description_mt: "April - Ä unju"
+                - code: "Q3"
+                  description_en: "July - September"
+                  description_mt: "Lulju - Settembru"
+                - code: "Q4"
+                  description_en: "October - December"
+                  description_mt: "Ottubru - DiÄ‹embru"
+              reference_table: null
+              cross_form_reference: "VAT_Return.return_quarter"
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "return_quarter"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "return_quarter"
+                data_type: "FixedString(2)"
+
+        # ----------------------------------------------------------------------
+        # Section 3: Plastic & Glass Containers
+        # ----------------------------------------------------------------------
+        - section_id: "CONTAINERS"
+          section_name: "Plastic & Glass Containers"
+          section_description: "Eco-contribution on beverage containers"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "plastic_units"
+              field_code: "Box 10"
+              field_name_en: "Plastic Containers (Units)"
+              field_name_mt: "Kontenituri tal-Plastik (Unitajiet)"
+              field_description: "Number of plastic containers placed on market"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECO_010"
+                  rule_type: "range"
+                  rule_description: "Must be non-negative"
+                  rule_expression: "plastic_units >= 0"
+                  error_message_en: "Units cannot be negative"
+                  error_message_mt: "Unitajiet ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "plastic_units"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "plastic_units"
+                data_type: "UInt64"
+
+            - field_id: "plastic_rate"
+              field_code: "Box 11"
+              field_name_en: "Plastic Container Rate (â‚¬/unit)"
+              field_name_mt: "Rata tal-Kontenitur tal-Plastik (â‚¬/unitÃ )"
+              field_description: "Current eco-contribution rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬#.####"
+              max_length: null
+              precision: 6
+              scale: 4
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "0.0232"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eco_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "plastic_rate"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "plastic_rate"
+                data_type: "Decimal(6,4)"
+
+            - field_id: "plastic_eco"
+              field_code: "Box 12"
+              field_name_en: "Plastic Container Eco-Contribution"
+              field_name_mt: "Eko-Kontribuzzjoni tal-Kontenituri tal-Plastik"
+              field_description: "Units Ã— rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "plastic_units * plastic_rate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "plastic_eco"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "plastic_eco"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "glass_units"
+              field_code: "Box 13"
+              field_name_en: "Glass Containers (Units)"
+              field_name_mt: "Kontenituri tal-Ä¦Ä¡ieÄ¡ (Unitajiet)"
+              field_description: "Number of glass containers placed on market"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "glass_units"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "glass_units"
+                data_type: "UInt64"
+
+            - field_id: "glass_rate"
+              field_code: "Box 14"
+              field_name_en: "Glass Container Rate (â‚¬/unit)"
+              field_name_mt: "Rata tal-Kontenitur tal-Ä¦Ä¡ieÄ¡ (â‚¬/unitÃ )"
+              field_description: "Current eco-contribution rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬#.####"
+              max_length: null
+              precision: 6
+              scale: 4
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "0.0116"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eco_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "glass_rate"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "glass_rate"
+                data_type: "Decimal(6,4)"
+
+            - field_id: "glass_eco"
+              field_code: "Box 15"
+              field_name_en: "Glass Container Eco-Contribution"
+              field_name_mt: "Eko-Kontribuzzjoni tal-Kontenituri tal-Ä¦Ä¡ieÄ¡"
+              field_description: "Units Ã— rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "glass_units * glass_rate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "glass_eco"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "glass_eco"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 4: Tyres
+        # ----------------------------------------------------------------------
+        - section_id: "TYRES"
+          section_name: "Tyres"
+          section_description: "Eco-contribution on tyres"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "car_tyres_units"
+              field_code: "Box 20"
+              field_name_en: "Passenger Car Tyres (Units)"
+              field_name_mt: "Tajers tal-Karozzi (Unitajiet)"
+              field_description: "Number of car tyres"
+              data_type: "INTEGER"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "car_tyres"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "car_tyres_units"
+                data_type: "UInt32"
+
+            - field_id: "car_tyres_rate"
+              field_code: "Box 21"
+              field_name_en: "Car Tyre Rate (â‚¬/unit)"
+              field_name_mt: "Rata tat-Tajer tal-Karozza (â‚¬/unitÃ )"
+              field_description: "Rate per tyre"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬#.##"
+              max_length: null
+              precision: 4
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "1.16"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eco_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "car_tyre_rate"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "car_tyres_rate"
+                data_type: "Decimal(4,2)"
+
+            - field_id: "car_tyres_eco"
+              field_code: "Box 22"
+              field_name_en: "Car Tyres Eco-Contribution"
+              field_name_mt: "Eko-Kontribuzzjoni tat-Tajers tal-Karozzi"
+              field_description: "Units Ã— rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "car_tyres_units * car_tyres_rate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "car_tyres_eco"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "car_tyres_eco"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "truck_tyres_units"
+              field_code: "Box 23"
+              field_name_en: "Truck/Bus Tyres (Units)"
+              field_name_mt: "Tajers tat-Trakkijiet/Xarabanks (Unitajiet)"
+              field_description: "Number of commercial vehicle tyres"
+              data_type: "INTEGER"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "truck_tyres"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "truck_tyres_units"
+                data_type: "UInt32"
+
+            - field_id: "truck_tyres_rate"
+              field_code: "Box 24"
+              field_name_en: "Truck/Bus Tyre Rate (â‚¬/unit)"
+              field_name_mt: "Rata tat-Tajer tat-Trakk/Xarabank (â‚¬/unitÃ )"
+              field_description: "Rate per tyre"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬#.##"
+              max_length: null
+              precision: 4
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "4.66"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eco_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "truck_tyre_rate"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "truck_tyres_rate"
+                data_type: "Decimal(4,2)"
+
+            - field_id: "truck_tyres_eco"
+              field_code: "Box 25"
+              field_name_en: "Truck/Bus Tyres Eco-Contribution"
+              field_name_mt: "Eko-Kontribuzzjoni tat-Tajers tat-Trakkijiet"
+              field_description: "Units Ã— rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "truck_tyres_units * truck_tyres_rate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "truck_tyres_eco"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "truck_tyres_eco"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 5: Electrical & Electronic Equipment (EEE)
+        # ----------------------------------------------------------------------
+        - section_id: "EEE"
+          section_name: "Electrical & Electronic Equipment"
+          section_description: "Eco-contribution on EEE (WEEE directive)"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "eee_small_kg"
+              field_code: "Box 30"
+              field_name_en: "Small EEE (kg)"
+              field_name_mt: "EEE Å»gÄ§ir (kg)"
+              field_description: "Weight of small appliances"
+              data_type: "DECIMAL"
+              format: "###,###.##"
+              max_length: null
+              precision: 12
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "eee_small_kg"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "eee_small_kg"
+                data_type: "Decimal(12,2)"
+
+            - field_id: "eee_small_rate"
+              field_code: "Box 31"
+              field_name_en: "Small EEE Rate (â‚¬/kg)"
+              field_name_mt: "Rata EEE Å»gÄ§ir (â‚¬/kg)"
+              field_description: "Rate per kg"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬#.##"
+              max_length: null
+              precision: 4
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "0.12"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eco_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "eee_small_rate"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "eee_small_rate"
+                data_type: "Decimal(4,2)"
+
+            - field_id: "eee_small_eco"
+              field_code: "Box 32"
+              field_name_en: "Small EEE Eco-Contribution"
+              field_name_mt: "Eko-Kontribuzzjoni EEE Å»gÄ§ir"
+              field_description: "kg Ã— rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "eee_small_kg * eee_small_rate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "eee_small_eco"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "eee_small_eco"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "eee_large_kg"
+              field_code: "Box 33"
+              field_name_en: "Large EEE (kg)"
+              field_name_mt: "EEE Kbir (kg)"
+              field_description: "Weight of large appliances"
+              data_type: "DECIMAL"
+              format: "###,###.##"
+              max_length: null
+              precision: 12
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "eee_large_kg"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "eee_large_kg"
+                data_type: "Decimal(12,2)"
+
+            - field_id: "eee_large_rate"
+              field_code: "Box 34"
+              field_name_en: "Large EEE Rate (â‚¬/kg)"
+              field_name_mt: "Rata EEE Kbir (â‚¬/kg)"
+              field_description: "Rate per kg"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬#.##"
+              max_length: null
+              precision: 4
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "0.07"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eco_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "eee_large_rate"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "eee_large_rate"
+                data_type: "Decimal(4,2)"
+
+            - field_id: "eee_large_eco"
+              field_code: "Box 35"
+              field_name_en: "Large EEE Eco-Contribution"
+              field_name_mt: "Eko-Kontribuzzjoni EEE Kbir"
+              field_description: "kg Ã— rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "eee_large_kg * eee_large_rate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "eee_large_eco"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "eee_large_eco"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 6: Batteries
+        # ----------------------------------------------------------------------
+        - section_id: "BATTERIES"
+          section_name: "Batteries"
+          section_description: "Eco-contribution on batteries"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "portable_batteries_kg"
+              field_code: "Box 40"
+              field_name_en: "Portable Batteries (kg)"
+              field_name_mt: "Batteriji Portabbli (kg)"
+              field_description: "Weight of portable batteries"
+              data_type: "DECIMAL"
+              format: "###,###.##"
+              max_length: null
+              precision: 12
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0.00"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "portable_batteries_kg"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "portable_batteries_kg"
+                data_type: "Decimal(12,2)"
+
+            - field_id: "portable_batteries_rate"
+              field_code: "Box 41"
+              field_name_en: "Portable Battery Rate (â‚¬/kg)"
+              field_name_mt: "Rata tal-Batterija Portabbli (â‚¬/kg)"
+              field_description: "Rate per kg"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬#.##"
+              max_length: null
+              precision: 4
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "0.47"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eco_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "portable_battery_rate"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "portable_batteries_rate"
+                data_type: "Decimal(4,2)"
+
+            - field_id: "portable_batteries_eco"
+              field_code: "Box 42"
+              field_name_en: "Portable Batteries Eco-Contribution"
+              field_name_mt: "Eko-Kontribuzzjoni tal-Batteriji Portabbli"
+              field_description: "kg Ã— rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "portable_batteries_kg * portable_batteries_rate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "portable_batteries_eco"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "portable_batteries_eco"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "automotive_batteries_units"
+              field_code: "Box 43"
+              field_name_en: "Automotive Batteries (Units)"
+              field_name_mt: "Batteriji tal-Vetturi (Unitajiet)"
+              field_description: "Number of car batteries"
+              data_type: "INTEGER"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "auto_batteries"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "automotive_batteries_units"
+                data_type: "UInt32"
+
+            - field_id: "automotive_batteries_rate"
+              field_code: "Box 44"
+              field_name_en: "Automotive Battery Rate (â‚¬/unit)"
+              field_name_mt: "Rata tal-Batterija tal-Vettura (â‚¬/unitÃ )"
+              field_description: "Rate per battery"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬#.##"
+              max_length: null
+              precision: 4
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "2.33"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eco_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "auto_battery_rate"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "automotive_batteries_rate"
+                data_type: "Decimal(4,2)"
+
+            - field_id: "automotive_batteries_eco"
+              field_code: "Box 45"
+              field_name_en: "Automotive Batteries Eco-Contribution"
+              field_name_mt: "Eko-Kontribuzzjoni tal-Batteriji tal-Vetturi"
+              field_description: "Units Ã— rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "automotive_batteries_units * automotive_batteries_rate"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "auto_batteries_eco"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "automotive_batteries_eco"
+                data_type: "Decimal(15,2)"
+
+        # ----------------------------------------------------------------------
+        # Section 7: Summary
+        # ----------------------------------------------------------------------
+        - section_id: "SUMMARY"
+          section_name: "Summary"
+          section_description: "Total eco-contribution payable"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_eco_contribution"
+              field_code: "Box 50"
+              field_name_en: "Total Eco-Contribution Payable"
+              field_name_mt: "Eko-Kontribuzzjoni Totali Dovuta"
+              field_description: "Sum of all eco-contributions"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "plastic_eco + glass_eco + car_tyres_eco + truck_tyres_eco + eee_small_eco + eee_large_eco + portable_batteries_eco + automotive_batteries_eco"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_products"
+                column: "total_eco"
+              ors_mapping:
+                table: "mtca_ors.eco_products_return"
+                column: "total_eco_contribution"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "VAT_Return"
+          relationship_type: "filed_with"
+          relationship_description: "Filed alongside quarterly VAT return"
+
+      submission_workflow:
+        authentication_required: "e-ID"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Electronic receipt"
+
+  # ==========================================================================
+  # ECO Accommodation Return: Environmental Contribution on Accommodation
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "ECO_ACCOMMODATION"
+        form_name_en: "Environmental Contribution on Accommodation Return"
+        form_name_mt: "Dikjarazzjoni tal-Kontribuzzjoni Ambjentali fuq l-Akkomodazzjoni"
+        version: "2024"
+        effective_from: "2016-06-01"
+        effective_to: "current"
+        legislative_basis: "Environment Protection Act Cap. 549"
+        subsidiary_legislation:
+          - "S.L.549.103 - Environmental Contribution Regulations"
+        administering_authority: "CFR"
+        tax_type: "Environmental Tax"
+        taxpayer_category: "Company, Individual (Accommodation Provider)"
+        filing_frequency: "Quarterly"
+        filing_deadline: "15th of Feb, May, Aug, Nov"
+        submission_method: "Electronic"
+        electronic_portal: "CFR e-Services (e-ID)"
+        source_url: "https://cfr.gov.mt/en/eServices/Pages/Environmental-Contribution.aspx"
+        pdf_available: false
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          â‚¬0.50 per night per guest for licensed accommodation.
+          Applies to hotels, guesthouses, hostels, B&Bs, and licensed 
+          short-term rentals. Capped at maximum of 5 nights per stay.
+          Exemptions for children under 18 and specific categories.
+
+      sections:
+        - section_id: "PROVIDER"
+          section_name: "Accommodation Provider Details"
+          section_description: "Licensed accommodation provider"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "provider_tin"
+              field_code: "Box 1"
+              field_name_en: "Provider TIN"
+              field_name_mt: "TIN tal-Fornitur"
+              field_description: "Tax ID of accommodation provider"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "provider_tin"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "provider_tin"
+                data_type: "String"
+
+            - field_id: "provider_name"
+              field_code: "Box 2"
+              field_name_en: "Provider/Establishment Name"
+              field_name_mt: "Isem tal-Fornitur/Stabbiliment"
+              field_description: "Name of accommodation"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "provider_name"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "provider_name"
+                data_type: "String"
+
+            - field_id: "mta_license_number"
+              field_code: "Box 3"
+              field_name_en: "MTA License Number"
+              field_name_mt: "Numru tal-LiÄ‹enzja tal-MTA"
+              field_description: "Malta Tourism Authority license"
+              data_type: "STRING"
+              format: null
+              max_length: 20
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "mta_licenses"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "mta_license"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "mta_license_number"
+                data_type: "String"
+
+            - field_id: "accommodation_type"
+              field_code: "Box 4"
+              field_name_en: "Accommodation Type"
+              field_name_mt: "Tip ta' Akkomodazzjoni"
+              field_description: "Category of accommodation"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "HTL"
+                  description_en: "Hotel"
+                  description_mt: "Lukanda"
+                - code: "GHS"
+                  description_en: "Guesthouse"
+                  description_mt: "Guesthouse"
+                - code: "HOS"
+                  description_en: "Hostel"
+                  description_mt: "Hostel"
+                - code: "BNB"
+                  description_en: "Bed & Breakfast"
+                  description_mt: "Bed & Breakfast"
+                - code: "APT"
+                  description_en: "Self-catering Apartment"
+                  description_mt: "Appartament Self-Catering"
+                - code: "STR"
+                  description_en: "Short-term Rental"
+                  description_mt: "Kiri gÄ§al Å»mien Qasir"
+                - code: "OTH"
+                  description_en: "Other Licensed Accommodation"
+                  description_mt: "Akkomodazzjoni LiÄ‹enzjata OÄ§ra"
+              reference_table: "accommodation_types"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "accommodation_type"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "accommodation_type"
+                data_type: "FixedString(3)"
+
+        - section_id: "PERIOD"
+          section_name: "Return Period"
+          section_description: "Quarterly period"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "return_year"
+              field_code: "Box 10"
+              field_name_en: "Year"
+              field_name_mt: "Sena"
+              field_description: "Calendar year"
+              data_type: "YEAR"
+              format: "YYYY"
+              max_length: 4
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "return_year"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "return_year"
+                data_type: "UInt16"
+
+            - field_id: "return_quarter"
+              field_code: "Box 11"
+              field_name_en: "Quarter"
+              field_name_mt: "Kwart"
+              field_description: "Calendar quarter"
+              data_type: "CODE"
+              format: null
+              max_length: 2
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "Q1"
+                  description_en: "January - March (due Feb 15)"
+                  description_mt: "Jannar - Marzu (dovut 15 ta' Frar)"
+                - code: "Q2"
+                  description_en: "April - June (due May 15)"
+                  description_mt: "April - Ä unju (dovut 15 ta' Mejju)"
+                - code: "Q3"
+                  description_en: "July - September (due Aug 15)"
+                  description_mt: "Lulju - Settembru (dovut 15 ta' Awwissu)"
+                - code: "Q4"
+                  description_en: "October - December (due Nov 15)"
+                  description_mt: "Ottubru - DiÄ‹embru (dovut 15 ta' Novembru)"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "return_quarter"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "return_quarter"
+                data_type: "FixedString(2)"
+
+        - section_id: "GUEST_NIGHTS"
+          section_name: "Guest Night Details"
+          section_description: "Number of chargeable guest nights"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "total_guest_nights"
+              field_code: "Box 20"
+              field_name_en: "Total Guest Nights"
+              field_name_mt: "Iljieli tal-Mistednin Totali"
+              field_description: "Total nights stayed by all guests"
+              data_type: "INTEGER"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "total_nights"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "total_guest_nights"
+                data_type: "UInt32"
+
+            - field_id: "exempt_under_18"
+              field_code: "Box 21"
+              field_name_en: "Exempt Nights (Under 18)"
+              field_name_mt: "Iljieli EÅ¼enti (TaÄ§t 18)"
+              field_description: "Nights by guests under 18 years"
+              data_type: "INTEGER"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "ECOA_010"
+                  rule_type: "comparison"
+                  rule_description: "Cannot exceed total"
+                  rule_expression: "exempt_under_18 <= total_guest_nights"
+                  error_message_en: "Exempt nights cannot exceed total"
+                  error_message_mt: "Iljieli eÅ¼enti ma jistgÄ§ux jaqbÅ¼u t-total"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "exempt_under_18"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "exempt_under_18"
+                data_type: "UInt32"
+
+            - field_id: "exempt_over_5_nights"
+              field_code: "Box 22"
+              field_name_en: "Exempt Nights (Over 5 per Stay)"
+              field_name_mt: "Iljieli EÅ¼enti (Aktar minn 5 kull SoÄ¡Ä¡orn)"
+              field_description: "Nights exceeding 5-night cap per stay"
+              data_type: "INTEGER"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "exempt_over_5"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "exempt_over_5_nights"
+                data_type: "UInt32"
+
+            - field_id: "other_exemptions"
+              field_code: "Box 23"
+              field_name_en: "Other Exempt Nights"
+              field_name_mt: "Iljieli EÅ¼enti OÄ§ra"
+              field_description: "Other exempt categories (e.g., diplomatic)"
+              data_type: "INTEGER"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: "0"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "other_exempt"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "other_exemptions"
+                data_type: "UInt32"
+
+            - field_id: "chargeable_nights"
+              field_code: "Box 24"
+              field_name_en: "Chargeable Guest Nights"
+              field_name_mt: "Iljieli tal-Mistednin li JitÄ§allsu"
+              field_description: "Total less exemptions"
+              data_type: "INTEGER"
+              format: null
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "total_guest_nights - exempt_under_18 - exempt_over_5_nights - other_exemptions"
+              validation_rules:
+                - rule_id: "ECOA_011"
+                  rule_type: "range"
+                  rule_description: "Must be non-negative"
+                  rule_expression: "chargeable_nights >= 0"
+                  error_message_en: "Chargeable nights cannot be negative"
+                  error_message_mt: "Iljieli li jitÄ§allsu ma jistgÄ§ux ikunu negattivi"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "chargeable_nights"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "chargeable_nights"
+                data_type: "UInt32"
+
+        - section_id: "CALCULATION"
+          section_name: "Contribution Calculation"
+          section_description: "Environmental contribution calculation"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "rate_per_night"
+              field_code: "Box 30"
+              field_name_en: "Rate per Guest Night"
+              field_name_mt: "Rata gÄ§al Kull Lejl tal-Mistieden"
+              field_description: "Current rate (â‚¬0.50)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬#.##"
+              max_length: null
+              precision: 4
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: "0.50"
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "eco_rates"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "rate_per_night"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "rate_per_night"
+                data_type: "Decimal(4,2)"
+
+            - field_id: "total_contribution"
+              field_code: "Box 31"
+              field_name_en: "Total Environmental Contribution"
+              field_name_mt: "Kontribuzzjoni Ambjentali Totali"
+              field_description: "Chargeable nights Ã— rate"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: false
+              default_value: null
+              calculated: true
+              calculation_formula: "chargeable_nights * rate_per_night"
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "eco_tax_db"
+                table: "eco_accommodation"
+                column: "total_contribution"
+              ors_mapping:
+                table: "mtca_ors.eco_accommodation_return"
+                column: "total_contribution"
+                data_type: "Decimal(15,2)"
+
+      attachments: []
+
+      related_forms:
+        - form_code: "TA24"
+          relationship_type: "related"
+          relationship_description: "Rental income tax form for same property"
+
+      submission_workflow:
+        authentication_required: "e-ID"
+        signature_required: false
+        payment_integration: true
+        acknowledgment_type: "Electronic receipt"
+
+  # ==========================================================================
+  # BCRS Registration: Beverage Container Refund Scheme
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "BCRS_REGISTRATION"
+        form_name_en: "Beverage Container Refund Scheme Producer Registration"
+        form_name_mt: "ReÄ¡istrazzjoni tal-Produttur fl-Iskema ta' RifuÅ¼joni tal-Kontenituri tax-Xorb"
+        version: "2024"
+        effective_from: "2022-11-01"
+        effective_to: "current"
+        legislative_basis: "Beverage Container Refund Scheme Regulations S.L.549.143"
+        subsidiary_legislation: []
+        administering_authority: "BCRS Malta Ltd / ERA"
+        tax_type: "Environmental Scheme"
+        taxpayer_category: "Company (Producer/Importer)"
+        filing_frequency: "One-time (Registration)"
+        filing_deadline: "Before placing beverages on market"
+        submission_method: "Electronic"
+        electronic_portal: "BCRS Malta Portal"
+        source_url: "https://www.bfrsmalta.com.mt/"
+        pdf_available: false
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Mandatory registration for producers/importers of beverages in 
+          single-use plastic, metal (aluminum/steel), or glass containers.
+          â‚¬0.10 deposit per container collected from consumers.
+          Producers pay handling fees to BCRS Malta.
+          Excludes milk, wine, spirits >5% ABV.
+
+      sections:
+        - section_id: "PRODUCER"
+          section_name: "Producer/Importer Details"
+          section_description: "Company placing beverages on Malta market"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "company_tin"
+              field_code: "Section 1.1"
+              field_name_en: "Company TIN"
+              field_name_mt: "TIN tal-Kumpanija"
+              field_description: "Tax identification number"
+              data_type: "TIN"
+              format: "999999999"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "company_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_registration"
+                column: "company_tin"
+              ors_mapping:
+                table: "mtca_ors.bcrs_producer"
+                column: "company_tin"
+                data_type: "FixedString(9)"
+
+            - field_id: "company_name"
+              field_code: "Section 1.2"
+              field_name_en: "Company Legal Name"
+              field_name_mt: "Isem Legali tal-Kumpanija"
+              field_description: "As per MBR registration"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_registration"
+                column: "company_name"
+              ors_mapping:
+                table: "mtca_ors.bcrs_producer"
+                column: "company_name"
+                data_type: "String"
+
+            - field_id: "company_roc"
+              field_code: "Section 1.3"
+              field_name_en: "Company Registration Number"
+              field_name_mt: "Numru tar-ReÄ¡istrazzjoni tal-Kumpanija"
+              field_description: "MBR registration"
+              data_type: "STRING"
+              format: "C #####"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "mbr_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_registration"
+                column: "company_roc"
+              ors_mapping:
+                table: "mtca_ors.bcrs_producer"
+                column: "company_roc"
+                data_type: "String"
+
+            - field_id: "vat_number"
+              field_code: "Section 1.4"
+              field_name_en: "VAT Number"
+              field_name_mt: "Numru tal-VAT"
+              field_description: "VAT registration"
+              data_type: "STRING"
+              format: "MT########"
+              max_length: 10
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "vat_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_registration"
+                column: "vat_number"
+              ors_mapping:
+                table: "mtca_ors.bcrs_producer"
+                column: "vat_number"
+                data_type: "FixedString(10)"
+
+            - field_id: "producer_type"
+              field_code: "Section 1.5"
+              field_name_en: "Producer Type"
+              field_name_mt: "Tip ta' Produttur"
+              field_description: "Producer or importer"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "MFG"
+                  description_en: "Manufacturer (produces in Malta)"
+                  description_mt: "Manifattur (jipproduÄ‹i f'Malta)"
+                - code: "IMP"
+                  description_en: "Importer"
+                  description_mt: "Importatur"
+                - code: "BTH"
+                  description_en: "Both Manufacturer and Importer"
+                  description_mt: "Kemm Manifattur kif ukoll Importatur"
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_registration"
+                column: "producer_type"
+              ors_mapping:
+                table: "mtca_ors.bcrs_producer"
+                column: "producer_type"
+                data_type: "FixedString(3)"
+
+        - section_id: "PRODUCTS"
+          section_name: "Product Details"
+          section_description: "Beverage products covered"
+          repeatable: true
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "product_brand"
+              field_code: "Section 2.1"
+              field_name_en: "Product Brand Name"
+              field_name_mt: "Isem tal-Marka tal-Prodott"
+              field_description: "Brand name of beverage"
+              data_type: "STRING"
+              format: null
+              max_length: 100
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_products"
+                column: "brand_name"
+              ors_mapping:
+                table: "mtca_ors.bcrs_products"
+                column: "product_brand"
+                data_type: "String"
+
+            - field_id: "container_material"
+              field_code: "Section 2.2"
+              field_name_en: "Container Material"
+              field_name_mt: "Materjal tal-Kontenitur"
+              field_description: "Type of container"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "PET"
+                  description_en: "PET Plastic"
+                  description_mt: "Plastik PET"
+                - code: "ALU"
+                  description_en: "Aluminum"
+                  description_mt: "Aluminju"
+                - code: "STL"
+                  description_en: "Steel"
+                  description_mt: "Azzar"
+                - code: "GLS"
+                  description_en: "Glass"
+                  description_mt: "Ä¦Ä¡ieÄ¡"
+              reference_table: "container_materials"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_products"
+                column: "container_material"
+              ors_mapping:
+                table: "mtca_ors.bcrs_products"
+                column: "container_material"
+                data_type: "FixedString(3)"
+
+            - field_id: "container_volume_ml"
+              field_code: "Section 2.3"
+              field_name_en: "Container Volume (ml)"
+              field_name_mt: "Volum tal-Kontenitur (ml)"
+              field_description: "Volume in milliliters"
+              data_type: "INTEGER"
+              format: null
+              max_length: 5
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "BCRS_010"
+                  rule_type: "range"
+                  rule_description: "Must be 100ml-3000ml"
+                  rule_expression: "container_volume_ml >= 100 AND container_volume_ml <= 3000"
+                  error_message_en: "Volume must be between 100ml and 3000ml"
+                  error_message_mt: "Volum irid ikun bejn 100ml u 3000ml"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_products"
+                column: "volume_ml"
+              ors_mapping:
+                table: "mtca_ors.bcrs_products"
+                column: "container_volume_ml"
+                data_type: "UInt16"
+
+            - field_id: "ean_barcode"
+              field_code: "Section 2.4"
+              field_name_en: "EAN Barcode"
+              field_name_mt: "Barcode EAN"
+              field_description: "Product barcode for RVM scanning"
+              data_type: "STRING"
+              format: "EAN-13"
+              max_length: 13
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "BCRS_011"
+                  rule_type: "pattern"
+                  rule_description: "Valid EAN-13"
+                  rule_expression: "^[0-9]{13}$"
+                  error_message_en: "Invalid EAN-13 barcode"
+                  error_message_mt: "Barcode EAN-13 mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_products"
+                column: "ean_barcode"
+              ors_mapping:
+                table: "mtca_ors.bcrs_products"
+                column: "ean_barcode"
+                data_type: "FixedString(13)"
+
+            - field_id: "estimated_annual_units"
+              field_code: "Section 2.5"
+              field_name_en: "Estimated Annual Units"
+              field_name_mt: "Unitajiet Stmati Annwali"
+              field_description: "Projected annual sales volume"
+              data_type: "INTEGER"
+              format: null
+              max_length: 15
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "bcrs_db"
+                table: "producer_products"
+                column: "annual_units"
+              ors_mapping:
+                table: "mtca_ors.bcrs_products"
+                column: "estimated_annual_units"
+                data_type: "UInt64"
+
+      attachments:
+        - attachment_code: "MBR_CERT"
+          attachment_name: "MBR Registration Certificate"
+          required: true
+          required_condition: null
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+        - attachment_code: "PRODUCT_IMAGES"
+          attachment_name: "Product Label Images"
+          required: true
+          required_condition: null
+          max_file_size_mb: 20
+          allowed_formats:
+            - "JPG"
+            - "PNG"
+            - "PDF"
+
+      related_forms:
+        - form_code: "ECO_PRODUCTS"
+          relationship_type: "related"
+          relationship_description: "Eco-contribution also applies to containers"
+
+      submission_workflow:
+        authentication_required: "BCRS Portal registration"
+        signature_required: true
+        payment_integration: true
+        acknowledgment_type: "BCRS Producer ID issued"
+
+  # ==========================================================================
+  # VEH 007: Motor Vehicle Registration Tax Exemption (TORE)
+  # ==========================================================================
+  - form:
+      metadata:
+        form_code: "VEH_007"
+        form_name_en: "Motor Vehicle Registration Tax Exemption Application (TORE)"
+        form_name_mt: "Applikazzjoni gÄ§all-EÅ¼enzjoni mit-Taxxa tar-ReÄ¡istrazzjoni tal-Vetturi (TORE)"
+        version: "2024"
+        effective_from: "2018-01-01"
+        effective_to: "current"
+        legislative_basis: "Motor Vehicle Registration and Licensing Act Cap. 368"
+        subsidiary_legislation:
+          - "S.L.368.02 - Registration Tax Exemption Rules"
+        administering_authority: "Transport Malta / CFR"
+        tax_type: "Vehicle Registration Tax"
+        taxpayer_category: "Individual, Company"
+        filing_frequency: "Event-driven"
+        filing_deadline: "Before vehicle registration"
+        submission_method: "Paper/Electronic"
+        electronic_portal: "Transport Malta Portal"
+        source_url: "https://www.transport.gov.mt/land/licensing/vehicle-registration"
+        pdf_available: true
+        online_form_available: true
+        xml_schema_ref: null
+        notes: |
+          Application for exemption from motor vehicle registration tax.
+          Exemptions available for electric vehicles, disabled persons,
+          diplomats, returning Maltese residents, and specific categories.
+          Requires supporting documentation per exemption type.
+
+      sections:
+        - section_id: "APPLICANT"
+          section_name: "Applicant Details"
+          section_description: "Person or entity applying for exemption"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "applicant_tin"
+              field_code: "Part A.1"
+              field_name_en: "Applicant TIN"
+              field_name_mt: "TIN tal-Applikant"
+              field_description: "Tax identification number"
+              data_type: "TIN"
+              format: "999999999 or 9999999L"
+              max_length: 9
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: "taxpayer_register"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "applicant_tin"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "applicant_tin"
+                data_type: "String"
+
+            - field_id: "applicant_name"
+              field_code: "Part A.2"
+              field_name_en: "Applicant Name"
+              field_name_mt: "Isem tal-Applikant"
+              field_description: "Full name or company name"
+              data_type: "STRING"
+              format: null
+              max_length: 200
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "applicant_name"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "applicant_name"
+                data_type: "String"
+
+            - field_id: "id_card_number"
+              field_code: "Part A.3"
+              field_name_en: "ID Card Number"
+              field_name_mt: "Numru tal-Karta tal-IdentitÃ "
+              field_description: "For individuals"
+              data_type: "STRING"
+              format: "#######L"
+              max_length: 8
+              precision: null
+              scale: null
+              required: false
+              required_condition: "applicant_type = IND"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "id_card"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "id_card_number"
+                data_type: "String"
+
+        - section_id: "VEHICLE"
+          section_name: "Vehicle Details"
+          section_description: "Vehicle for which exemption is sought"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "vehicle_make"
+              field_code: "Part B.1"
+              field_name_en: "Vehicle Make"
+              field_name_mt: "Marka tal-Vettura"
+              field_description: "Manufacturer"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "vehicle_make"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "vehicle_make"
+                data_type: "String"
+
+            - field_id: "vehicle_model"
+              field_code: "Part B.2"
+              field_name_en: "Vehicle Model"
+              field_name_mt: "Mudell tal-Vettura"
+              field_description: "Model name"
+              data_type: "STRING"
+              format: null
+              max_length: 50
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "vehicle_model"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "vehicle_model"
+                data_type: "String"
+
+            - field_id: "chassis_number"
+              field_code: "Part B.3"
+              field_name_en: "Chassis/VIN Number"
+              field_name_mt: "Numru tax-Chassis/VIN"
+              field_description: "Vehicle identification number"
+              data_type: "STRING"
+              format: "17 characters"
+              max_length: 17
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VEH_010"
+                  rule_type: "pattern"
+                  rule_description: "Valid VIN format"
+                  rule_expression: "^[A-HJ-NPR-Z0-9]{17}$"
+                  error_message_en: "Invalid VIN format"
+                  error_message_mt: "Format tal-VIN mhux validu"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "chassis_number"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "chassis_number"
+                data_type: "FixedString(17)"
+
+            - field_id: "fuel_type"
+              field_code: "Part B.4"
+              field_name_en: "Fuel Type"
+              field_name_mt: "Tip ta' Fjuwil"
+              field_description: "Propulsion type"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "PET"
+                  description_en: "Petrol"
+                  description_mt: "Petrol"
+                - code: "DIE"
+                  description_en: "Diesel"
+                  description_mt: "Diesel"
+                - code: "HYB"
+                  description_en: "Hybrid"
+                  description_mt: "Ibridu"
+                - code: "PHV"
+                  description_en: "Plug-in Hybrid"
+                  description_mt: "Plug-in Ibridu"
+                - code: "ELE"
+                  description_en: "Full Electric"
+                  description_mt: "Elettriku SÄ§iÄ§"
+                - code: "LPG"
+                  description_en: "LPG"
+                  description_mt: "LPG"
+                - code: "HYD"
+                  description_en: "Hydrogen"
+                  description_mt: "IdroÄ¡enu"
+              reference_table: "fuel_types"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "fuel_type"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "fuel_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "co2_emissions"
+              field_code: "Part B.5"
+              field_name_en: "CO2 Emissions (g/km)"
+              field_name_mt: "Emissjonijiet CO2 (g/km)"
+              field_description: "WLTP combined CO2"
+              data_type: "INTEGER"
+              format: null
+              max_length: 4
+              precision: null
+              scale: null
+              required: false
+              required_condition: "fuel_type != ELE"
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "co2_emissions"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "co2_emissions"
+                data_type: "UInt16"
+
+            - field_id: "vehicle_value"
+              field_code: "Part B.6"
+              field_name_en: "Vehicle Value (â‚¬)"
+              field_name_mt: "Valur tal-Vettura (â‚¬)"
+              field_description: "Purchase price or market value"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "vehicle_value"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "vehicle_value"
+                data_type: "Decimal(15,2)"
+
+        - section_id: "EXEMPTION"
+          section_name: "Exemption Details"
+          section_description: "Type of exemption claimed"
+          repeatable: false
+          conditional: false
+          condition_logic: null
+          fields:
+            - field_id: "exemption_type"
+              field_code: "Part C.1"
+              field_name_en: "Exemption Type"
+              field_name_mt: "Tip ta' EÅ¼enzjoni"
+              field_description: "Category of exemption"
+              data_type: "CODE"
+              format: null
+              max_length: 3
+              precision: null
+              scale: null
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values:
+                - code: "ELE"
+                  description_en: "Electric Vehicle Grant"
+                  description_mt: "GÄ§otja gÄ§al Vettura Elettrika"
+                - code: "DIS"
+                  description_en: "Disabled Person"
+                  description_mt: "Persuna b'DiÅ¼abilitÃ "
+                - code: "DIP"
+                  description_en: "Diplomatic/Consular"
+                  description_mt: "Diplomatiku/Konsulari"
+                - code: "RET"
+                  description_en: "Returning Maltese Resident"
+                  description_mt: "Resident Malti li Jirritorna"
+                - code: "TRF"
+                  description_en: "Transfer of Residence"
+                  description_mt: "Trasferiment ta' Residenza"
+                - code: "INH"
+                  description_en: "Inherited Vehicle"
+                  description_mt: "Vettura li Wirtet"
+                - code: "OTH"
+                  description_en: "Other (specify)"
+                  description_mt: "OÄ§ra (speÄ‹ifika)"
+              reference_table: "exemption_types"
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "exemption_type"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "exemption_type"
+                data_type: "FixedString(3)"
+
+            - field_id: "registration_tax_due"
+              field_code: "Part C.2"
+              field_name_en: "Registration Tax Otherwise Due"
+              field_name_mt: "Taxxa tar-ReÄ¡istrazzjoni li Kienet Tkun Dovuta"
+              field_description: "Tax amount being exempted"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules: []
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "tax_amount"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "registration_tax_due"
+                data_type: "Decimal(15,2)"
+
+            - field_id: "exemption_amount"
+              field_code: "Part C.3"
+              field_name_en: "Exemption Amount"
+              field_name_mt: "Ammont tal-EÅ¼enzjoni"
+              field_description: "Amount being exempted (may be partial)"
+              data_type: "CURRENCY_EUR"
+              format: "â‚¬###,###.00"
+              max_length: null
+              precision: 15
+              scale: 2
+              required: true
+              required_condition: null
+              editable: true
+              default_value: null
+              calculated: false
+              calculation_formula: null
+              validation_rules:
+                - rule_id: "VEH_020"
+                  rule_type: "comparison"
+                  rule_description: "Cannot exceed tax due"
+                  rule_expression: "exemption_amount <= registration_tax_due"
+                  error_message_en: "Exemption cannot exceed tax due"
+                  error_message_mt: "EÅ¼enzjoni ma tistax taqbeÅ¼ it-taxxa dovuta"
+                  severity: "error"
+              allowed_values: []
+              reference_table: null
+              cross_form_reference: null
+              legacy_mapping:
+                database: "vehicle_tax_db"
+                table: "veh007"
+                column: "exemption_amount"
+              ors_mapping:
+                table: "mtca_ors.vehicle_tax_exemption"
+                column: "exemption_amount"
+                data_type: "Decimal(15,2)"
+
+      attachments:
+        - attachment_code: "COC"
+          attachment_name: "Certificate of Conformity"
+          required: true
+          required_condition: null
+          max_file_size_mb: 10
+          allowed_formats:
+            - "PDF"
+        - attachment_code: "INVOICE"
+          attachment_name: "Purchase Invoice"
+          required: true
+          required_condition: null
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+        - attachment_code: "DISABILITY_CERT"
+          attachment_name: "Disability Certificate"
+          required: false
+          required_condition: "exemption_type = DIS"
+          max_file_size_mb: 5
+          allowed_formats:
+            - "PDF"
+
+      related_forms:
+        - form_code: "Vehicle_Circulation_License"
+          relationship_type: "follows"
+          relationship_description: "Exemption precedes vehicle registration"
+
+      submission_workflow:
+        authentication_required: "Transport Malta / e-ID"
+        signature_required: true
+        payment_integration: false
+        acknowledgment_type: "Exemption approval letter"
+
+# ============================================================================
+# Reference Tables for Priority 2C Forms
+# ============================================================================
+reference_tables:
+  eco_rates:
+    plastic_container:
+      rate: 0.0232
+      unit: "per unit"
+      effective_from: "2024-01-01"
+    glass_container:
+      rate: 0.0116
+      unit: "per unit"
+      effective_from: "2024-01-01"
+    car_tyre:
+      rate: 1.16
+      unit: "per unit"
+      effective_from: "2024-01-01"
+    truck_tyre:
+      rate: 4.66
+      unit: "per unit"
+      effective_from: "2024-01-01"
+    eee_small:
+      rate: 0.12
+      unit: "per kg"
+      effective_from: "2024-01-01"
+    eee_large:
+      rate: 0.07
+      unit: "per kg"
+      effective_from: "2024-01-01"
+    portable_battery:
+      rate: 0.47
+      unit: "per kg"
+      effective_from: "2024-01-01"
+    automotive_battery:
+      rate: 2.33
+      unit: "per unit"
+      effective_from: "2024-01-01"
+    accommodation:
+      rate: 0.50
+      unit: "per guest night"
+      max_nights: 5
+      effective_from: "2016-06-01"
+
+  accommodation_types:
+    - code: "HTL"
+      description_en: "Hotel"
+    - code: "GHS"
+      description_en: "Guesthouse"
+    - code: "HOS"
+      description_en: "Hostel"
+    - code: "BNB"
+      description_en: "Bed & Breakfast"
+    - code: "APT"
+      description_en: "Self-catering Apartment"
+    - code: "STR"
+      description_en: "Short-term Rental"
+    - code: "OTH"
+      description_en: "Other Licensed"
+
+  container_materials:
+    - code: "PET"
+      description_en: "PET Plastic"
+      deposit: 0.10
+    - code: "ALU"
+      description_en: "Aluminum"
+      deposit: 0.10
+    - code: "STL"
+      description_en: "Steel"
+      deposit: 0.10
+    - code: "GLS"
+      description_en: "Glass"
+      deposit: 0.10
+
+  fuel_types:
+    - code: "PET"
+      description_en: "Petrol"
+    - code: "DIE"
+      description_en: "Diesel"
+    - code: "HYB"
+      description_en: "Hybrid"
+    - code: "PHV"
+      description_en: "Plug-in Hybrid"
+    - code: "ELE"
+      description_en: "Full Electric"
+    - code: "LPG"
+      description_en: "LPG"
+    - code: "HYD"
+      description_en: "Hydrogen"
+
+  exemption_types:
+    - code: "ELE"
+      description_en: "Electric Vehicle Grant"
+    - code: "DIS"
+      description_en: "Disabled Person"
+    - code: "DIP"
+      description_en: "Diplomatic/Consular"
+    - code: "RET"
+      description_en: "Returning Maltese Resident"
+    - code: "TRF"
+      description_en: "Transfer of Residence"
+    - code: "INH"
+      description_en: "Inherited Vehicle"
+    - code: "OTH"
+      description_en: "Other"
+
+# ============================================================================
+# Legacy to ORS Migration Mapping
+# ============================================================================
+migration_mapping:
+  eco_tax_db:
+    tables:
+      - legacy_table: "eco_products"
+        ors_table: "mtca_ors.eco_products_return"
+        key_columns:
+          - legacy: "declarant_tin"
+            ors: "declarant_tin"
+          - legacy: "return_year"
+            ors: "return_year"
+          - legacy: "return_quarter"
+            ors: "return_quarter"
+      - legacy_table: "eco_accommodation"
+        ors_table: "mtca_ors.eco_accommodation_return"
+        key_columns:
+          - legacy: "provider_tin"
+            ors: "provider_tin"
+          - legacy: "return_year"
+            ors: "return_year"
+          - legacy: "return_quarter"
+            ors: "return_quarter"
+
+  bcrs_db:
+    tables:
+      - legacy_table: "producer_registration"
+        ors_table: "mtca_ors.bcrs_producer"
+        key_columns:
+          - legacy: "company_tin"
+            ors: "company_tin"
+      - legacy_table: "producer_products"
+        ors_table: "mtca_ors.bcrs_products"
+        key_columns:
+          - legacy: "company_tin"
+            ors: "company_tin"
+          - legacy: "ean_barcode"
+            ors: "ean_barcode"
+
+  vehicle_tax_db:
+    tables:
+      - legacy_table: "veh007"
+        ors_table: "mtca_ors.vehicle_tax_exemption"
+        key_columns:
+          - legacy: "applicant_tin"
+            ors: "applicant_tin"
+          - legacy: "chassis_number"
+            ors: "chassis_number"

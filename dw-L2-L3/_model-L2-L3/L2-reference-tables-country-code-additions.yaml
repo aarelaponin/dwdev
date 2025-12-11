@@ -1,0 +1,2410 @@
+# =============================================================================
+# TA-RDM L2 - Reference Tables Country Code Additions
+# =============================================================================
+# File: L2-reference-tables-country-code-additions.yaml
+# Purpose: Add country_code support to existing reference tables
+# Pattern: Country-Scoped Reference Data Pattern
+# Version: 1.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L2 Generalization Process
+# Step: 2d of 6 in L2 Generalization process
+# =============================================================================
+#
+# This specification adds country_code columns to 8 existing reference tables,
+# enabling country-specific code values while maintaining universal codes.
+#
+# Key Design Principles:
+# - country_code = NULL indicates universal code (applies to all countries)
+# - country_code = ISO 3166-1 alpha-3 indicates country-specific code
+# - Country-specific codes take precedence over universal codes in queries
+# - Existing data becomes universal (country_code = NULL)
+# - Backward compatible: existing lookups continue to work
+#
+# Tables Modified:
+# 1. ref_tax_category
+# 2. ref_assessment_type
+# 3. ref_penalty_type
+# 4. ref_interest_type
+# 5. ref_payment_method
+# 6. ref_document_type
+# 7. ref_filing_status
+# 8. ref_compliance_status
+#
+# =============================================================================
+
+metadata:
+  specification_name: "L2 Reference Tables Country Code Additions"
+  version: "1.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L2 Generalization"
+  step: "2d"
+  description: |
+    Adds country_code support to existing reference tables, enabling
+    country-specific values while maintaining universal defaults.
+    
+    This modification pattern:
+    - Adds nullable country_code column (NULL = universal)
+    - Adds local language name column for internationalization
+    - Updates unique constraints to include country_code
+    - Adds indexes for efficient country-specific lookups
+    - Provides sample data for universal and country-specific codes
+
+# =============================================================================
+# MODIFICATION 1: ref_tax_category
+# =============================================================================
+# Purpose: Categorize taxes (Direct, Indirect, Property, etc.)
+# Change: Add country-specific categories while preserving universal ones
+# =============================================================================
+
+modifications:
+  - table_name: ref_tax_category
+    schema: reference
+    modification_summary: |
+      Add country_code to support country-specific tax categories
+      (e.g., Malta Gaming taxes, Environmental levies)
+    
+    current_structure:
+      columns:
+        - tax_category_code  # varchar(20) PK
+        - category_name      # varchar(100) NOT NULL
+        - description        # text
+        - display_order      # integer
+        - is_active          # boolean DEFAULT TRUE
+    
+    add_columns:
+      - name: country_code
+        type: char(3)
+        position: after tax_category_code
+        constraints:
+          not_null: false
+        description: "ISO 3166-1 alpha-3. NULL = universal category"
+        reference_data: ref_country
+      
+      - name: category_name_local
+        type: varchar(100)
+        position: after category_name
+        description: "Category name in local language (UTF-8)"
+      
+      - name: parent_category_code
+        type: varchar(20)
+        description: "Parent category for hierarchical structure"
+        constraints:
+          foreign_key:
+            table: reference.ref_tax_category
+            column: tax_category_code
+      
+      - name: oecd_classification
+        type: varchar(50)
+        description: "OECD tax classification code (1000, 2000, 3000, etc.)"
+    
+    modify_constraints:
+      - action: drop_if_exists
+        constraint_name: uk_tax_category_code
+      
+      - action: add
+        constraint:
+          name: uk_tax_category_code_country
+          type: unique
+          columns: [tax_category_code, country_code]
+          description: "Unique category code per country (NULL = universal)"
+    
+    add_indexes:
+      - name: idx_tax_category_country
+        columns: [country_code, tax_category_code]
+        description: "Efficient lookup by country"
+      
+      - name: idx_tax_category_parent
+        columns: [parent_category_code]
+        where: "parent_category_code IS NOT NULL"
+        description: "Hierarchy navigation"
+    
+    sample_data:
+      # Universal categories (OECD-aligned)
+      - tax_category_code: "INCOME"
+        country_code: null
+        category_name: "Income and Profits Taxes"
+        oecd_classification: "1000"
+        display_order: 10
+        is_active: true
+      
+      - tax_category_code: "PAYROLL"
+        country_code: null
+        category_name: "Social Security Contributions"
+        oecd_classification: "2000"
+        display_order: 20
+        is_active: true
+      
+      - tax_category_code: "PROPERTY"
+        country_code: null
+        category_name: "Property Taxes"
+        oecd_classification: "4000"
+        display_order: 30
+        is_active: true
+      
+      - tax_category_code: "GOODS_SERVICES"
+        country_code: null
+        category_name: "Taxes on Goods and Services"
+        oecd_classification: "5000"
+        display_order: 40
+        is_active: true
+      
+      - tax_category_code: "VAT"
+        country_code: null
+        category_name: "Value Added Tax"
+        parent_category_code: "GOODS_SERVICES"
+        oecd_classification: "5111"
+        display_order: 41
+        is_active: true
+      
+      - tax_category_code: "EXCISE"
+        country_code: null
+        category_name: "Excise Duties"
+        parent_category_code: "GOODS_SERVICES"
+        oecd_classification: "5121"
+        display_order: 42
+        is_active: true
+      
+      - tax_category_code: "CUSTOMS"
+        country_code: null
+        category_name: "Customs and Import Duties"
+        oecd_classification: "5123"
+        display_order: 50
+        is_active: true
+      
+      - tax_category_code: "OTHER"
+        country_code: null
+        category_name: "Other Taxes"
+        oecd_classification: "6000"
+        display_order: 90
+        is_active: true
+      
+      # Malta-specific categories
+      - tax_category_code: "GAMING"
+        country_code: "MLT"
+        category_name: "Gaming Taxes"
+        category_name_local: "Taxxi fuq l-Imħatri"
+        oecd_classification: "5126"
+        display_order: 60
+        is_active: true
+      
+      - tax_category_code: "ENVIRON"
+        country_code: "MLT"
+        category_name: "Environmental Levies"
+        category_name_local: "Imposti Ambjentali"
+        oecd_classification: "5200"
+        display_order: 70
+        is_active: true
+      
+      - tax_category_code: "IMPUTATION"
+        country_code: "MLT"
+        category_name: "Imputation Credit System"
+        category_name_local: "Sistema ta' Kreditu ta' Imputazzjoni"
+        parent_category_code: "INCOME"
+        display_order: 15
+        is_active: true
+      
+      # Sri Lanka-specific
+      - tax_category_code: "NBT"
+        country_code: "LKA"
+        category_name: "Nation Building Tax"
+        category_name_local: "ජාතිය ගොඩනැඟීමේ බදු"
+        oecd_classification: "5126"
+        display_order: 65
+        is_active: false  # Abolished
+      
+      - tax_category_code: "SVAT"
+        country_code: "LKA"
+        category_name: "Simplified VAT"
+        category_name_local: "සරල වැට් බද්ද"
+        parent_category_code: "VAT"
+        display_order: 43
+        is_active: false  # Abolished Oct 2025
+      
+      # Moldova-specific
+      - tax_category_code: "LOCAL"
+        country_code: "MDA"
+        category_name: "Local Taxes and Fees"
+        category_name_local: "Impozite și taxe locale"
+        oecd_classification: "6000"
+        display_order: 80
+        is_active: true
+
+# =============================================================================
+# MODIFICATION 2: ref_assessment_type
+# =============================================================================
+# Purpose: Define types of tax assessments
+# Change: Add country-specific assessment types with legal references
+# =============================================================================
+
+  - table_name: ref_assessment_type
+    schema: reference
+    modification_summary: |
+      Add country_code to support country-specific assessment types
+      (e.g., Malta CFC Assessment, Sri Lanka SVAT Conversion)
+    
+    current_structure:
+      columns:
+        - assessment_type_code  # varchar(20) PK
+        - assessment_type_name  # varchar(100) NOT NULL
+        - description           # text
+        - requires_audit        # boolean DEFAULT FALSE
+        - is_appealable         # boolean DEFAULT TRUE
+        - display_order         # integer
+        - is_active             # boolean DEFAULT TRUE
+    
+    add_columns:
+      - name: country_code
+        type: char(3)
+        position: after assessment_type_code
+        constraints:
+          not_null: false
+        description: "ISO 3166-1 alpha-3. NULL = universal type"
+      
+      - name: assessment_type_name_local
+        type: varchar(100)
+        position: after assessment_type_name
+        description: "Name in local language"
+      
+      - name: legal_reference
+        type: varchar(200)
+        description: "Law/regulation reference"
+      
+      - name: legal_reference_url
+        type: varchar(500)
+        description: "URL to legislation"
+      
+      - name: appeal_deadline_days
+        type: integer
+        description: "Days allowed to file appeal from assessment date"
+      
+      - name: applies_to_tax_types
+        type: varchar(200)
+        default: "'ALL'"
+        description: "Comma-separated tax types, or ALL"
+      
+      - name: can_be_revised
+        type: boolean
+        default: true
+        description: "Whether this assessment type can be revised"
+      
+      - name: generates_interest
+        type: boolean
+        default: true
+        description: "Whether underpayment generates interest"
+      
+      - name: generates_penalty
+        type: boolean
+        default: false
+        description: "Whether this type automatically generates penalties"
+    
+    modify_constraints:
+      - action: drop_if_exists
+        constraint_name: uk_assessment_type_code
+      
+      - action: add
+        constraint:
+          name: uk_assessment_type_code_country
+          type: unique
+          columns: [assessment_type_code, country_code]
+    
+    add_indexes:
+      - name: idx_assessment_type_country
+        columns: [country_code, assessment_type_code]
+      
+      - name: idx_assessment_type_appealable
+        columns: [is_appealable, country_code]
+        where: "is_active = TRUE"
+    
+    sample_data:
+      # Universal assessment types
+      - assessment_type_code: "SELF"
+        country_code: null
+        assessment_type_name: "Self-Assessment"
+        description: "Taxpayer-prepared assessment based on return filing"
+        requires_audit: false
+        is_appealable: true
+        can_be_revised: true
+        generates_interest: true
+        generates_penalty: false
+        display_order: 10
+        is_active: true
+      
+      - assessment_type_code: "ADMIN"
+        country_code: null
+        assessment_type_name: "Administrative Assessment"
+        description: "Tax authority assessment based on available information"
+        requires_audit: false
+        is_appealable: true
+        can_be_revised: true
+        generates_interest: true
+        generates_penalty: false
+        display_order: 20
+        is_active: true
+      
+      - assessment_type_code: "AUDIT"
+        country_code: null
+        assessment_type_name: "Audit Assessment"
+        description: "Assessment resulting from compliance audit"
+        requires_audit: true
+        is_appealable: true
+        can_be_revised: true
+        generates_interest: true
+        generates_penalty: true
+        display_order: 30
+        is_active: true
+      
+      - assessment_type_code: "BJA"
+        country_code: null
+        assessment_type_name: "Best Judgment Assessment"
+        description: "Assessment when taxpayer fails to file or provide records"
+        requires_audit: false
+        is_appealable: true
+        can_be_revised: true
+        generates_interest: true
+        generates_penalty: true
+        display_order: 40
+        is_active: true
+      
+      - assessment_type_code: "AMENDED"
+        country_code: null
+        assessment_type_name: "Amended Assessment"
+        description: "Revision of previous assessment"
+        requires_audit: false
+        is_appealable: true
+        can_be_revised: true
+        generates_interest: true
+        generates_penalty: false
+        display_order: 50
+        is_active: true
+      
+      - assessment_type_code: "PROVISIONAL"
+        country_code: null
+        assessment_type_name: "Provisional Assessment"
+        description: "Interim assessment pending final determination"
+        requires_audit: false
+        is_appealable: false
+        can_be_revised: true
+        generates_interest: false
+        generates_penalty: false
+        display_order: 15
+        is_active: true
+      
+      - assessment_type_code: "FINAL"
+        country_code: null
+        assessment_type_name: "Final Assessment"
+        description: "Conclusive assessment after all adjustments"
+        requires_audit: false
+        is_appealable: false
+        can_be_revised: false
+        generates_interest: true
+        generates_penalty: false
+        display_order: 90
+        is_active: true
+      
+      - assessment_type_code: "REFUND"
+        country_code: null
+        assessment_type_name: "Refund Assessment"
+        description: "Assessment determining refund due to taxpayer"
+        requires_audit: false
+        is_appealable: true
+        can_be_revised: true
+        generates_interest: false
+        generates_penalty: false
+        display_order: 60
+        is_active: true
+      
+      # Malta-specific assessment types
+      - assessment_type_code: "CFC"
+        country_code: "MLT"
+        assessment_type_name: "CFC Assessment"
+        assessment_type_name_local: "Valutazzjoni CFC"
+        description: "Controlled Foreign Company income assessment"
+        legal_reference: "ITA Article 12B"
+        requires_audit: true
+        is_appealable: true
+        appeal_deadline_days: 30
+        applies_to_tax_types: "CIT"
+        display_order: 35
+        is_active: true
+      
+      - assessment_type_code: "IMPUTATION"
+        country_code: "MLT"
+        assessment_type_name: "Imputation Credit Assessment"
+        assessment_type_name_local: "Valutazzjoni Kreditu ta' Imputazzjoni"
+        description: "Assessment of corporate imputation tax credits"
+        legal_reference: "ITA Article 4(2)"
+        requires_audit: false
+        is_appealable: true
+        appeal_deadline_days: 30
+        applies_to_tax_types: "CIT"
+        display_order: 36
+        is_active: true
+      
+      - assessment_type_code: "ART11_EXIT"
+        country_code: "MLT"
+        assessment_type_name: "Article 11 Exit Assessment"
+        assessment_type_name_local: "Valutazzjoni ta' Ħruġ mill-Artikolu 11"
+        description: "Assessment when exiting VAT Article 11 scheme"
+        legal_reference: "VAT Act Article 11(5)"
+        requires_audit: false
+        is_appealable: true
+        appeal_deadline_days: 30
+        applies_to_tax_types: "VAT"
+        display_order: 37
+        is_active: true
+      
+      # Sri Lanka-specific
+      - assessment_type_code: "SVAT_CONV"
+        country_code: "LKA"
+        assessment_type_name: "SVAT Conversion Assessment"
+        assessment_type_name_local: "සරල වැට් පරිවර්තන තක්සේරුව"
+        description: "Assessment for SVAT to Standard VAT conversion"
+        legal_reference: "VAT Act Section 25C"
+        requires_audit: false
+        is_appealable: true
+        appeal_deadline_days: 21
+        applies_to_tax_types: "VAT"
+        display_order: 38
+        is_active: true
+      
+      - assessment_type_code: "WHT_REFUND"
+        country_code: "LKA"
+        assessment_type_name: "WHT Excess Refund Assessment"
+        assessment_type_name_local: "අතිරික්ත රඳවා ගැනීම් බදු ආපසු ගෙවීම"
+        description: "Assessment for excess withholding tax refund claims"
+        legal_reference: "IRA Section 169"
+        requires_audit: false
+        is_appealable: true
+        appeal_deadline_days: 30
+        applies_to_tax_types: "WHT"
+        display_order: 65
+        is_active: true
+      
+      # Moldova-specific
+      - assessment_type_code: "CONTROL"
+        country_code: "MDA"
+        assessment_type_name: "Control Assessment"
+        assessment_type_name_local: "Evaluare de control"
+        description: "Assessment from tax control/inspection"
+        legal_reference: "Fiscal Code Article 227"
+        requires_audit: true
+        is_appealable: true
+        appeal_deadline_days: 30
+        display_order: 32
+        is_active: true
+
+# =============================================================================
+# MODIFICATION 3: ref_penalty_type
+# =============================================================================
+# Purpose: Define types of tax penalties
+# Change: Add country-specific penalty types with legal references
+# =============================================================================
+
+  - table_name: ref_penalty_type
+    schema: reference
+    modification_summary: |
+      Add country_code to support country-specific penalty types
+      with legal references and applicable tax types
+    
+    current_structure:
+      columns:
+        - penalty_type_code   # varchar(20) PK
+        - penalty_type_name   # varchar(100) NOT NULL
+        - description         # text
+        - is_percentage       # boolean
+        - default_rate        # decimal(5,2)
+        - display_order       # integer
+        - is_active           # boolean
+    
+    add_columns:
+      - name: country_code
+        type: char(3)
+        position: after penalty_type_code
+        constraints:
+          not_null: false
+        description: "ISO 3166-1 alpha-3. NULL = universal type"
+      
+      - name: penalty_type_name_local
+        type: varchar(100)
+        position: after penalty_type_name
+        description: "Name in local language"
+      
+      - name: legal_reference
+        type: varchar(200)
+        description: "Law/regulation reference"
+      
+      - name: applies_to_tax_types
+        type: varchar(200)
+        default: "'ALL'"
+        description: "Comma-separated tax types, or ALL"
+      
+      - name: min_amount
+        type: decimal(15,2)
+        description: "Minimum penalty amount (country currency)"
+      
+      - name: max_amount
+        type: decimal(15,2)
+        description: "Maximum penalty amount (country currency)"
+      
+      - name: is_compoundable
+        type: boolean
+        default: true
+        description: "Can this penalty be waived/reduced?"
+      
+      - name: waiver_authority
+        type: varchar(100)
+        description: "Authority level required to waive"
+      
+      - name: is_criminal
+        type: boolean
+        default: false
+        description: "Does this penalty have criminal implications?"
+      
+      - name: escalation_rules
+        type: text
+        description: "JSON defining escalation for repeat offenses"
+    
+    modify_constraints:
+      - action: add
+        constraint:
+          name: uk_penalty_type_code_country
+          type: unique
+          columns: [penalty_type_code, country_code]
+    
+    add_indexes:
+      - name: idx_penalty_type_country
+        columns: [country_code, penalty_type_code]
+      
+      - name: idx_penalty_type_tax
+        columns: [applies_to_tax_types]
+    
+    sample_data:
+      # Universal penalty types
+      - penalty_type_code: "LATE_FILING"
+        country_code: null
+        penalty_type_name: "Late Filing Penalty"
+        description: "Penalty for filing return after due date"
+        is_percentage: false
+        is_compoundable: true
+        is_criminal: false
+        display_order: 10
+        is_active: true
+      
+      - penalty_type_code: "LATE_PAYMENT"
+        country_code: null
+        penalty_type_name: "Late Payment Penalty"
+        description: "Penalty for paying tax after due date"
+        is_percentage: true
+        default_rate: 5.00
+        is_compoundable: true
+        is_criminal: false
+        display_order: 20
+        is_active: true
+      
+      - penalty_type_code: "UNDERDECL"
+        country_code: null
+        penalty_type_name: "Underdeclaration Penalty"
+        description: "Penalty for declaring less than actual liability"
+        is_percentage: true
+        default_rate: 10.00
+        is_compoundable: true
+        is_criminal: false
+        display_order: 30
+        is_active: true
+      
+      - penalty_type_code: "NON_FILING"
+        country_code: null
+        penalty_type_name: "Non-Filing Penalty"
+        description: "Penalty for failure to file required return"
+        is_percentage: false
+        is_compoundable: true
+        is_criminal: false
+        display_order: 15
+        is_active: true
+      
+      - penalty_type_code: "NON_REG"
+        country_code: null
+        penalty_type_name: "Non-Registration Penalty"
+        description: "Penalty for failure to register when required"
+        is_percentage: false
+        is_compoundable: true
+        is_criminal: false
+        display_order: 5
+        is_active: true
+      
+      - penalty_type_code: "FRAUD"
+        country_code: null
+        penalty_type_name: "Fraud Penalty"
+        description: "Penalty for fraudulent evasion"
+        is_percentage: true
+        default_rate: 100.00
+        is_compoundable: false
+        is_criminal: true
+        display_order: 90
+        is_active: true
+      
+      - penalty_type_code: "OBSTRUCTION"
+        country_code: null
+        penalty_type_name: "Obstruction Penalty"
+        description: "Penalty for obstructing tax officials"
+        is_percentage: false
+        is_compoundable: false
+        is_criminal: true
+        display_order: 85
+        is_active: true
+      
+      # Malta-specific
+      - penalty_type_code: "ART11_EXIT"
+        country_code: "MLT"
+        penalty_type_name: "Article 11 Exit Penalty"
+        penalty_type_name_local: "Multa għall-Ħruġ mill-Artikolu 11"
+        description: "Penalty for early exit from Article 11 scheme"
+        legal_reference: "VAT Act Article 11(5)"
+        applies_to_tax_types: "VAT"
+        is_percentage: true
+        default_rate: 10.00
+        is_compoundable: true
+        is_criminal: false
+        display_order: 40
+        is_active: true
+      
+      - penalty_type_code: "FS3_LATE"
+        country_code: "MLT"
+        penalty_type_name: "FS3 Late Submission"
+        penalty_type_name_local: "Sottomissjoni Tard FS3"
+        description: "Penalty for late employer FS3 submission"
+        legal_reference: "ITA Rule 14(3)"
+        applies_to_tax_types: "WHT,SSC"
+        is_percentage: false
+        min_amount: 50.00
+        max_amount: 500.00
+        is_compoundable: true
+        is_criminal: false
+        display_order: 45
+        is_active: true
+      
+      - penalty_type_code: "IMPUTATION_EXCESS"
+        country_code: "MLT"
+        penalty_type_name: "Excess Imputation Claim"
+        penalty_type_name_local: "Talba Żejda ta' Imputazzjoni"
+        description: "Penalty for claiming imputation credits in excess of entitlement"
+        legal_reference: "ITA Article 59"
+        applies_to_tax_types: "CIT"
+        is_percentage: true
+        default_rate: 20.00
+        is_compoundable: true
+        is_criminal: false
+        display_order: 50
+        is_active: true
+      
+      # Sri Lanka-specific
+      - penalty_type_code: "SVAT_MISUSE"
+        country_code: "LKA"
+        penalty_type_name: "SVAT Certificate Misuse"
+        penalty_type_name_local: "සරල වැට් සහතිකය අනිසි භාවිතය"
+        description: "Penalty for misusing SVAT exemption certificate"
+        legal_reference: "VAT Act Section 25C"
+        applies_to_tax_types: "VAT"
+        is_percentage: true
+        default_rate: 50.00
+        is_compoundable: false
+        is_criminal: true
+        display_order: 55
+        is_active: true
+      
+      - penalty_type_code: "APIT_DEFAULT"
+        country_code: "LKA"
+        penalty_type_name: "APIT Default Penalty"
+        penalty_type_name_local: "APIT පැහැර හැරීම් දඩය"
+        description: "Penalty for employer default on APIT remittance"
+        legal_reference: "IRA Section 83"
+        applies_to_tax_types: "WHT"
+        is_percentage: true
+        default_rate: 10.00
+        min_amount: 50000.00
+        is_compoundable: true
+        is_criminal: false
+        display_order: 60
+        is_active: true
+      
+      # Moldova-specific
+      - penalty_type_code: "INVOICE_ERROR"
+        country_code: "MDA"
+        penalty_type_name: "Invoice Irregularity Penalty"
+        penalty_type_name_local: "Penalitate pentru nereguli în facturi"
+        description: "Penalty for VAT invoice errors"
+        legal_reference: "Fiscal Code Article 260"
+        applies_to_tax_types: "VAT"
+        is_percentage: false
+        min_amount: 1000.00
+        max_amount: 10000.00
+        is_compoundable: true
+        is_criminal: false
+        display_order: 65
+        is_active: true
+
+# =============================================================================
+# MODIFICATION 4: ref_interest_type
+# =============================================================================
+# Purpose: Define types of interest on tax amounts
+# Change: Add country-specific interest types with legal references
+# =============================================================================
+
+  - table_name: ref_interest_type
+    schema: reference
+    modification_summary: |
+      Add country_code to support country-specific interest types
+      with rates and calculation methods
+    
+    current_structure:
+      columns:
+        - interest_type_code   # varchar(20) PK
+        - interest_type_name   # varchar(100) NOT NULL
+        - description          # text
+        - default_rate         # decimal(7,4)
+        - calculation_method   # varchar(50)
+        - display_order        # integer
+        - is_active            # boolean
+    
+    add_columns:
+      - name: country_code
+        type: char(3)
+        position: after interest_type_code
+        constraints:
+          not_null: false
+        description: "ISO 3166-1 alpha-3. NULL = universal type"
+      
+      - name: interest_type_name_local
+        type: varchar(100)
+        position: after interest_type_name
+        description: "Name in local language"
+      
+      - name: legal_reference
+        type: varchar(200)
+        description: "Law/regulation reference"
+      
+      - name: rate_basis
+        type: varchar(50)
+        description: "FIXED, CBR_PLUS (central bank rate + margin), VARIABLE"
+        default: "'FIXED'"
+      
+      - name: rate_margin
+        type: decimal(5,2)
+        description: "Margin above base rate (for CBR_PLUS)"
+      
+      - name: compounds
+        type: boolean
+        default: false
+        description: "Does interest compound?"
+      
+      - name: compounding_frequency
+        type: varchar(20)
+        description: "DAILY, MONTHLY, QUARTERLY, ANNUALLY"
+      
+      - name: grace_period_days
+        type: integer
+        default: 0
+        description: "Days before interest starts accruing"
+      
+      - name: max_rate
+        type: decimal(7,4)
+        description: "Maximum interest rate cap"
+      
+      - name: applies_to_tax_types
+        type: varchar(200)
+        default: "'ALL'"
+        description: "Comma-separated tax types"
+    
+    modify_constraints:
+      - action: add
+        constraint:
+          name: uk_interest_type_code_country
+          type: unique
+          columns: [interest_type_code, country_code]
+    
+    add_indexes:
+      - name: idx_interest_type_country
+        columns: [country_code, interest_type_code]
+    
+    sample_data:
+      # Universal interest types
+      - interest_type_code: "LATE_PAYMENT"
+        country_code: null
+        interest_type_name: "Late Payment Interest"
+        description: "Interest charged on late tax payments"
+        rate_basis: "FIXED"
+        calculation_method: "SIMPLE"
+        compounds: false
+        grace_period_days: 0
+        display_order: 10
+        is_active: true
+      
+      - interest_type_code: "UNDERPAYMENT"
+        country_code: null
+        interest_type_name: "Underpayment Interest"
+        description: "Interest on assessed underpayment"
+        rate_basis: "FIXED"
+        calculation_method: "SIMPLE"
+        compounds: false
+        grace_period_days: 0
+        display_order: 20
+        is_active: true
+      
+      - interest_type_code: "REFUND"
+        country_code: null
+        interest_type_name: "Refund Interest"
+        description: "Interest paid on delayed refunds"
+        rate_basis: "FIXED"
+        calculation_method: "SIMPLE"
+        compounds: false
+        display_order: 30
+        is_active: true
+      
+      - interest_type_code: "INSTALLMENT"
+        country_code: null
+        interest_type_name: "Installment Interest"
+        description: "Interest on approved payment plans"
+        rate_basis: "FIXED"
+        calculation_method: "SIMPLE"
+        compounds: false
+        display_order: 40
+        is_active: true
+      
+      - interest_type_code: "DEFERRAL"
+        country_code: null
+        interest_type_name: "Deferral Interest"
+        description: "Interest on deferred payments"
+        rate_basis: "FIXED"
+        calculation_method: "SIMPLE"
+        compounds: false
+        display_order: 50
+        is_active: true
+      
+      # Malta-specific
+      - interest_type_code: "LATE_PAYMENT"
+        country_code: "MLT"
+        interest_type_name: "Late Payment Interest"
+        interest_type_name_local: "Imgħax fuq Ħlas Tard"
+        description: "Interest on late tax payments"
+        legal_reference: "ITA Article 58"
+        default_rate: 0.6000
+        rate_basis: "FIXED"
+        calculation_method: "SIMPLE_MONTHLY"
+        compounds: false
+        grace_period_days: 0
+        display_order: 10
+        is_active: true
+      
+      - interest_type_code: "REFUND"
+        country_code: "MLT"
+        interest_type_name: "Refund Interest"
+        interest_type_name_local: "Imgħax fuq Rifużjoni"
+        description: "Interest on delayed VAT refunds beyond 6 months"
+        legal_reference: "VAT Act Article 29"
+        default_rate: 0.5000
+        rate_basis: "FIXED"
+        calculation_method: "SIMPLE_MONTHLY"
+        grace_period_days: 180
+        display_order: 30
+        is_active: true
+      
+      # Sri Lanka-specific
+      - interest_type_code: "LATE_PAYMENT"
+        country_code: "LKA"
+        interest_type_name: "Late Payment Interest"
+        interest_type_name_local: "ප්‍රමාද ගෙවීම් පොලී"
+        description: "Interest on overdue taxes"
+        legal_reference: "IRA Section 163"
+        default_rate: 1.5000
+        rate_basis: "FIXED"
+        calculation_method: "SIMPLE_MONTHLY"
+        compounds: false
+        max_rate: 72.0000
+        display_order: 10
+        is_active: true
+      
+      - interest_type_code: "INSTALLMENT"
+        country_code: "LKA"
+        interest_type_name: "Installment Interest"
+        interest_type_name_local: "වාරික ගෙවීම් පොලී"
+        description: "Interest on approved installment payments"
+        legal_reference: "IRA Section 167"
+        default_rate: 1.0000
+        rate_basis: "FIXED"
+        calculation_method: "SIMPLE_MONTHLY"
+        compounds: false
+        display_order: 40
+        is_active: true
+      
+      # Moldova-specific
+      - interest_type_code: "LATE_PAYMENT"
+        country_code: "MDA"
+        interest_type_name: "Late Payment Interest"
+        interest_type_name_local: "Dobândă pentru întârziere"
+        description: "Interest on late tax payments"
+        legal_reference: "Fiscal Code Article 228"
+        rate_basis: "CBR_PLUS"
+        rate_margin: 5.00
+        calculation_method: "SIMPLE_DAILY"
+        compounds: false
+        display_order: 10
+        is_active: true
+
+# =============================================================================
+# MODIFICATION 5: ref_payment_method
+# =============================================================================
+# Purpose: Define payment methods for tax payments
+# Change: Add country-specific payment methods
+# =============================================================================
+
+  - table_name: ref_payment_method
+    schema: reference
+    modification_summary: |
+      Add country_code to support country-specific payment methods
+      with processing details
+    
+    current_structure:
+      columns:
+        - payment_method_code   # varchar(20) PK
+        - payment_method_name   # varchar(100) NOT NULL
+        - description           # text
+        - display_order         # integer
+        - is_active             # boolean
+    
+    add_columns:
+      - name: country_code
+        type: char(3)
+        position: after payment_method_code
+        constraints:
+          not_null: false
+        description: "ISO 3166-1 alpha-3. NULL = universal method"
+      
+      - name: payment_method_name_local
+        type: varchar(100)
+        position: after payment_method_name
+        description: "Name in local language"
+      
+      - name: is_electronic
+        type: boolean
+        default: false
+        description: "Electronic payment method?"
+      
+      - name: is_real_time
+        type: boolean
+        default: false
+        description: "Real-time/instant payment?"
+      
+      - name: processing_days
+        type: integer
+        default: 0
+        description: "Business days to process/clear"
+      
+      - name: min_amount
+        type: decimal(15,2)
+        description: "Minimum payment amount"
+      
+      - name: max_amount
+        type: decimal(15,2)
+        description: "Maximum payment amount"
+      
+      - name: fee_type
+        type: varchar(20)
+        description: "NONE, FIXED, PERCENTAGE"
+        default: "'NONE'"
+      
+      - name: fee_amount
+        type: decimal(10,2)
+        description: "Fee amount or percentage"
+      
+      - name: requires_verification
+        type: boolean
+        default: false
+        description: "Requires additional verification?"
+      
+      - name: integration_code
+        type: varchar(50)
+        description: "Payment gateway/bank integration code"
+      
+      - name: available_hours
+        type: varchar(100)
+        description: "Availability hours (e.g., '24/7', '08:00-20:00')"
+    
+    modify_constraints:
+      - action: add
+        constraint:
+          name: uk_payment_method_code_country
+          type: unique
+          columns: [payment_method_code, country_code]
+    
+    add_indexes:
+      - name: idx_payment_method_country
+        columns: [country_code, payment_method_code]
+      
+      - name: idx_payment_method_electronic
+        columns: [is_electronic, country_code]
+        where: "is_active = TRUE"
+    
+    sample_data:
+      # Universal payment methods
+      - payment_method_code: "BANK_TRANSFER"
+        country_code: null
+        payment_method_name: "Bank Transfer"
+        description: "Standard bank wire transfer"
+        is_electronic: true
+        is_real_time: false
+        processing_days: 1
+        fee_type: "NONE"
+        display_order: 10
+        is_active: true
+      
+      - payment_method_code: "DIRECT_DEBIT"
+        country_code: null
+        payment_method_name: "Direct Debit"
+        description: "Authorized automatic debit"
+        is_electronic: true
+        is_real_time: false
+        processing_days: 2
+        fee_type: "NONE"
+        display_order: 20
+        is_active: true
+      
+      - payment_method_code: "CREDIT_CARD"
+        country_code: null
+        payment_method_name: "Credit Card"
+        description: "Credit/debit card payment"
+        is_electronic: true
+        is_real_time: true
+        processing_days: 0
+        fee_type: "PERCENTAGE"
+        fee_amount: 1.50
+        display_order: 30
+        is_active: true
+      
+      - payment_method_code: "CASH"
+        country_code: null
+        payment_method_name: "Cash"
+        description: "Cash payment at tax office"
+        is_electronic: false
+        is_real_time: true
+        processing_days: 0
+        fee_type: "NONE"
+        display_order: 50
+        is_active: true
+      
+      - payment_method_code: "CHEQUE"
+        country_code: null
+        payment_method_name: "Cheque"
+        description: "Bank cheque/check payment"
+        is_electronic: false
+        is_real_time: false
+        processing_days: 3
+        fee_type: "NONE"
+        requires_verification: true
+        display_order: 60
+        is_active: true
+      
+      - payment_method_code: "SEPA"
+        country_code: null
+        payment_method_name: "SEPA Transfer"
+        description: "SEPA credit transfer (EU)"
+        is_electronic: true
+        is_real_time: false
+        processing_days: 1
+        fee_type: "NONE"
+        display_order: 15
+        is_active: true
+      
+      # Malta-specific
+      - payment_method_code: "BOV_ONLINE"
+        country_code: "MLT"
+        payment_method_name: "BOV Internet Banking"
+        payment_method_name_local: "Internet Banking BOV"
+        description: "Bank of Valletta online payment"
+        is_electronic: true
+        is_real_time: true
+        processing_days: 0
+        fee_type: "NONE"
+        integration_code: "BOV_IB"
+        available_hours: "24/7"
+        display_order: 11
+        is_active: true
+      
+      - payment_method_code: "CFR_PORTAL"
+        country_code: "MLT"
+        payment_method_name: "CFR e-Services"
+        payment_method_name_local: "Servizzi Elettroniċi CFR"
+        description: "Commissioner for Revenue online portal"
+        is_electronic: true
+        is_real_time: true
+        processing_days: 0
+        fee_type: "NONE"
+        integration_code: "CFR_ESERV"
+        available_hours: "24/7"
+        display_order: 5
+        is_active: true
+      
+      - payment_method_code: "HSBC_ONLINE"
+        country_code: "MLT"
+        payment_method_name: "HSBC Internet Banking"
+        is_electronic: true
+        is_real_time: true
+        processing_days: 0
+        fee_type: "NONE"
+        integration_code: "HSBC_IB"
+        display_order: 12
+        is_active: true
+      
+      # Sri Lanka-specific
+      - payment_method_code: "RAMIS_PAY"
+        country_code: "LKA"
+        payment_method_name: "RAMIS Online Payment"
+        payment_method_name_local: "RAMIS මාර්ගගත ගෙවීම"
+        description: "IRD RAMIS portal payment"
+        is_electronic: true
+        is_real_time: true
+        processing_days: 0
+        fee_type: "NONE"
+        integration_code: "RAMIS_PAY"
+        available_hours: "24/7"
+        display_order: 5
+        is_active: true
+      
+      - payment_method_code: "LANKAQR"
+        country_code: "LKA"
+        payment_method_name: "LankaQR Payment"
+        payment_method_name_local: "LankaQR ගෙවීම"
+        description: "LankaQR mobile payment"
+        is_electronic: true
+        is_real_time: true
+        processing_days: 0
+        fee_type: "NONE"
+        max_amount: 500000.00
+        display_order: 35
+        is_active: true
+      
+      - payment_method_code: "BOC_ONLINE"
+        country_code: "LKA"
+        payment_method_name: "Bank of Ceylon Online"
+        is_electronic: true
+        is_real_time: true
+        processing_days: 0
+        fee_type: "NONE"
+        integration_code: "BOC_IB"
+        display_order: 13
+        is_active: true
+      
+      # Moldova-specific
+      - payment_method_code: "MPAY"
+        country_code: "MDA"
+        payment_method_name: "MPay"
+        payment_method_name_local: "MPay"
+        description: "Government electronic payment service"
+        is_electronic: true
+        is_real_time: true
+        processing_days: 0
+        fee_type: "NONE"
+        integration_code: "MPAY_GV"
+        available_hours: "24/7"
+        display_order: 5
+        is_active: true
+
+# =============================================================================
+# MODIFICATION 6: ref_document_type
+# =============================================================================
+# Purpose: Define document types in tax administration
+# Change: Add country-specific document types
+# =============================================================================
+
+  - table_name: ref_document_type
+    schema: reference
+    modification_summary: |
+      Add country_code to support country-specific document types
+      with retention requirements
+    
+    current_structure:
+      columns:
+        - document_type_code   # varchar(20) PK
+        - document_type_name   # varchar(100) NOT NULL
+        - description          # text
+        - display_order        # integer
+        - is_active            # boolean
+    
+    add_columns:
+      - name: country_code
+        type: char(3)
+        position: after document_type_code
+        constraints:
+          not_null: false
+        description: "ISO 3166-1 alpha-3. NULL = universal type"
+      
+      - name: document_type_name_local
+        type: varchar(100)
+        position: after document_type_name
+        description: "Name in local language"
+      
+      - name: category
+        type: varchar(50)
+        description: "RETURN, ASSESSMENT, PAYMENT, CORRESPONDENCE, AUDIT, APPEAL, OTHER"
+      
+      - name: applicable_tax_types
+        type: varchar(200)
+        default: "'ALL'"
+        description: "Comma-separated tax types"
+      
+      - name: retention_years
+        type: integer
+        description: "Legal retention period in years"
+      
+      - name: retention_reference
+        type: varchar(200)
+        description: "Legal reference for retention requirement"
+      
+      - name: is_taxpayer_generated
+        type: boolean
+        default: false
+        description: "Document generated/submitted by taxpayer"
+      
+      - name: is_authority_generated
+        type: boolean
+        default: false
+        description: "Document generated by tax authority"
+      
+      - name: requires_signature
+        type: boolean
+        default: false
+        description: "Requires authorized signature"
+      
+      - name: allows_electronic
+        type: boolean
+        default: true
+        description: "Can be submitted/stored electronically"
+      
+      - name: template_code
+        type: varchar(50)
+        description: "Document template reference"
+    
+    modify_constraints:
+      - action: add
+        constraint:
+          name: uk_document_type_code_country
+          type: unique
+          columns: [document_type_code, country_code]
+    
+    add_indexes:
+      - name: idx_document_type_country
+        columns: [country_code, document_type_code]
+      
+      - name: idx_document_type_category
+        columns: [category, country_code]
+    
+    sample_data:
+      # Universal document types
+      - document_type_code: "TAX_RETURN"
+        country_code: null
+        document_type_name: "Tax Return"
+        description: "Tax return/declaration form"
+        category: "RETURN"
+        retention_years: 7
+        is_taxpayer_generated: true
+        is_authority_generated: false
+        requires_signature: true
+        allows_electronic: true
+        display_order: 10
+        is_active: true
+      
+      - document_type_code: "ASSESSMENT"
+        country_code: null
+        document_type_name: "Assessment Notice"
+        description: "Tax assessment issued by authority"
+        category: "ASSESSMENT"
+        retention_years: 7
+        is_taxpayer_generated: false
+        is_authority_generated: true
+        allows_electronic: true
+        display_order: 20
+        is_active: true
+      
+      - document_type_code: "PAYMENT_RECEIPT"
+        country_code: null
+        document_type_name: "Payment Receipt"
+        description: "Tax payment acknowledgment"
+        category: "PAYMENT"
+        retention_years: 7
+        is_taxpayer_generated: false
+        is_authority_generated: true
+        allows_electronic: true
+        display_order: 30
+        is_active: true
+      
+      - document_type_code: "REFUND_NOTICE"
+        country_code: null
+        document_type_name: "Refund Notice"
+        description: "Tax refund notification"
+        category: "PAYMENT"
+        retention_years: 7
+        is_authority_generated: true
+        allows_electronic: true
+        display_order: 35
+        is_active: true
+      
+      - document_type_code: "AUDIT_REPORT"
+        country_code: null
+        document_type_name: "Audit Report"
+        description: "Tax audit findings report"
+        category: "AUDIT"
+        retention_years: 10
+        is_authority_generated: true
+        requires_signature: true
+        allows_electronic: true
+        display_order: 40
+        is_active: true
+      
+      - document_type_code: "APPEAL"
+        country_code: null
+        document_type_name: "Appeal Document"
+        description: "Taxpayer appeal against assessment"
+        category: "APPEAL"
+        retention_years: 10
+        is_taxpayer_generated: true
+        requires_signature: true
+        allows_electronic: true
+        display_order: 50
+        is_active: true
+      
+      - document_type_code: "CORRESPONDENCE"
+        country_code: null
+        document_type_name: "General Correspondence"
+        description: "Official correspondence"
+        category: "CORRESPONDENCE"
+        retention_years: 5
+        allows_electronic: true
+        display_order: 60
+        is_active: true
+      
+      - document_type_code: "REG_CERT"
+        country_code: null
+        document_type_name: "Registration Certificate"
+        description: "Tax registration certificate"
+        category: "OTHER"
+        retention_years: 10
+        is_authority_generated: true
+        allows_electronic: true
+        display_order: 5
+        is_active: true
+      
+      # Malta-specific
+      - document_type_code: "TRA_FORM"
+        country_code: "MLT"
+        document_type_name: "TRA Tax Return Form"
+        document_type_name_local: "Formola TRA"
+        description: "Maltese Tax Return Application form"
+        category: "RETURN"
+        applicable_tax_types: "PIT,CIT"
+        retention_years: 7
+        retention_reference: "ITA Article 56"
+        is_taxpayer_generated: true
+        requires_signature: true
+        allows_electronic: true
+        template_code: "TRA_2024"
+        display_order: 11
+        is_active: true
+      
+      - document_type_code: "FS3"
+        country_code: "MLT"
+        document_type_name: "FS3 Employer Return"
+        document_type_name_local: "Formola FS3"
+        description: "Monthly employer withholding return"
+        category: "RETURN"
+        applicable_tax_types: "WHT,SSC"
+        retention_years: 7
+        retention_reference: "ITA Rule 14"
+        is_taxpayer_generated: true
+        requires_signature: false
+        allows_electronic: true
+        template_code: "FS3_2024"
+        display_order: 12
+        is_active: true
+      
+      - document_type_code: "FS5"
+        country_code: "MLT"
+        document_type_name: "FS5 Annual Reconciliation"
+        document_type_name_local: "Formola FS5"
+        description: "Annual employer reconciliation"
+        category: "RETURN"
+        applicable_tax_types: "WHT,SSC"
+        retention_years: 7
+        is_taxpayer_generated: true
+        requires_signature: true
+        allows_electronic: true
+        template_code: "FS5_2024"
+        display_order: 13
+        is_active: true
+      
+      - document_type_code: "TA24"
+        country_code: "MLT"
+        document_type_name: "TA24 Transfer Document"
+        document_type_name_local: "TA24"
+        description: "Transfer of immovable property"
+        category: "OTHER"
+        applicable_tax_types: "STAMP,PIT,CIT"
+        retention_years: 10
+        is_taxpayer_generated: true
+        requires_signature: true
+        allows_electronic: false
+        display_order: 70
+        is_active: true
+      
+      # Sri Lanka-specific
+      - document_type_code: "CIT_RETURN"
+        country_code: "LKA"
+        document_type_name: "Corporate Income Tax Return"
+        document_type_name_local: "සංස්ථාපිත ආදායම් බදු ප්‍රතිලාභ"
+        description: "Annual corporate tax return"
+        category: "RETURN"
+        applicable_tax_types: "CIT"
+        retention_years: 6
+        retention_reference: "IRA Section 107"
+        is_taxpayer_generated: true
+        requires_signature: true
+        allows_electronic: true
+        template_code: "CIT_2024"
+        display_order: 11
+        is_active: true
+      
+      - document_type_code: "APIT_RETURN"
+        country_code: "LKA"
+        document_type_name: "APIT Monthly Return"
+        document_type_name_local: "APIT මාසික ප්‍රතිලාභය"
+        description: "Advanced Personal Income Tax employer return"
+        category: "RETURN"
+        applicable_tax_types: "WHT"
+        retention_years: 6
+        is_taxpayer_generated: true
+        allows_electronic: true
+        template_code: "APIT_2024"
+        display_order: 15
+        is_active: true
+      
+      # Moldova-specific
+      - document_type_code: "DECL4"
+        country_code: "MDA"
+        document_type_name: "Declaration 4"
+        document_type_name_local: "Declarația 4"
+        description: "VAT and excise declaration"
+        category: "RETURN"
+        applicable_tax_types: "VAT,EXCISE"
+        retention_years: 6
+        retention_reference: "Fiscal Code Article 187"
+        is_taxpayer_generated: true
+        requires_signature: true
+        allows_electronic: true
+        template_code: "DECL4_2024"
+        display_order: 11
+        is_active: true
+
+# =============================================================================
+# MODIFICATION 7: ref_filing_status
+# =============================================================================
+# Purpose: Define filing workflow statuses
+# Change: Add country-specific filing statuses
+# =============================================================================
+
+  - table_name: ref_filing_status
+    schema: reference
+    modification_summary: |
+      Add country_code to support country-specific filing statuses
+      with workflow sequencing
+    
+    current_structure:
+      columns:
+        - filing_status_code   # varchar(20) PK
+        - filing_status_name   # varchar(100) NOT NULL
+        - description          # text
+        - display_order        # integer
+        - is_active            # boolean
+    
+    add_columns:
+      - name: country_code
+        type: char(3)
+        position: after filing_status_code
+        constraints:
+          not_null: false
+        description: "ISO 3166-1 alpha-3. NULL = universal status"
+      
+      - name: filing_status_name_local
+        type: varchar(100)
+        position: after filing_status_name
+        description: "Name in local language"
+      
+      - name: status_sequence
+        type: integer
+        description: "Order in filing workflow (10, 20, 30...)"
+      
+      - name: is_terminal
+        type: boolean
+        default: false
+        description: "Final status in workflow?"
+      
+      - name: is_error
+        type: boolean
+        default: false
+        description: "Error/rejection status?"
+      
+      - name: allows_modification
+        type: boolean
+        default: true
+        description: "Filing can be modified in this status?"
+      
+      - name: triggers_assessment
+        type: boolean
+        default: false
+        description: "Reaching this status triggers assessment?"
+      
+      - name: next_statuses
+        type: varchar(200)
+        description: "Comma-separated valid next statuses"
+      
+      - name: sla_days
+        type: integer
+        description: "SLA days to process to next status"
+      
+      - name: color_code
+        type: varchar(7)
+        description: "UI color hex code (e.g., #00FF00)"
+    
+    modify_constraints:
+      - action: add
+        constraint:
+          name: uk_filing_status_code_country
+          type: unique
+          columns: [filing_status_code, country_code]
+    
+    add_indexes:
+      - name: idx_filing_status_country
+        columns: [country_code, filing_status_code]
+      
+      - name: idx_filing_status_sequence
+        columns: [country_code, status_sequence]
+    
+    sample_data:
+      # Universal filing statuses
+      - filing_status_code: "DRAFT"
+        country_code: null
+        filing_status_name: "Draft"
+        description: "Return saved but not submitted"
+        status_sequence: 10
+        is_terminal: false
+        is_error: false
+        allows_modification: true
+        triggers_assessment: false
+        next_statuses: "SUBMITTED,CANCELLED"
+        color_code: "#808080"
+        display_order: 10
+        is_active: true
+      
+      - filing_status_code: "SUBMITTED"
+        country_code: null
+        filing_status_name: "Submitted"
+        description: "Return submitted by taxpayer"
+        status_sequence: 20
+        is_terminal: false
+        is_error: false
+        allows_modification: false
+        triggers_assessment: false
+        next_statuses: "RECEIVED,REJECTED"
+        color_code: "#0066CC"
+        display_order: 20
+        is_active: true
+      
+      - filing_status_code: "RECEIVED"
+        country_code: null
+        filing_status_name: "Received"
+        description: "Return received by tax authority"
+        status_sequence: 30
+        is_terminal: false
+        is_error: false
+        allows_modification: false
+        triggers_assessment: false
+        next_statuses: "PROCESSING,VALIDATION_ERROR"
+        sla_days: 1
+        color_code: "#0099CC"
+        display_order: 30
+        is_active: true
+      
+      - filing_status_code: "PROCESSING"
+        country_code: null
+        filing_status_name: "Processing"
+        description: "Return being processed"
+        status_sequence: 40
+        is_terminal: false
+        is_error: false
+        allows_modification: false
+        triggers_assessment: false
+        next_statuses: "ACCEPTED,REJECTED,REVIEW_REQUIRED"
+        sla_days: 5
+        color_code: "#FF9900"
+        display_order: 40
+        is_active: true
+      
+      - filing_status_code: "ACCEPTED"
+        country_code: null
+        filing_status_name: "Accepted"
+        description: "Return accepted and processed"
+        status_sequence: 50
+        is_terminal: true
+        is_error: false
+        allows_modification: false
+        triggers_assessment: true
+        next_statuses: "AMENDED"
+        color_code: "#00CC00"
+        display_order: 50
+        is_active: true
+      
+      - filing_status_code: "REJECTED"
+        country_code: null
+        filing_status_name: "Rejected"
+        description: "Return rejected - requires resubmission"
+        status_sequence: 50
+        is_terminal: true
+        is_error: true
+        allows_modification: false
+        triggers_assessment: false
+        color_code: "#CC0000"
+        display_order: 55
+        is_active: true
+      
+      - filing_status_code: "VALIDATION_ERROR"
+        country_code: null
+        filing_status_name: "Validation Error"
+        description: "Return failed validation checks"
+        status_sequence: 35
+        is_terminal: false
+        is_error: true
+        allows_modification: false
+        triggers_assessment: false
+        next_statuses: "DRAFT,CANCELLED"
+        color_code: "#FF6600"
+        display_order: 35
+        is_active: true
+      
+      - filing_status_code: "REVIEW_REQUIRED"
+        country_code: null
+        filing_status_name: "Review Required"
+        description: "Manual review required"
+        status_sequence: 45
+        is_terminal: false
+        is_error: false
+        allows_modification: false
+        triggers_assessment: false
+        next_statuses: "ACCEPTED,REJECTED"
+        sla_days: 10
+        color_code: "#CC6600"
+        display_order: 45
+        is_active: true
+      
+      - filing_status_code: "AMENDED"
+        country_code: null
+        filing_status_name: "Amended"
+        description: "Original return amended"
+        status_sequence: 60
+        is_terminal: false
+        is_error: false
+        allows_modification: false
+        triggers_assessment: true
+        next_statuses: "ACCEPTED"
+        color_code: "#9933CC"
+        display_order: 60
+        is_active: true
+      
+      - filing_status_code: "CANCELLED"
+        country_code: null
+        filing_status_name: "Cancelled"
+        description: "Filing cancelled by taxpayer"
+        status_sequence: 99
+        is_terminal: true
+        is_error: false
+        allows_modification: false
+        triggers_assessment: false
+        color_code: "#999999"
+        display_order: 99
+        is_active: true
+      
+      # Malta-specific statuses
+      - filing_status_code: "PENDING_TA24"
+        country_code: "MLT"
+        filing_status_name: "Pending TA24 Verification"
+        filing_status_name_local: "Jistenna Verifika TA24"
+        description: "Awaiting property transfer document verification"
+        status_sequence: 42
+        is_terminal: false
+        allows_modification: false
+        triggers_assessment: false
+        next_statuses: "PROCESSING,REJECTED"
+        sla_days: 15
+        color_code: "#FF9966"
+        display_order: 42
+        is_active: true
+      
+      # Sri Lanka-specific
+      - filing_status_code: "SVAT_VALIDATION"
+        country_code: "LKA"
+        filing_status_name: "SVAT Validation"
+        filing_status_name_local: "SVAT වලංගුකරණය"
+        description: "Validating SVAT exemption certificates"
+        status_sequence: 38
+        is_terminal: false
+        allows_modification: false
+        triggers_assessment: false
+        next_statuses: "PROCESSING,VALIDATION_ERROR"
+        sla_days: 3
+        color_code: "#CC9900"
+        display_order: 38
+        is_active: true
+
+# =============================================================================
+# MODIFICATION 8: ref_compliance_status
+# =============================================================================
+# Purpose: Define taxpayer compliance status levels
+# Change: Add country-specific compliance statuses
+# =============================================================================
+
+  - table_name: ref_compliance_status
+    schema: reference
+    modification_summary: |
+      Add country_code to support country-specific compliance statuses
+      with risk weighting
+    
+    current_structure:
+      columns:
+        - compliance_status_code   # varchar(20) PK
+        - compliance_status_name   # varchar(100) NOT NULL
+        - description              # text
+        - display_order            # integer
+        - is_active                # boolean
+    
+    add_columns:
+      - name: country_code
+        type: char(3)
+        position: after compliance_status_code
+        constraints:
+          not_null: false
+        description: "ISO 3166-1 alpha-3. NULL = universal status"
+      
+      - name: compliance_status_name_local
+        type: varchar(100)
+        position: after compliance_status_name
+        description: "Name in local language"
+      
+      - name: risk_weight
+        type: decimal(3,2)
+        default: 0.50
+        description: "Risk weighting factor (0.00 = no risk, 1.00 = highest risk)"
+        constraints:
+          check: "risk_weight >= 0.00 AND risk_weight <= 1.00"
+      
+      - name: triggers_action
+        type: boolean
+        default: false
+        description: "Automatically triggers compliance action?"
+      
+      - name: action_type
+        type: varchar(50)
+        description: "NOTICE, AUDIT, RESTRICTION, ENFORCEMENT, NONE"
+      
+      - name: can_register
+        type: boolean
+        default: true
+        description: "Party can register for new tax types?"
+      
+      - name: can_file
+        type: boolean
+        default: true
+        description: "Party can file returns?"
+      
+      - name: can_claim_refund
+        type: boolean
+        default: true
+        description: "Party can claim refunds?"
+      
+      - name: requires_review
+        type: boolean
+        default: false
+        description: "Requires supervisor review for changes?"
+      
+      - name: escalation_days
+        type: integer
+        description: "Days before escalation to next status"
+      
+      - name: next_status_code
+        type: varchar(20)
+        description: "Status to escalate to after escalation_days"
+      
+      - name: color_code
+        type: varchar(7)
+        description: "UI color hex code"
+    
+    modify_constraints:
+      - action: add
+        constraint:
+          name: uk_compliance_status_code_country
+          type: unique
+          columns: [compliance_status_code, country_code]
+    
+    add_indexes:
+      - name: idx_compliance_status_country
+        columns: [country_code, compliance_status_code]
+      
+      - name: idx_compliance_status_risk
+        columns: [risk_weight, country_code]
+    
+    sample_data:
+      # Universal compliance statuses
+      - compliance_status_code: "COMPLIANT"
+        country_code: null
+        compliance_status_name: "Compliant"
+        description: "Taxpayer is fully compliant with all obligations"
+        risk_weight: 0.00
+        triggers_action: false
+        action_type: "NONE"
+        can_register: true
+        can_file: true
+        can_claim_refund: true
+        requires_review: false
+        color_code: "#00CC00"
+        display_order: 10
+        is_active: true
+      
+      - compliance_status_code: "MINOR_ISSUE"
+        country_code: null
+        compliance_status_name: "Minor Issues"
+        description: "Minor compliance issues requiring attention"
+        risk_weight: 0.25
+        triggers_action: false
+        action_type: "NOTICE"
+        can_register: true
+        can_file: true
+        can_claim_refund: true
+        requires_review: false
+        escalation_days: 30
+        next_status_code: "NON_COMPLIANT"
+        color_code: "#FFCC00"
+        display_order: 20
+        is_active: true
+      
+      - compliance_status_code: "UNDER_REVIEW"
+        country_code: null
+        compliance_status_name: "Under Review"
+        description: "Compliance status being reviewed"
+        risk_weight: 0.50
+        triggers_action: false
+        action_type: "NONE"
+        can_register: false
+        can_file: true
+        can_claim_refund: false
+        requires_review: true
+        color_code: "#FF9900"
+        display_order: 30
+        is_active: true
+      
+      - compliance_status_code: "NON_COMPLIANT"
+        country_code: null
+        compliance_status_name: "Non-Compliant"
+        description: "Taxpayer has significant compliance issues"
+        risk_weight: 0.75
+        triggers_action: true
+        action_type: "AUDIT"
+        can_register: false
+        can_file: true
+        can_claim_refund: false
+        requires_review: true
+        escalation_days: 60
+        next_status_code: "ENFORCEMENT"
+        color_code: "#FF6600"
+        display_order: 40
+        is_active: true
+      
+      - compliance_status_code: "ENFORCEMENT"
+        country_code: null
+        compliance_status_name: "Enforcement Action"
+        description: "Under active enforcement proceedings"
+        risk_weight: 0.90
+        triggers_action: true
+        action_type: "ENFORCEMENT"
+        can_register: false
+        can_file: true
+        can_claim_refund: false
+        requires_review: true
+        color_code: "#CC3300"
+        display_order: 50
+        is_active: true
+      
+      - compliance_status_code: "SUSPENDED"
+        country_code: null
+        compliance_status_name: "Suspended"
+        description: "Tax registration suspended"
+        risk_weight: 1.00
+        triggers_action: true
+        action_type: "RESTRICTION"
+        can_register: false
+        can_file: false
+        can_claim_refund: false
+        requires_review: true
+        color_code: "#CC0000"
+        display_order: 60
+        is_active: true
+      
+      - compliance_status_code: "DORMANT"
+        country_code: null
+        compliance_status_name: "Dormant"
+        description: "No activity for extended period"
+        risk_weight: 0.30
+        triggers_action: false
+        action_type: "NOTICE"
+        can_register: true
+        can_file: true
+        can_claim_refund: true
+        requires_review: false
+        color_code: "#999999"
+        display_order: 70
+        is_active: true
+      
+      # Malta-specific
+      - compliance_status_code: "ART11_REVIEW"
+        country_code: "MLT"
+        compliance_status_name: "Article 11 Review"
+        compliance_status_name_local: "Reviżjoni Artikolu 11"
+        description: "Under Article 11 threshold review"
+        risk_weight: 0.40
+        triggers_action: false
+        action_type: "NOTICE"
+        can_register: true
+        can_file: true
+        can_claim_refund: false
+        requires_review: true
+        escalation_days: 30
+        color_code: "#CC9966"
+        display_order: 35
+        is_active: true
+      
+      - compliance_status_code: "IMPUTATION_AUDIT"
+        country_code: "MLT"
+        compliance_status_name: "Imputation Credit Audit"
+        compliance_status_name_local: "Verifika Kreditu ta' Imputazzjoni"
+        description: "Under audit for imputation credit claims"
+        risk_weight: 0.60
+        triggers_action: true
+        action_type: "AUDIT"
+        can_register: true
+        can_file: true
+        can_claim_refund: false
+        requires_review: true
+        color_code: "#CC6633"
+        display_order: 45
+        is_active: true
+      
+      # Sri Lanka-specific
+      - compliance_status_code: "SVAT_SUSPENDED"
+        country_code: "LKA"
+        compliance_status_name: "SVAT Certificate Suspended"
+        compliance_status_name_local: "SVAT සහතිකය අත්හිටුවන ලදී"
+        description: "SVAT exemption certificate suspended"
+        risk_weight: 0.80
+        triggers_action: true
+        action_type: "RESTRICTION"
+        can_register: true
+        can_file: true
+        can_claim_refund: false
+        requires_review: true
+        color_code: "#CC3333"
+        display_order: 55
+        is_active: true
+
+# =============================================================================
+# STANDARD QUERY PATTERNS
+# =============================================================================
+
+query_patterns:
+  - name: "Country-Specific Lookup with Universal Fallback"
+    description: |
+      Get codes valid for a specific country, including universal codes.
+      Country-specific codes take precedence when both exist.
+    sql: |
+      SELECT 
+          code_column,
+          name_column,
+          COALESCE(name_column_local, name_column) AS display_name,
+          country_code
+      FROM reference.ref_[table_name]
+      WHERE (country_code = :country_code OR country_code IS NULL)
+        AND is_active = TRUE
+      ORDER BY 
+          country_code NULLS LAST,  -- Country-specific first
+          display_order;
+    example: |
+      -- Get all assessment types valid for Malta
+      SELECT 
+          assessment_type_code,
+          assessment_type_name,
+          COALESCE(assessment_type_name_local, assessment_type_name) AS display_name,
+          legal_reference,
+          country_code
+      FROM reference.ref_assessment_type
+      WHERE (country_code = 'MLT' OR country_code IS NULL)
+        AND is_active = TRUE
+      ORDER BY 
+          country_code NULLS LAST,
+          display_order;
+  
+  - name: "Country-Specific Only"
+    description: "Get only country-specific codes (excludes universal)"
+    sql: |
+      SELECT * FROM reference.ref_[table_name]
+      WHERE country_code = :country_code
+        AND is_active = TRUE
+      ORDER BY display_order;
+  
+  - name: "Universal Only"
+    description: "Get only universal codes"
+    sql: |
+      SELECT * FROM reference.ref_[table_name]
+      WHERE country_code IS NULL
+        AND is_active = TRUE
+      ORDER BY display_order;
+  
+  - name: "Effective Code Lookup"
+    description: "Get code by primary key with country-specific priority"
+    sql: |
+      SELECT *
+      FROM reference.ref_[table_name]
+      WHERE [code_column] = :code
+        AND (country_code = :country_code OR country_code IS NULL)
+        AND is_active = TRUE
+      ORDER BY country_code NULLS LAST
+      LIMIT 1;
+
+# =============================================================================
+# MIGRATION SCRIPTS
+# =============================================================================
+
+migration:
+  template: |
+    -- ==========================================================================
+    -- Template: Add country_code to reference table
+    -- Replace [table_name], [code_column], [name_column] with actual values
+    -- ==========================================================================
+    
+    -- Step 1: Add country_code column
+    ALTER TABLE reference.ref_[table_name]
+    ADD COLUMN country_code CHAR(3) NULL AFTER [code_column];
+    
+    -- Step 2: Add local name column
+    ALTER TABLE reference.ref_[table_name]
+    ADD COLUMN [name_column]_local VARCHAR(100) AFTER [name_column];
+    
+    -- Step 3: Drop old unique constraint (if exists)
+    -- Note: Check actual constraint name in your database
+    ALTER TABLE reference.ref_[table_name]
+    DROP INDEX IF EXISTS uk_[table_name]_code;
+    
+    -- Step 4: Add new unique constraint including country_code
+    ALTER TABLE reference.ref_[table_name]
+    ADD CONSTRAINT uk_[table_name]_code_country 
+    UNIQUE ([code_column], country_code);
+    
+    -- Step 5: Add index for country lookups
+    CREATE INDEX idx_[table_name]_country 
+    ON reference.ref_[table_name] (country_code, [code_column]);
+    
+    -- Step 6: Existing data becomes universal (country_code remains NULL)
+    -- No UPDATE needed as NULL is default
+    
+    -- Step 7: Verify migration
+    SELECT 
+        COUNT(*) as total_rows,
+        COUNT(country_code) as country_specific,
+        COUNT(*) - COUNT(country_code) as universal
+    FROM reference.ref_[table_name];
+
+  specific_scripts:
+    - table: ref_tax_category
+      ddl: |
+        ALTER TABLE reference.ref_tax_category
+        ADD COLUMN country_code CHAR(3) NULL AFTER tax_category_code,
+        ADD COLUMN category_name_local VARCHAR(100) AFTER category_name,
+        ADD COLUMN parent_category_code VARCHAR(20),
+        ADD COLUMN oecd_classification VARCHAR(50);
+        
+        ALTER TABLE reference.ref_tax_category
+        ADD CONSTRAINT uk_tax_category_code_country 
+        UNIQUE (tax_category_code, country_code);
+        
+        CREATE INDEX idx_tax_category_country 
+        ON reference.ref_tax_category (country_code, tax_category_code);
+    
+    - table: ref_assessment_type
+      ddl: |
+        ALTER TABLE reference.ref_assessment_type
+        ADD COLUMN country_code CHAR(3) NULL AFTER assessment_type_code,
+        ADD COLUMN assessment_type_name_local VARCHAR(100) AFTER assessment_type_name,
+        ADD COLUMN legal_reference VARCHAR(200),
+        ADD COLUMN legal_reference_url VARCHAR(500),
+        ADD COLUMN appeal_deadline_days INTEGER,
+        ADD COLUMN applies_to_tax_types VARCHAR(200) DEFAULT 'ALL',
+        ADD COLUMN can_be_revised BOOLEAN DEFAULT TRUE,
+        ADD COLUMN generates_interest BOOLEAN DEFAULT TRUE,
+        ADD COLUMN generates_penalty BOOLEAN DEFAULT FALSE;
+        
+        ALTER TABLE reference.ref_assessment_type
+        ADD CONSTRAINT uk_assessment_type_code_country 
+        UNIQUE (assessment_type_code, country_code);
+        
+        CREATE INDEX idx_assessment_type_country 
+        ON reference.ref_assessment_type (country_code, assessment_type_code);
+    
+    - table: ref_penalty_type
+      ddl: |
+        ALTER TABLE reference.ref_penalty_type
+        ADD COLUMN country_code CHAR(3) NULL AFTER penalty_type_code,
+        ADD COLUMN penalty_type_name_local VARCHAR(100) AFTER penalty_type_name,
+        ADD COLUMN legal_reference VARCHAR(200),
+        ADD COLUMN applies_to_tax_types VARCHAR(200) DEFAULT 'ALL',
+        ADD COLUMN min_amount DECIMAL(15,2),
+        ADD COLUMN max_amount DECIMAL(15,2),
+        ADD COLUMN is_compoundable BOOLEAN DEFAULT TRUE,
+        ADD COLUMN waiver_authority VARCHAR(100),
+        ADD COLUMN is_criminal BOOLEAN DEFAULT FALSE,
+        ADD COLUMN escalation_rules TEXT;
+        
+        ALTER TABLE reference.ref_penalty_type
+        ADD CONSTRAINT uk_penalty_type_code_country 
+        UNIQUE (penalty_type_code, country_code);
+        
+        CREATE INDEX idx_penalty_type_country 
+        ON reference.ref_penalty_type (country_code, penalty_type_code);
+    
+    - table: ref_interest_type
+      ddl: |
+        ALTER TABLE reference.ref_interest_type
+        ADD COLUMN country_code CHAR(3) NULL AFTER interest_type_code,
+        ADD COLUMN interest_type_name_local VARCHAR(100) AFTER interest_type_name,
+        ADD COLUMN legal_reference VARCHAR(200),
+        ADD COLUMN rate_basis VARCHAR(50) DEFAULT 'FIXED',
+        ADD COLUMN rate_margin DECIMAL(5,2),
+        ADD COLUMN compounds BOOLEAN DEFAULT FALSE,
+        ADD COLUMN compounding_frequency VARCHAR(20),
+        ADD COLUMN grace_period_days INTEGER DEFAULT 0,
+        ADD COLUMN max_rate DECIMAL(7,4),
+        ADD COLUMN applies_to_tax_types VARCHAR(200) DEFAULT 'ALL';
+        
+        ALTER TABLE reference.ref_interest_type
+        ADD CONSTRAINT uk_interest_type_code_country 
+        UNIQUE (interest_type_code, country_code);
+        
+        CREATE INDEX idx_interest_type_country 
+        ON reference.ref_interest_type (country_code, interest_type_code);
+    
+    - table: ref_payment_method
+      ddl: |
+        ALTER TABLE reference.ref_payment_method
+        ADD COLUMN country_code CHAR(3) NULL AFTER payment_method_code,
+        ADD COLUMN payment_method_name_local VARCHAR(100) AFTER payment_method_name,
+        ADD COLUMN is_electronic BOOLEAN DEFAULT FALSE,
+        ADD COLUMN is_real_time BOOLEAN DEFAULT FALSE,
+        ADD COLUMN processing_days INTEGER DEFAULT 0,
+        ADD COLUMN min_amount DECIMAL(15,2),
+        ADD COLUMN max_amount DECIMAL(15,2),
+        ADD COLUMN fee_type VARCHAR(20) DEFAULT 'NONE',
+        ADD COLUMN fee_amount DECIMAL(10,2),
+        ADD COLUMN requires_verification BOOLEAN DEFAULT FALSE,
+        ADD COLUMN integration_code VARCHAR(50),
+        ADD COLUMN available_hours VARCHAR(100);
+        
+        ALTER TABLE reference.ref_payment_method
+        ADD CONSTRAINT uk_payment_method_code_country 
+        UNIQUE (payment_method_code, country_code);
+        
+        CREATE INDEX idx_payment_method_country 
+        ON reference.ref_payment_method (country_code, payment_method_code);
+    
+    - table: ref_document_type
+      ddl: |
+        ALTER TABLE reference.ref_document_type
+        ADD COLUMN country_code CHAR(3) NULL AFTER document_type_code,
+        ADD COLUMN document_type_name_local VARCHAR(100) AFTER document_type_name,
+        ADD COLUMN category VARCHAR(50),
+        ADD COLUMN applicable_tax_types VARCHAR(200) DEFAULT 'ALL',
+        ADD COLUMN retention_years INTEGER,
+        ADD COLUMN retention_reference VARCHAR(200),
+        ADD COLUMN is_taxpayer_generated BOOLEAN DEFAULT FALSE,
+        ADD COLUMN is_authority_generated BOOLEAN DEFAULT FALSE,
+        ADD COLUMN requires_signature BOOLEAN DEFAULT FALSE,
+        ADD COLUMN allows_electronic BOOLEAN DEFAULT TRUE,
+        ADD COLUMN template_code VARCHAR(50);
+        
+        ALTER TABLE reference.ref_document_type
+        ADD CONSTRAINT uk_document_type_code_country 
+        UNIQUE (document_type_code, country_code);
+        
+        CREATE INDEX idx_document_type_country 
+        ON reference.ref_document_type (country_code, document_type_code);
+    
+    - table: ref_filing_status
+      ddl: |
+        ALTER TABLE reference.ref_filing_status
+        ADD COLUMN country_code CHAR(3) NULL AFTER filing_status_code,
+        ADD COLUMN filing_status_name_local VARCHAR(100) AFTER filing_status_name,
+        ADD COLUMN status_sequence INTEGER,
+        ADD COLUMN is_terminal BOOLEAN DEFAULT FALSE,
+        ADD COLUMN is_error BOOLEAN DEFAULT FALSE,
+        ADD COLUMN allows_modification BOOLEAN DEFAULT TRUE,
+        ADD COLUMN triggers_assessment BOOLEAN DEFAULT FALSE,
+        ADD COLUMN next_statuses VARCHAR(200),
+        ADD COLUMN sla_days INTEGER,
+        ADD COLUMN color_code VARCHAR(7);
+        
+        ALTER TABLE reference.ref_filing_status
+        ADD CONSTRAINT uk_filing_status_code_country 
+        UNIQUE (filing_status_code, country_code);
+        
+        CREATE INDEX idx_filing_status_country 
+        ON reference.ref_filing_status (country_code, filing_status_code);
+    
+    - table: ref_compliance_status
+      ddl: |
+        ALTER TABLE reference.ref_compliance_status
+        ADD COLUMN country_code CHAR(3) NULL AFTER compliance_status_code,
+        ADD COLUMN compliance_status_name_local VARCHAR(100) AFTER compliance_status_name,
+        ADD COLUMN risk_weight DECIMAL(3,2) DEFAULT 0.50,
+        ADD COLUMN triggers_action BOOLEAN DEFAULT FALSE,
+        ADD COLUMN action_type VARCHAR(50),
+        ADD COLUMN can_register BOOLEAN DEFAULT TRUE,
+        ADD COLUMN can_file BOOLEAN DEFAULT TRUE,
+        ADD COLUMN can_claim_refund BOOLEAN DEFAULT TRUE,
+        ADD COLUMN requires_review BOOLEAN DEFAULT FALSE,
+        ADD COLUMN escalation_days INTEGER,
+        ADD COLUMN next_status_code VARCHAR(20),
+        ADD COLUMN color_code VARCHAR(7);
+        
+        ALTER TABLE reference.ref_compliance_status
+        ADD CONSTRAINT uk_compliance_status_code_country 
+        UNIQUE (compliance_status_code, country_code);
+        
+        CREATE INDEX idx_compliance_status_country 
+        ON reference.ref_compliance_status (country_code, compliance_status_code);
+        
+        ALTER TABLE reference.ref_compliance_status
+        ADD CONSTRAINT chk_compliance_risk_weight 
+        CHECK (risk_weight >= 0.00 AND risk_weight <= 1.00);
+
+# =============================================================================
+# DATA QUALITY RULES
+# =============================================================================
+
+data_quality_rules:
+  - rule_id: "DQ_RC_001"
+    rule_name: "No Duplicate Universal Codes"
+    rule_type: "uniqueness"
+    severity: "error"
+    description: "Each code should appear at most once with country_code = NULL"
+    validation_query: |
+      SELECT [code_column], COUNT(*) as count
+      FROM reference.ref_[table_name]
+      WHERE country_code IS NULL
+      GROUP BY [code_column]
+      HAVING COUNT(*) > 1
+  
+  - rule_id: "DQ_RC_002"
+    rule_name: "Valid Country Codes"
+    rule_type: "referential"
+    severity: "error"
+    description: "country_code must be valid ISO 3166-1 alpha-3 or NULL"
+    validation_query: |
+      SELECT DISTINCT r.country_code
+      FROM reference.ref_[table_name] r
+      WHERE r.country_code IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM reference.ref_country c
+          WHERE c.country_code = r.country_code
+        )
+  
+  - rule_id: "DQ_RC_003"
+    rule_name: "Country-Specific Override Completeness"
+    rule_type: "consistency"
+    severity: "warning"
+    description: "Country-specific codes should have local names populated"
+    validation_query: |
+      SELECT [code_column], country_code
+      FROM reference.ref_[table_name]
+      WHERE country_code IS NOT NULL
+        AND [name_column]_local IS NULL
+
+# =============================================================================
+# INTEGRATION POINTS
+# =============================================================================
+
+integration:
+  application_guidelines:
+    - guideline: "Always include country_code = NULL in WHERE clause for lookups"
+      example: "WHERE (country_code = :country OR country_code IS NULL)"
+    
+    - guideline: "Order by country_code NULLS LAST to prioritize country-specific"
+      example: "ORDER BY country_code NULLS LAST, display_order"
+    
+    - guideline: "Cache reference data with country-specific invalidation"
+      example: "Cache key: {table_name}:{country_code|'universal'}"
+    
+    - guideline: "Use COALESCE for display names to fall back to English"
+      example: "COALESCE(name_local, name) AS display_name"
+  
+  backward_compatibility:
+    - note: "Existing data with NULL country_code continues to work"
+    - note: "Existing queries without country filter return universal codes"
+    - note: "Views can provide backward-compatible interfaces"
+    - note: "Application code should be updated to pass country_code parameter"
+
+# =============================================================================
+# VALIDATION CRITERIA
+# =============================================================================
+
+validation_criteria:
+  - check: "All 8 tables modified"
+    expected: "country_code column added to each"
+  
+  - check: "Unique constraints updated"
+    expected: "Include country_code in unique constraint"
+  
+  - check: "NULL allowed"
+    expected: "country_code accepts NULL for universal codes"
+  
+  - check: "Local name columns"
+    expected: "_local suffix columns added for i18n"
+  
+  - check: "Sample data provided"
+    expected: "Universal + country-specific for each table"
+  
+  - check: "Query patterns documented"
+    expected: "Standard lookups with country filtering"
+  
+  - check: "Migration scripts provided"
+    expected: "DDL for each table modification"
+  
+  - check: "Data quality rules defined"
+    expected: "Validation queries for consistency"
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+
+change_log:
+  - version: "1.0.0"
+    date: "2025-12-10"
+    author: "TA-RDM L2 Generalization"
+    changes:
+      - "Initial specification for Step 2d"
+      - "Added country_code modifications for 8 reference tables"
+      - "Defined universal and country-specific sample data"
+      - "Created migration DDL for all tables"
+      - "Documented standard query patterns"
+      - "Added data quality validation rules"
+      - "Provided integration guidelines"
+      - "Countries covered: MLT, LKA, MDA (with some LBN references)"

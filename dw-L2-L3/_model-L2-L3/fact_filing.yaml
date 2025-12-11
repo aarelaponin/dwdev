@@ -1,0 +1,648 @@
+# =============================================================================
+# Malta L3 Warehouse: fact_filing Fact Table
+# =============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Phase: C - L3 Warehouse Model Development
+# Step: 11a - Fact Table Framework & Core Facts
+# =============================================================================
+
+fact_table:
+  name: "fact_filing"
+  schema: "warehouse"
+  description: |
+    Transactional fact table tracking all tax return submissions.
+    Each row represents a single tax return filing event.
+    Supports analysis of filing compliance, tax liability declared,
+    processing times, and submission patterns.
+    
+  fact_type: "TRANSACTIONAL"
+  grain: "One row per tax return submission"
+  
+  business_context:
+    domain: "Filing & Assessment"
+    primary_use: "Filing compliance analysis, declared revenue reporting"
+    usage_pattern: "High read volume for compliance dashboards"
+    refresh: "Daily incremental based on L2 modified_date"
+    
+  estimated_volume:
+    initial_rows: 5000000
+    annual_growth_rows: 500000
+    average_daily_inserts: 2000
+    
+  # ===========================================================================
+  # DIMENSION FOREIGN KEYS
+  # ===========================================================================
+  dimension_keys:
+    - name: "party_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_party"
+      description: "Taxpayer who filed the return"
+      
+    - name: "tax_type_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_tax_type"
+      description: "Type of tax (CIT, PIT, VAT, FSS, etc.)"
+      
+    - name: "tax_period_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_tax_period"
+      description: "Tax period the return covers"
+      
+    - name: "registration_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_registration"
+      description: "Registration status at time of filing"
+      
+    - name: "geography_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_geography"
+      description: "Taxpayer location at time of filing"
+      default_value: -1
+      note: "NULL mapped to Unknown (-1) geography"
+      
+    - name: "compliance_status_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_compliance_status"
+      description: "Filing compliance status classification"
+      
+    - name: "risk_category_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_risk_category"
+      description: "Risk profile at filing time"
+      default_value: -1
+      note: "NULL mapped to Unknown (-1) risk category"
+
+  # ===========================================================================
+  # ROLE-PLAYING DATE KEYS
+  # ===========================================================================
+  date_keys:
+    - name: "filing_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Filing Date"
+      description: "Date return was filed/submitted"
+      format: "YYYYMMDD smart key"
+      source: "tax_return.filing_date"
+      
+    - name: "due_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Due Date"
+      description: "Statutory due date for the return"
+      format: "YYYYMMDD smart key"
+      source: "tax_return.due_date or derived from tax_period"
+      
+    - name: "received_date_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Received Date"
+      description: "Date received by tax authority (may differ from filing)"
+      format: "YYYYMMDD smart key"
+      source: "tax_return.received_date"
+      default_value: -1
+      
+    - name: "processed_date_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_date"
+      role: "Processed Date"
+      description: "Date processing/validation completed"
+      format: "YYYYMMDD smart key"
+      source: "tax_return.processed_date"
+      default_value: -1
+
+  # ===========================================================================
+  # DEGENERATE DIMENSIONS
+  # ===========================================================================
+  degenerate_dimensions:
+    - name: "filing_source_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "L2 tax_return_id - primary key from source"
+      source: "filing_assessment.tax_return.tax_return_id"
+      role: "PRIMARY_KEY"
+      
+    - name: "return_reference_number"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "Business reference number for the return"
+      source: "tax_return.return_reference_number"
+      
+    - name: "form_type_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: |
+        Form type identifier:
+        - TA1: Individual income tax return
+        - TA3: Corporate income tax return
+        - VAT: VAT return
+        - FSS: Final Settlement System (employer withholding)
+        - SSC: Social Security contributions
+      source: "tax_return.form_type_code"
+      allowed_values: ["TA1", "TA3", "VAT", "FSS", "SSC", "CIT_PW", "PT"]
+      
+    - name: "submission_channel"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Channel through which return was submitted"
+      source: "tax_return.submission_channel"
+      allowed_values: ["ONLINE", "PAPER", "AGENT", "BULK", "API"]
+      
+    - name: "return_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Current status of the return"
+      source: "tax_return.return_status_code"
+      allowed_values: ["SUBMITTED", "ACCEPTED", "REJECTED", "AMENDED", "CANCELLED"]
+      
+    - name: "amendment_sequence"
+      data_type: "SMALLINT"
+      nullable: false
+      default_value: 0
+      description: |
+        Sequence number for amendments:
+        0 = Original return
+        1+ = Amendment sequence
+      source: "tax_return.amendment_sequence"
+
+  # ===========================================================================
+  # ADDITIVE MEASURES - INCOME & DEDUCTIONS
+  # ===========================================================================
+  measures_additive:
+    # Income Tax Measures
+    - name: "gross_income_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Total gross income declared"
+      source: "return_field_value.field_value WHERE field_code = 'GROSS_INCOME'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["TA1", "TA3", "CIT_PW"]
+      
+    - name: "deductions_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Total allowable deductions claimed"
+      source: "return_field_value.field_value WHERE field_code = 'TOTAL_DEDUCTIONS'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["TA1", "TA3", "CIT_PW"]
+      
+    - name: "taxable_income_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Net taxable income (gross - deductions)"
+      source: "return_field_value.field_value WHERE field_code = 'TAXABLE_INCOME'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["TA1", "TA3", "CIT_PW"]
+      derivation: "gross_income_amount - deductions_amount"
+      
+    - name: "tax_liability_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: "Total tax liability computed on the return"
+      source: "tax_return.tax_liability_amount"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Primary revenue measure"
+      
+    - name: "tax_credits_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: |
+        Tax credits claimed:
+        - Personal tax credits
+        - Foreign tax credits
+        - Investment credits (e.g., Malta Enterprise)
+        - Imputation credits (for shareholders)
+      source: "return_field_value.field_value WHERE field_code = 'TOTAL_CREDITS'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["TA1", "TA3", "CIT_PW"]
+      
+    - name: "tax_withheld_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Tax already withheld at source (FSS, WHT, bank interest)"
+      source: "return_field_value.field_value WHERE field_code = 'TAX_WITHHELD'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["TA1", "TA3"]
+      
+    - name: "tax_payable_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: false
+      description: "Net tax payable after credits and withholding"
+      source: "tax_return.tax_payable_amount"
+      unit: "EUR"
+      aggregation: "SUM"
+      derivation: "tax_liability_amount - tax_credits_amount - tax_withheld_amount"
+      
+    - name: "refund_claimed_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Refund claimed if credits/withholding exceed liability"
+      source: "tax_return.refund_claimed_amount"
+      unit: "EUR"
+      aggregation: "SUM"
+      note: "Positive value indicates refund requested"
+
+    # VAT-Specific Measures
+    - name: "output_vat_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "VAT charged on sales/outputs"
+      source: "return_field_value.field_value WHERE field_code = 'OUTPUT_VAT'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["VAT"]
+      
+    - name: "input_vat_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "VAT paid on purchases/inputs (recoverable)"
+      source: "return_field_value.field_value WHERE field_code = 'INPUT_VAT'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["VAT"]
+      
+    - name: "vat_payable_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Net VAT payable (output - input)"
+      source: "return_field_value.field_value WHERE field_code = 'VAT_PAYABLE'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["VAT"]
+      derivation: "output_vat_amount - input_vat_amount"
+
+    # Withholding Tax Measures (FSS Returns)
+    - name: "total_emoluments_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Total employee emoluments (for FSS returns)"
+      source: "return_field_value.field_value WHERE field_code = 'TOTAL_EMOLUMENTS'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["FSS"]
+      
+    - name: "fss_tax_withheld_amount"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Tax withheld by employer under FSS"
+      source: "return_field_value.field_value WHERE field_code = 'FSS_TAX_WITHHELD'"
+      unit: "EUR"
+      aggregation: "SUM"
+      applicable_forms: ["FSS"]
+
+    # Count Measures
+    - name: "line_item_count"
+      data_type: "INT"
+      nullable: true
+      description: "Number of line items in the return"
+      source: "COUNT(*) from return_field_value"
+      aggregation: "SUM"
+      
+    - name: "schedule_count"
+      data_type: "SMALLINT"
+      nullable: true
+      description: "Number of schedules/attachments"
+      source: "tax_return.schedule_count"
+      aggregation: "SUM"
+      
+    - name: "attachment_count"
+      data_type: "SMALLINT"
+      nullable: true
+      description: "Number of supporting documents attached"
+      source: "tax_return.attachment_count"
+      aggregation: "SUM"
+
+  # ===========================================================================
+  # SEMI-ADDITIVE MEASURES
+  # ===========================================================================
+  measures_semi_additive:
+    - name: "days_before_due"
+      data_type: "INT"
+      nullable: false
+      description: |
+        Days between filing and due date:
+        - Positive = filed before due date
+        - Zero = filed on due date
+        - Negative = filed after due date (late)
+      source: "DATEDIFF(due_date, filing_date)"
+      aggregation: "AVG when aggregating across time"
+      note: "Semi-additive - can SUM across non-time dimensions"
+      
+    - name: "processing_days"
+      data_type: "INT"
+      nullable: true
+      description: "Days from receipt to processing complete"
+      source: "DATEDIFF(processed_date, received_date)"
+      aggregation: "AVG when aggregating across time"
+
+  # ===========================================================================
+  # NON-ADDITIVE MEASURES
+  # ===========================================================================
+  measures_non_additive:
+    - name: "effective_tax_rate"
+      data_type: "DECIMAL(10,4)"
+      nullable: true
+      description: "Effective tax rate (tax_liability / taxable_income)"
+      source: "tax_liability_amount / NULLIF(taxable_income_amount, 0)"
+      aggregation: "Cannot be summed - must recalculate from components"
+      note: "Store as decimal, not percentage (0.35 = 35%)"
+
+  # ===========================================================================
+  # FLAGS (BOOLEAN INDICATORS)
+  # ===========================================================================
+  flags:
+    - name: "is_original"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if original submission, FALSE if amendment"
+      source: "amendment_sequence = 0"
+      
+    - name: "is_filed_on_time"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if filed on or before due date"
+      source: "filing_date <= due_date"
+      
+    - name: "is_nil_return"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if zero liability return"
+      source: "tax_liability_amount = 0"
+      
+    - name: "has_refund_claim"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "TRUE if return includes refund claim"
+      source: "refund_claimed_amount > 0"
+      
+    - name: "is_selected_for_review"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if return selected for manual review"
+      source: "tax_return.is_selected_for_review"
+
+  # ===========================================================================
+  # ETL METADATA
+  # ===========================================================================
+  metadata:
+    - name: "etl_batch_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for this load"
+      
+    - name: "etl_load_timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "When this record was loaded into warehouse"
+      default_value: "CURRENT_TIMESTAMP"
+      
+    - name: "source_system"
+      data_type: "VARCHAR(50)"
+      nullable: false
+      description: "Source system identifier"
+      default_value: "'SIGTAS'"
+      allowed_values: ["SIGTAS", "CFRS", "E-FILING"]
+
+  # ===========================================================================
+  # INDEXES
+  # ===========================================================================
+  indexes:
+    - name: "pk_fact_filing"
+      columns: ["filing_source_id"]
+      primary: true
+      description: "Primary key on L2 source ID"
+      
+    - name: "idx_fact_filing_party_date"
+      columns: ["party_key", "filing_date_key"]
+      description: "Party-centric queries with date"
+      
+    - name: "idx_fact_filing_tax_period"
+      columns: ["tax_type_key", "tax_period_key"]
+      description: "Tax type and period analysis"
+      
+    - name: "idx_fact_filing_date"
+      columns: ["filing_date_key"]
+      description: "Date-range queries"
+      
+    - name: "idx_fact_filing_compliance"
+      columns: ["compliance_status_key", "filing_date_key"]
+      description: "Compliance status analysis"
+      
+    - name: "idx_fact_filing_form"
+      columns: ["form_type_code", "filing_date_key"]
+      description: "Form type analysis"
+
+  # ===========================================================================
+  # PARTITIONING STRATEGY
+  # ===========================================================================
+  partitioning:
+    enabled: true
+    strategy: "RANGE"
+    column: "filing_date_key"
+    interval: "MONTHLY"
+    description: "Partition by filing month (YYYYMM from date_key)"
+    retention_months: 120  # 10 years online
+    archive_strategy: "Move to cold storage after retention"
+
+  # ===========================================================================
+  # SOURCE MAPPING
+  # ===========================================================================
+  source_mapping:
+    primary_table: "filing_assessment.tax_return"
+    alias: "tr"
+    
+    joins:
+      # Dimension lookups
+      - table: "warehouse.dim_party"
+        alias: "dp"
+        type: "INNER"
+        condition: "tr.party_id = dp.party_source_id AND dp.is_current_flag = TRUE"
+        description: "Current party record"
+        
+      - table: "warehouse.dim_tax_type"
+        alias: "dtt"
+        type: "INNER"
+        condition: "tr.tax_type_code = dtt.tax_type_code"
+        description: "Tax type lookup"
+        
+      - table: "warehouse.dim_tax_period"
+        alias: "dtp"
+        type: "INNER"
+        condition: "tr.tax_period_id = dtp.tax_period_source_id"
+        description: "Tax period lookup"
+        
+      - table: "warehouse.dim_registration"
+        alias: "dr"
+        type: "INNER"
+        condition: |
+          tr.party_id = dr.party_source_id 
+          AND tr.tax_type_code = dr.tax_type_code
+          AND dr.is_current_flag = TRUE
+        description: "Registration status at filing time"
+        
+      - table: "warehouse.dim_date"
+        alias: "dd_filing"
+        type: "INNER"
+        condition: "DATE_FORMAT(tr.filing_date, '%Y%m%d') = dd_filing.date_key"
+        description: "Filing date lookup"
+        
+      - table: "warehouse.dim_date"
+        alias: "dd_due"
+        type: "INNER"
+        condition: "DATE_FORMAT(tr.due_date, '%Y%m%d') = dd_due.date_key"
+        description: "Due date lookup"
+        
+      # Field value aggregation
+      - table: "filing_assessment.return_field_value"
+        alias: "rfv"
+        type: "LEFT"
+        condition: "tr.tax_return_id = rfv.tax_return_id"
+        aggregation: |
+          SUM(CASE WHEN field_code = 'GROSS_INCOME' THEN field_value END),
+          SUM(CASE WHEN field_code = 'TOTAL_DEDUCTIONS' THEN field_value END),
+          ...
+        description: "Aggregate field values from return"
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+  business_rules:
+    - rule_id: "FF_001"
+      description: "Tax payable calculation consistency"
+      validation_sql: |
+        SELECT filing_source_id
+        FROM warehouse.fact_filing
+        WHERE ABS(tax_payable_amount - (tax_liability_amount 
+              - COALESCE(tax_credits_amount, 0) 
+              - COALESCE(tax_withheld_amount, 0))) > 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FF_002"
+      description: "VAT payable calculation consistency"
+      validation_sql: |
+        SELECT filing_source_id
+        FROM warehouse.fact_filing
+        WHERE form_type_code = 'VAT'
+          AND ABS(vat_payable_amount - (output_vat_amount - input_vat_amount)) > 0.01
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FF_003"
+      description: "Nil return flag consistency"
+      validation_sql: |
+        SELECT filing_source_id
+        FROM warehouse.fact_filing
+        WHERE is_nil_return = TRUE AND tax_liability_amount > 0
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FF_004"
+      description: "On-time flag consistency"
+      validation_sql: |
+        SELECT filing_source_id
+        FROM warehouse.fact_filing
+        WHERE (is_filed_on_time = TRUE AND days_before_due < 0)
+           OR (is_filed_on_time = FALSE AND days_before_due >= 0)
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FF_005"
+      description: "Original return flag consistency"
+      validation_sql: |
+        SELECT filing_source_id
+        FROM warehouse.fact_filing
+        WHERE (is_original = TRUE AND amendment_sequence > 0)
+           OR (is_original = FALSE AND amendment_sequence = 0)
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "FF_006"
+      description: "All dimension keys must be valid"
+      validation_sql: |
+        SELECT 'party' AS dimension, COUNT(*) AS missing
+        FROM warehouse.fact_filing ff
+        WHERE NOT EXISTS (SELECT 1 FROM warehouse.dim_party dp WHERE dp.party_key = ff.party_key)
+        UNION ALL
+        SELECT 'tax_type', COUNT(*)
+        FROM warehouse.fact_filing ff
+        WHERE NOT EXISTS (SELECT 1 FROM warehouse.dim_tax_type dtt WHERE dtt.tax_type_key = ff.tax_type_key)
+        UNION ALL
+        SELECT 'tax_period', COUNT(*)
+        FROM warehouse.fact_filing ff
+        WHERE NOT EXISTS (SELECT 1 FROM warehouse.dim_tax_period dtp WHERE dtp.tax_period_key = ff.tax_period_key)
+      expected_result: "All counts = 0"
+      severity: "CRITICAL"
+
+  # ===========================================================================
+  # SAMPLE QUERIES
+  # ===========================================================================
+  sample_queries:
+    - name: "Filing Compliance by Tax Type"
+      description: "Monthly on-time filing rate by tax type"
+      sql: |
+        SELECT 
+            dtt.tax_type_name,
+            dd.calendar_year_month,
+            COUNT(*) AS total_filings,
+            SUM(CASE WHEN ff.is_filed_on_time THEN 1 ELSE 0 END) AS on_time,
+            ROUND(100.0 * SUM(CASE WHEN ff.is_filed_on_time THEN 1 ELSE 0 END) / COUNT(*), 2) AS compliance_rate
+        FROM warehouse.fact_filing ff
+        JOIN warehouse.dim_tax_type dtt ON ff.tax_type_key = dtt.tax_type_key
+        JOIN warehouse.dim_date dd ON ff.filing_date_key = dd.date_key
+        WHERE ff.is_original = TRUE
+        GROUP BY dtt.tax_type_name, dd.calendar_year_month
+        ORDER BY dd.calendar_year_month DESC, dtt.tax_type_name;
+        
+    - name: "Revenue Declared by Segment"
+      description: "Tax liability declared by taxpayer segment"
+      sql: |
+        SELECT 
+            dp.segment_name,
+            dtt.tax_type_name,
+            dtp.period_name,
+            SUM(ff.tax_liability_amount) AS total_declared,
+            COUNT(DISTINCT ff.party_key) AS taxpayer_count,
+            AVG(ff.effective_tax_rate) AS avg_effective_rate
+        FROM warehouse.fact_filing ff
+        JOIN warehouse.dim_party dp ON ff.party_key = dp.party_key
+        JOIN warehouse.dim_tax_type dtt ON ff.tax_type_key = dtt.tax_type_key
+        JOIN warehouse.dim_tax_period dtp ON ff.tax_period_key = dtp.tax_period_key
+        WHERE ff.is_original = TRUE
+          AND dp.is_current_flag = TRUE
+        GROUP BY dp.segment_name, dtt.tax_type_name, dtp.period_name;
+        
+    - name: "VAT Analysis"
+      description: "VAT output vs input analysis"
+      sql: |
+        SELECT 
+            dtp.period_name,
+            SUM(ff.output_vat_amount) AS total_output_vat,
+            SUM(ff.input_vat_amount) AS total_input_vat,
+            SUM(ff.vat_payable_amount) AS net_vat_payable,
+            COUNT(CASE WHEN ff.has_refund_claim THEN 1 END) AS refund_claims
+        FROM warehouse.fact_filing ff
+        JOIN warehouse.dim_tax_period dtp ON ff.tax_period_key = dtp.tax_period_key
+        WHERE ff.form_type_code = 'VAT'
+          AND ff.is_original = TRUE
+        GROUP BY dtp.period_name
+        ORDER BY dtp.period_start_date DESC;

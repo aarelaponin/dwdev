@@ -1,0 +1,607 @@
+# ==============================================================================
+# Malta L3 Warehouse Model: dim_compliance_status
+# Step 10c: Reference & Analytical Dimensions
+# ==============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Purpose: Compliance status classification dimension for fact_compliance
+# ==============================================================================
+
+dimension:
+  name: "dim_compliance_status"
+  schema: "warehouse"
+  display_name: "Compliance Status Dimension"
+  description: |
+    Classification dimension for taxpayer compliance status across filing,
+    payment, reporting, and registration obligations. Supports compliance
+    monitoring, penalty assessment, and enforcement action analysis.
+    
+    Enables dashboard reporting on compliance rates by category and
+    identification of non-compliant taxpayer segments.
+    
+  scd_type: 1
+  scd_type_description: "Type 1 - Overwrite on change (reference data rarely changes)"
+  
+  natural_key: ["compliance_status_code"]
+  surrogate_key: "compliance_status_key"
+  
+  grain: "One row per compliance status"
+  estimated_rows: 25
+  
+  source_system:
+    primary_table: "reference.ref_compliance_status"
+    
+  refresh_frequency: "Annual (or on policy changes)"
+  
+  # ============================================================================
+  # COLUMNS
+  # ============================================================================
+  columns:
+    # --------------------------------------------------------------------------
+    # Surrogate Key
+    # --------------------------------------------------------------------------
+    - name: "compliance_status_key"
+      display_name: "Compliance Status Key"
+      data_type: "INT"
+      nullable: false
+      description: "Surrogate key for compliance status dimension"
+      constraints:
+        primary_key: true
+        auto_increment: true
+
+    # --------------------------------------------------------------------------
+    # Natural Key & Names
+    # --------------------------------------------------------------------------
+    - name: "compliance_status_code"
+      display_name: "Compliance Status Code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Short code for compliance status"
+      constraints:
+        unique: true
+      examples: ["FILED_ONTIME", "FILED_LATE", "NOT_FILED", "PAID_FULL", "UNPAID"]
+      
+    - name: "compliance_status_name"
+      display_name: "Compliance Status Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Full name of the compliance status"
+      examples: ["Filed On Time", "Filed Late", "Not Filed", "Paid in Full", "Unpaid"]
+      
+    - name: "compliance_status_name_mt"
+      display_name: "Compliance Status Name (Maltese)"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Compliance status name in Maltese"
+      examples: ["Iffajljat fil-Ħin", "Iffajljat Tard", "Mhux Iffajljat"]
+      
+    - name: "compliance_status_description"
+      display_name: "Compliance Status Description"
+      data_type: "VARCHAR(500)"
+      nullable: true
+      description: "Detailed description of the compliance status"
+
+    # --------------------------------------------------------------------------
+    # Classification
+    # --------------------------------------------------------------------------
+    - name: "compliance_category"
+      display_name: "Compliance Category"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "High-level compliance category"
+      constraints:
+        check: "compliance_category IN ('FILING', 'PAYMENT', 'REPORTING', 'REGISTRATION', 'GENERAL')"
+      examples: ["FILING", "PAYMENT", "REPORTING", "REGISTRATION"]
+      
+    - name: "compliance_category_name"
+      display_name: "Compliance Category Name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Display name for compliance category"
+      examples: ["Filing Compliance", "Payment Compliance", "Reporting Compliance", "Registration Compliance"]
+
+    # --------------------------------------------------------------------------
+    # Severity Classification
+    # --------------------------------------------------------------------------
+    - name: "severity_level"
+      display_name: "Severity Level"
+      data_type: "SMALLINT"
+      nullable: false
+      description: "Severity level: 1=Compliant, 2=Minor Issue, 3=Moderate Issue, 4=Serious Issue, 5=Critical"
+      constraints:
+        check: "severity_level BETWEEN 1 AND 5"
+      examples: [1, 2, 3, 4, 5]
+      
+    - name: "severity_name"
+      display_name: "Severity Name"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Display name for severity level"
+      constraints:
+        check: "severity_name IN ('Compliant', 'Minor', 'Moderate', 'Serious', 'Critical')"
+      examples: ["Compliant", "Minor", "Moderate", "Serious", "Critical"]
+
+    # --------------------------------------------------------------------------
+    # Compliance Indicators
+    # --------------------------------------------------------------------------
+    - name: "is_compliant"
+      display_name: "Is Compliant"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether this status represents compliance"
+      
+    - name: "requires_action"
+      display_name: "Requires Action"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Whether taxpayer or authority action is required"
+      
+    - name: "is_terminal"
+      display_name: "Is Terminal"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this is a final/terminal status"
+
+    # --------------------------------------------------------------------------
+    # Consequence Triggers
+    # --------------------------------------------------------------------------
+    - name: "triggers_penalty"
+      display_name: "Triggers Penalty"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this status typically triggers a penalty"
+      
+    - name: "triggers_interest"
+      display_name: "Triggers Interest"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this status typically triggers interest charges"
+      
+    - name: "triggers_enforcement"
+      display_name: "Triggers Enforcement"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this status may trigger enforcement action"
+      
+    - name: "triggers_notification"
+      display_name: "Triggers Notification"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "false"
+      description: "Whether this status triggers taxpayer notification"
+
+    # --------------------------------------------------------------------------
+    # Time Thresholds
+    # --------------------------------------------------------------------------
+    - name: "days_threshold_min"
+      display_name: "Days Threshold (Min)"
+      data_type: "INT"
+      nullable: true
+      description: "Minimum days past due for this status (e.g., 1 for late filing)"
+      
+    - name: "days_threshold_max"
+      display_name: "Days Threshold (Max)"
+      data_type: "INT"
+      nullable: true
+      description: "Maximum days past due for this status (e.g., 30 for late, NULL for not filed)"
+
+    # --------------------------------------------------------------------------
+    # Display & Visualization
+    # --------------------------------------------------------------------------
+    - name: "color_code"
+      display_name: "Color Code"
+      data_type: "VARCHAR(10)"
+      nullable: true
+      description: "Color for dashboard visualization"
+      constraints:
+        check: "color_code IN ('GREEN', 'YELLOW', 'ORANGE', 'RED', 'BLACK', 'GREY')"
+      examples: ["GREEN", "YELLOW", "ORANGE", "RED"]
+      
+    - name: "icon_name"
+      display_name: "Icon Name"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Icon identifier for UI display"
+      examples: ["check-circle", "warning", "exclamation-triangle", "times-circle"]
+      
+    - name: "sort_order"
+      display_name: "Sort Order"
+      data_type: "INT"
+      nullable: false
+      description: "Display sort order"
+      
+    - name: "is_active"
+      display_name: "Active Flag"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: "true"
+      description: "Whether compliance status is currently in use"
+
+    # --------------------------------------------------------------------------
+    # ETL Metadata
+    # --------------------------------------------------------------------------
+    - name: "etl_batch_id"
+      display_name: "ETL Batch ID"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for audit trail"
+      
+    - name: "etl_load_timestamp"
+      display_name: "ETL Load Timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when record was loaded"
+
+  # ============================================================================
+  # INDEXES
+  # ============================================================================
+  indexes:
+    - name: "pk_dim_compliance_status"
+      columns: ["compliance_status_key"]
+      primary: true
+      
+    - name: "uk_dim_compliance_status_code"
+      columns: ["compliance_status_code"]
+      unique: true
+      
+    - name: "idx_dim_compliance_category"
+      columns: ["compliance_category"]
+      description: "Support queries by compliance category"
+      
+    - name: "idx_dim_compliance_severity"
+      columns: ["severity_level"]
+      description: "Support severity-based analysis"
+      
+    - name: "idx_dim_compliance_compliant"
+      columns: ["is_compliant"]
+      description: "Support compliant vs non-compliant filtering"
+
+  # ============================================================================
+  # REFERENCE DATA
+  # ============================================================================
+  reference_data:
+    # -------------------------------------------------------------------------
+    # FILING COMPLIANCE
+    # -------------------------------------------------------------------------
+    - code: "FILED_ONTIME"
+      name: "Filed On Time"
+      name_mt: "Iffajljat fil-Ħin"
+      category: "FILING"
+      severity: 1
+      severity_name: "Compliant"
+      compliant: true
+      requires_action: false
+      is_terminal: true
+      triggers_penalty: false
+      color: "GREEN"
+      icon: "check-circle"
+      description: "Return filed before or on the due date"
+      sort_order: 10
+      
+    - code: "FILED_LATE_MINOR"
+      name: "Filed Late (1-30 days)"
+      name_mt: "Iffajljat Tard (1-30 jum)"
+      category: "FILING"
+      severity: 2
+      severity_name: "Minor"
+      compliant: false
+      requires_action: false
+      is_terminal: true
+      triggers_penalty: true
+      triggers_notification: true
+      days_min: 1
+      days_max: 30
+      color: "YELLOW"
+      icon: "warning"
+      description: "Return filed within 30 days after due date"
+      sort_order: 20
+      
+    - code: "FILED_LATE_MAJOR"
+      name: "Filed Late (31-90 days)"
+      name_mt: "Iffajljat Tard (31-90 jum)"
+      category: "FILING"
+      severity: 3
+      severity_name: "Moderate"
+      compliant: false
+      requires_action: false
+      is_terminal: true
+      triggers_penalty: true
+      triggers_interest: true
+      triggers_notification: true
+      days_min: 31
+      days_max: 90
+      color: "ORANGE"
+      icon: "exclamation-triangle"
+      description: "Return filed 31-90 days after due date"
+      sort_order: 30
+      
+    - code: "NOT_FILED"
+      name: "Not Filed"
+      name_mt: "Mhux Iffajljat"
+      category: "FILING"
+      severity: 5
+      severity_name: "Critical"
+      compliant: false
+      requires_action: true
+      is_terminal: false
+      triggers_penalty: true
+      triggers_interest: true
+      triggers_enforcement: true
+      triggers_notification: true
+      days_min: 91
+      color: "RED"
+      icon: "times-circle"
+      description: "Return not filed more than 90 days after due date"
+      sort_order: 40
+      
+    - code: "FILED_PENDING"
+      name: "Filed - Pending Processing"
+      name_mt: "Iffajljat - Qed Jistenna Proċessar"
+      category: "FILING"
+      severity: 1
+      severity_name: "Compliant"
+      compliant: true
+      requires_action: false
+      is_terminal: false
+      triggers_penalty: false
+      color: "GREY"
+      icon: "hourglass"
+      description: "Return submitted and awaiting processing"
+      sort_order: 15
+
+    # -------------------------------------------------------------------------
+    # PAYMENT COMPLIANCE
+    # -------------------------------------------------------------------------
+    - code: "PAID_FULL"
+      name: "Paid in Full"
+      name_mt: "Imħallas Kollu"
+      category: "PAYMENT"
+      severity: 1
+      severity_name: "Compliant"
+      compliant: true
+      requires_action: false
+      is_terminal: true
+      triggers_penalty: false
+      color: "GREEN"
+      icon: "check-circle"
+      description: "Full tax liability paid by due date"
+      sort_order: 50
+      
+    - code: "PAID_FULL_LATE"
+      name: "Paid in Full (Late)"
+      name_mt: "Imħallas Kollu (Tard)"
+      category: "PAYMENT"
+      severity: 2
+      severity_name: "Minor"
+      compliant: false
+      requires_action: false
+      is_terminal: true
+      triggers_penalty: true
+      triggers_interest: true
+      color: "YELLOW"
+      icon: "check"
+      description: "Full tax liability paid after due date"
+      sort_order: 55
+      
+    - code: "PAID_PARTIAL"
+      name: "Partially Paid"
+      name_mt: "Imħallas Parzjalment"
+      category: "PAYMENT"
+      severity: 3
+      severity_name: "Moderate"
+      compliant: false
+      requires_action: true
+      is_terminal: false
+      triggers_penalty: true
+      triggers_interest: true
+      triggers_notification: true
+      color: "ORANGE"
+      icon: "exclamation"
+      description: "Partial payment received, balance outstanding"
+      sort_order: 60
+      
+    - code: "UNPAID"
+      name: "Unpaid"
+      name_mt: "Mhux Imħallas"
+      category: "PAYMENT"
+      severity: 5
+      severity_name: "Critical"
+      compliant: false
+      requires_action: true
+      is_terminal: false
+      triggers_penalty: true
+      triggers_interest: true
+      triggers_enforcement: true
+      triggers_notification: true
+      color: "RED"
+      icon: "times-circle"
+      description: "No payment received, full balance outstanding"
+      sort_order: 70
+      
+    - code: "IN_ARREARS"
+      name: "In Arrears"
+      name_mt: "F'Arretrati"
+      category: "PAYMENT"
+      severity: 4
+      severity_name: "Serious"
+      compliant: false
+      requires_action: true
+      is_terminal: false
+      triggers_penalty: true
+      triggers_interest: true
+      triggers_enforcement: true
+      triggers_notification: true
+      color: "RED"
+      icon: "exclamation-circle"
+      description: "Chronic payment arrears (multiple periods)"
+      sort_order: 75
+      
+    - code: "UNDER_PLAN"
+      name: "Under Payment Plan"
+      name_mt: "Taħt Pjan ta' Ħlas"
+      category: "PAYMENT"
+      severity: 2
+      severity_name: "Minor"
+      compliant: false
+      requires_action: false
+      is_terminal: false
+      triggers_penalty: false
+      triggers_interest: true
+      color: "YELLOW"
+      icon: "calendar"
+      description: "Approved installment payment plan in place"
+      sort_order: 65
+
+    # -------------------------------------------------------------------------
+    # REGISTRATION COMPLIANCE
+    # -------------------------------------------------------------------------
+    - code: "REGISTERED"
+      name: "Properly Registered"
+      name_mt: "Reġistrat Sew"
+      category: "REGISTRATION"
+      severity: 1
+      severity_name: "Compliant"
+      compliant: true
+      requires_action: false
+      is_terminal: false
+      triggers_penalty: false
+      color: "GREEN"
+      icon: "check-circle"
+      description: "Registered with all required tax types"
+      sort_order: 80
+      
+    - code: "NOT_REGISTERED"
+      name: "Not Registered"
+      name_mt: "Mhux Reġistrat"
+      category: "REGISTRATION"
+      severity: 4
+      severity_name: "Serious"
+      compliant: false
+      requires_action: true
+      is_terminal: false
+      triggers_penalty: true
+      triggers_enforcement: true
+      triggers_notification: true
+      color: "RED"
+      icon: "user-slash"
+      description: "Required registration not completed"
+      sort_order: 90
+      
+    - code: "SUSPENDED"
+      name: "Registration Suspended"
+      name_mt: "Reġistrazzjoni Sospiża"
+      category: "REGISTRATION"
+      severity: 4
+      severity_name: "Serious"
+      compliant: false
+      requires_action: true
+      is_terminal: false
+      triggers_enforcement: true
+      triggers_notification: true
+      color: "ORANGE"
+      icon: "pause-circle"
+      description: "Registration suspended due to non-compliance"
+      sort_order: 95
+      
+    - code: "DEREGISTERED"
+      name: "Deregistered"
+      name_mt: "Dereġistrat"
+      category: "REGISTRATION"
+      severity: 1
+      severity_name: "Compliant"
+      compliant: true
+      requires_action: false
+      is_terminal: true
+      triggers_penalty: false
+      color: "GREY"
+      icon: "minus-circle"
+      description: "Properly deregistered (no longer required)"
+      sort_order: 100
+
+    # -------------------------------------------------------------------------
+    # REPORTING COMPLIANCE
+    # -------------------------------------------------------------------------
+    - code: "REPORTED_ONTIME"
+      name: "Reported On Time"
+      name_mt: "Rappurtat fil-Ħin"
+      category: "REPORTING"
+      severity: 1
+      severity_name: "Compliant"
+      compliant: true
+      requires_action: false
+      is_terminal: true
+      triggers_penalty: false
+      color: "GREEN"
+      icon: "check-circle"
+      description: "Information return/report submitted on time"
+      sort_order: 110
+      
+    - code: "REPORTED_LATE"
+      name: "Reported Late"
+      name_mt: "Rappurtat Tard"
+      category: "REPORTING"
+      severity: 2
+      severity_name: "Minor"
+      compliant: false
+      requires_action: false
+      is_terminal: true
+      triggers_penalty: true
+      color: "YELLOW"
+      icon: "warning"
+      description: "Information return/report submitted late"
+      sort_order: 120
+      
+    - code: "NOT_REPORTED"
+      name: "Not Reported"
+      name_mt: "Mhux Rappurtat"
+      category: "REPORTING"
+      severity: 4
+      severity_name: "Serious"
+      compliant: false
+      requires_action: true
+      is_terminal: false
+      triggers_penalty: true
+      triggers_enforcement: true
+      triggers_notification: true
+      color: "RED"
+      icon: "times-circle"
+      description: "Required information return/report not submitted"
+      sort_order: 130
+
+  # ============================================================================
+  # USAGE NOTES
+  # ============================================================================
+  usage_notes:
+    fact_tables:
+      - fact_compliance: "Primary dimension for compliance analysis"
+      - fact_filing: "Filing status tracking"
+      - fact_payment: "Payment status tracking"
+      
+    common_queries:
+      - name: "Compliance Rate by Category"
+        pattern: "SELECT compliance_category, SUM(CASE WHEN is_compliant THEN 1 ELSE 0 END) / COUNT(*) FROM ... GROUP BY compliance_category"
+        
+      - name: "Non-Compliance Severity Distribution"
+        pattern: "WHERE is_compliant = false GROUP BY severity_name"
+        
+      - name: "Enforcement Trigger Analysis"
+        pattern: "WHERE triggers_enforcement = true GROUP BY compliance_status_name"
+        
+    analysis_patterns:
+      - name: "Compliance Trend"
+        description: "Track compliance rates over time by category"
+        
+      - name: "Penalty Revenue Forecasting"
+        description: "Project penalty revenue based on non-compliance statuses"
+        
+      - name: "Resource Allocation"
+        description: "Prioritize enforcement resources based on severity levels"
+
+# ==============================================================================
+# END OF SPECIFICATION
+# ==============================================================================

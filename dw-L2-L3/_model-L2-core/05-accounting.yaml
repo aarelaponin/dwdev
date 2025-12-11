@@ -1,0 +1,2803 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Accounting Domain
+# =============================================================================
+#
+# This domain manages all financial accounting for tax administration,
+# implementing balance forward accounting, revenue accounting, transaction
+# processing, and financial reporting.
+#
+# Generated from: SIGTAS schemas (CASHIERING, TAX_ACCOUNT, BANK__BANK_INTERFACE)
+#                 + tax-capabilities.docx
+#
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    Accounting Domain - The financial heart of tax administration, managing
+    all taxpayer and revenue accounting using the balance forward method.
+    This domain ensures the integrity of financial information through
+    automated double-entry bookkeeping for all financial transactions.
+
+    This domain implements the core accounting functions:
+    - Taxpayer Accounting (what taxpayers owe)
+    - Revenue Accounting (what was collected)
+    - Balance Forward Method (not open item accounting)
+    - Automated Transaction Posting
+    - Dual-sided Transactions (taxpayer AND revenue accounts)
+    - Account Balance Management
+    - Period Opening/Closing
+    - Fiscal Year Management
+    - Account Reconciliation
+    - Write-off Management
+    - Chart of Accounts
+    - Journal Entry Management
+    - Account Statements
+
+    Core Accounting Principles (per tax-capabilities.docx):
+    - Balance Forward Method: Payments credit account balance, not specific liabilities
+    - Automated Posting: Every transaction automatically posted (no manual entries)
+    - Double-Entry: Every transaction affects both taxpayer AND revenue accounts
+    - TTT Structure: Accounts maintained per TIN-Tax Type-Tax Period
+    - Period Balancing: Balances (debit/credit/zero) close at period end
+    - Opening Balances: Closing balance becomes opening balance for next period
+    - Transaction Types: Liability, payment, refund, transfer, write-off, reversal
+    - Charge Types: Principal tax, penalties, interest, surcharges
+    - No Physical Deletes: All transactions preserved for audit
+    - Allocation Rules: Automated payment allocation per configured rules
+
+    Transaction Flow:
+    1. Business event occurs (assessment, payment, refund, etc.)
+    2. System automatically generates transaction
+    3. Transaction posted to taxpayer account (debit or credit)
+    4. Corresponding transaction posted to revenue account (opposite side)
+    5. Account balances updated
+    6. Transaction cannot be deleted (only reversed)
+
+    Liability Recording:
+    - Debit to taxpayer account (+liability)
+    - Credit to revenue account (+expected revenue)
+
+    Payment Recording:
+    - Credit to taxpayer account (-liability)
+    - Debit to revenue account (+collected revenue)
+
+    Account Balance Types:
+    - Debit Balance: Taxpayer owes money
+    - Credit Balance: Taxpayer has overpayment
+    - Zero Balance: Fully paid/reconciled
+
+    Integration Points:
+    - Filing & Assessment: Assessment creates liability transactions
+    - Payment & Refund: Payments and refunds create cash transactions
+    - Compliance & Control: Collection actions may adjust accounts
+    - Registration: Tax accounts are the structure for accounting
+    - Tax Framework: Tax types and periods organize accounts
+
+    Volume Characteristics:
+    - Very High Volume (10M-100M transactions annually)
+    - High concurrency during payment processing
+    - Real-time balance updates required
+    - Archive strategy essential
+    - Performance-critical indexes
+
+    This domain was synthesized from:
+    - SIGTAS schemas: CASHIERING (TAX_TRANSACTION, TAX_SUB_TRANS, CHARGE_TYPE,
+      TAX_TRANS_TYPE, CREDIT_SOURCE_TYPE, PAYMENT_TYPE, PAYMENT_LOC),
+      TAX_ACCOUNT (TAX_BALANCE, OPENING_TAX, OPENING_PEN, OPENING_INT)
+    - Tax capabilities sections: Accounting, Taxpayer Accounting, Revenue
+      Accounting, Payment Processing, Revenue Distribution
+
+  authors:
+    - "Generated from SIGTAS analysis"
+    - "Moldova SRS collaboration"
+    - "GovStack Initiative"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Payments BB"
+    - "Workflow BB"
+    - "Information Mediator BB"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+  changelog:
+    - version: "1.0.0"
+      date: "2025-11-04"
+      author: "Claude"
+      changes:
+        - "Initial accounting domain creation"
+        - "28 core tables defined"
+        - "Balance forward method implemented"
+        - "Revenue accounting framework"
+        - "Double-entry transaction model"
+        - "Fiscal year management"
+        - "Account reconciliation support"
+
+# =============================================================================
+# DOMAINS
+# =============================================================================
+
+domains:
+  - name: "accounting"
+    code: "AC"
+    display_name: "Accounting"
+    description: |
+      Manages all financial accounting for tax administration, including taxpayer
+      accounts, revenue accounts, transactions, balances, and financial reporting.
+      Implements the balance forward accounting method with automated double-entry
+      posting for all financial transactions.
+
+      This is a CRITICAL and HIGH-VOLUME domain that ensures financial integrity
+      and provides real-time visibility into taxpayer obligations and revenue
+      collection.
+
+    business_owner: "Accounting Department"
+    technical_owner: "Core Systems Team"
+
+    dependencies:
+      - "party_management"      # For party information
+      - "tax_framework"         # For tax types, periods
+      - "registration"          # For tax accounts
+      - "filing_assessment"     # Receives assessment transactions
+      - "reference_data"        # For codes and lookups
+
+    tags:
+      - "critical"
+      - "core"
+      - "very_high_volume"
+      - "real_time"
+      - "performance_sensitive"
+      - "financial"
+      - "audit_required"
+
+    domain_events:
+      - event_name: "TransactionPosted"
+        description: "Emitted when any financial transaction is posted"
+        payload_schema: |
+          {
+            "transaction_id": "bigint",
+            "tax_account_id": "bigint",
+            "transaction_type": "string",
+            "amount": "decimal",
+            "transaction_date": "date",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "AccountBalanceUpdated"
+        description: "Emitted when account balance changes"
+        payload_schema: |
+          {
+            "account_balance_id": "bigint",
+            "tax_account_id": "bigint",
+            "tax_period_id": "bigint",
+            "old_balance": "decimal",
+            "new_balance": "decimal",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "PeriodClosed"
+        description: "Emitted when accounting period is closed"
+        payload_schema: |
+          {
+            "tax_account_id": "bigint",
+            "tax_period_id": "bigint",
+            "closing_balance": "decimal",
+            "close_date": "date",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "PeriodOpened"
+        description: "Emitted when new accounting period is opened"
+        payload_schema: |
+          {
+            "tax_account_id": "bigint",
+            "tax_period_id": "bigint",
+            "opening_balance": "decimal",
+            "open_date": "date",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "RevenueReconciled"
+        description: "Emitted when revenue account is reconciled"
+        payload_schema: |
+          {
+            "revenue_account_id": "bigint",
+            "reconciliation_date": "date",
+            "expected_revenue": "decimal",
+            "actual_revenue": "decimal",
+            "variance": "decimal",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "FiscalYearClosed"
+        description: "Emitted when fiscal year accounting is closed"
+        payload_schema: |
+          {
+            "fiscal_year_id": "bigint",
+            "fiscal_year": "integer",
+            "close_date": "date",
+            "timestamp": "datetime"
+          }
+
+    # =============================================================================
+    # SCHEMAS
+    # =============================================================================
+
+    schemas:
+      - schema_name: "accounting"
+        description: |
+          Core schema containing all tables for financial accounting, including
+          taxpayer accounting, revenue accounting, transactions, balances, and
+          fiscal management.
+
+        # =========================================================================
+        # TABLES
+        # =========================================================================
+
+        tables:
+          # ===================================================================
+          # CORE TRANSACTION TABLES
+          # ===================================================================
+
+          - name: "tax_transaction"
+            display_name: "Tax Transaction"
+            description: |
+              Master table for all financial transactions in the tax system. Every
+              financial event (assessment, payment, refund, transfer, write-off, etc.)
+              generates a transaction record. Transactions are immutable once posted
+              and can only be reversed by creating offsetting transactions.
+
+              This is the transaction journal for taxpayer accounting. Each transaction
+              affects the taxpayer account balance and triggers a corresponding entry
+              in the revenue accounting system (double-entry bookkeeping).
+
+              Transaction Types:
+              - LIABILITY: Assessment creates tax liability (debit taxpayer)
+              - PAYMENT: Payment received (credit taxpayer)
+              - REFUND: Refund issued (debit taxpayer)
+              - TRANSFER_TO: Transfer to another account (credit taxpayer)
+              - TRANSFER_FROM: Transfer from another account (debit taxpayer)
+              - WRITE_OFF: Write-off of uncollectible amount (credit taxpayer)
+              - REVERSAL: Reversal of previous transaction
+              - PENALTY: Penalty imposed (debit taxpayer)
+              - INTEREST: Interest charged (debit taxpayer)
+              - ADJUSTMENT: Manual adjustment (debit/credit)
+
+              Charge Types:
+              - PRINCIPAL_TAX: Main tax liability
+              - PENALTY: Late filing/payment penalties
+              - INTEREST: Interest on late payment
+              - SURCHARGE: Additional charges
+              - FEE: Administrative fees
+
+              Sourced from: SIGTAS CASHIERING.TAX_TRANSACTION
+
+
+            aspects:
+              - auditable
+              - temporal
+
+            business_rule: |
+              1. Transactions are immutable (no updates or deletes allowed)
+              2. Reversals create new transactions with negative amounts
+              3. Every transaction must link to valid tax account and period
+              4. Amount can be positive (debit) or negative (credit)
+              5. Transaction date cannot be in the future
+              6. Each transaction automatically creates revenue account entry
+              7. Allocation sequence applied when identifying target liabilities
+              8. Sub-transactions may detail charge type breakdown
+              9. Document reference required for audit trail
+              10. Status must progress: DRAFT->POSTED->FINAL (no backward movement)
+
+            type: "transaction"
+
+            tags:
+              - "critical"
+              - "immutable"
+              - "very_high_volume"
+              - "audit_required"
+              - "double_entry"
+
+            estimated_rows:
+              initial: 50000000
+              annual_growth: 10000000
+              five_year: 100000000
+
+            columns:
+              - name: "transaction_id"
+                display_name: "Transaction ID"
+                type: "bigint"
+                description: "Unique identifier for the transaction"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account ID"
+                type: "bigint"
+                description: |
+                  Foreign key to tax_account. Links transaction to specific TIN-Tax Type
+                  combination. This is the taxpayer account being debited or credited.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Account"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_account"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period ID"
+                type: "bigint"
+                description: |
+                  Foreign key to tax_period. Links transaction to specific period.
+                  Critical for period-based accounting and balance forward method.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Period"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_period"
+
+              - name: "transaction_type_code"
+                display_name: "Transaction Type Code"
+                type: "varchar(30)"
+                description: |
+                  Foreign key to ref_transaction_type. Identifies the type of financial
+                  transaction (LIABILITY, PAYMENT, REFUND, TRANSFER, WRITE_OFF, etc.).
+                  Determines debit vs. credit treatment.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "ref_transaction_type"
+                    referenced_column: "transaction_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Transaction Type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_type"
+
+              - name: "charge_type_code"
+                display_name: "Charge Type Code"
+                type: "varchar(30)"
+                description: |
+                  Foreign key to ref_charge_type. Identifies what is being charged
+                  (PRINCIPAL_TAX, PENALTY, INTEREST, SURCHARGE, FEE). Used for
+                  allocation rules and reporting.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "ref_charge_type"
+                    referenced_column: "charge_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Charge Type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_charge_type"
+
+              - name: "transaction_date"
+                display_name: "Transaction Date"
+                type: "date"
+                description: |
+                  Date when transaction occurred (business date). This is the date
+                  the transaction is effective for accounting purposes, not necessarily
+                  when it was recorded in the system.
+                constraints:
+                  not_null: true
+                business_name: "Transaction Date"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_date"
+
+              - name: "posting_date"
+                display_name: "Posting Date"
+                type: "date"
+                description: |
+                  Date when transaction was posted to the account. May differ from
+                  transaction_date if transaction was entered retroactively or
+                  forward-dated.
+                constraints:
+                  not_null: true
+                business_name: "Posting Date"
+
+              - name: "amount"
+                display_name: "Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Transaction amount in local currency. Positive amounts are debits
+                  (increase liability), negative amounts are credits (reduce liability).
+                  Zero amounts not allowed.
+                constraints:
+                  not_null: true
+                  check: "amount <> 0"
+                business_name: "Transaction Amount"
+                usage_note: "Use negative values for credits"
+
+              - name: "balance_after_transaction"
+                display_name: "Balance After Transaction"
+                type: "decimal(19,2)"
+                description: |
+                  Running balance of the account after this transaction was posted.
+                  Positive = taxpayer owes, Negative = overpayment, Zero = settled.
+                  Computed when transaction posted.
+                constraints:
+                  not_null: true
+                business_name: "Balance After"
+
+              - name: "reference_number"
+                display_name: "Reference Number"
+                type: "varchar(50)"
+                description: |
+                  Unique reference number for the transaction. Could be payment receipt
+                  number, assessment number, refund voucher number, etc. Used for
+                  reconciliation and audit trail.
+                constraints:
+                  not_null: false
+                  unique: true
+                business_name: "Reference Number"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_ref_num"
+
+              - name: "source_document_type"
+                display_name: "Source Document Type"
+                type: "varchar(30)"
+                description: |
+                  Type of source document that generated this transaction (ASSESSMENT,
+                  PAYMENT_RECEIPT, REFUND_VOUCHER, AUDIT_NOTICE, COLLECTION_ORDER, etc.).
+                  Links to document management system.
+                constraints:
+                  not_null: false
+                business_name: "Source Document Type"
+
+              - name: "source_document_id"
+                display_name: "Source Document ID"
+                type: "bigint"
+                description: |
+                  ID of source document in originating system. Could be assessment_id,
+                  payment_id, refund_id, etc. Used to trace back to source.
+                constraints:
+                  not_null: false
+                business_name: "Source Document ID"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_source_doc"
+
+              - name: "reversal_of_transaction_id"
+                display_name: "Reversal Of Transaction ID"
+                type: "bigint"
+                description: |
+                  Foreign key to tax_transaction. If this transaction is a reversal
+                  of a previous transaction, this field contains the ID of the
+                  original transaction being reversed.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    referenced_table: "tax_transaction"
+                    referenced_column: "transaction_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Reversal Of Transaction"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_reversal"
+
+              - name: "reversed_by_transaction_id"
+                display_name: "Reversed By Transaction ID"
+                type: "bigint"
+                description: |
+                  Foreign key to tax_transaction. If this transaction has been reversed,
+                  this field contains the ID of the reversal transaction. Null if not
+                  yet reversed.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    referenced_table: "tax_transaction"
+                    referenced_column: "transaction_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Reversed By Transaction"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_reversed_by"
+
+              - name: "narrative"
+                display_name: "Narrative"
+                type: "text"
+                description: |
+                  Free-text description of the transaction. Provides context for
+                  auditing and customer service. Should describe what this transaction
+                  represents in business terms.
+                constraints:
+                  not_null: false
+                business_name: "Transaction Description"
+
+              - name: "transaction_status_code"
+                display_name: "Transaction Status Code"
+                type: "varchar(20)"
+                description: |
+                  Current status of transaction: DRAFT (not yet posted), POSTED
+                  (posted but can be reversed), FINAL (locked, cannot be reversed),
+                  REVERSED (has been reversed), ERROR (posting failed).
+                constraints:
+                  not_null: true
+                  default: "'DRAFT'"
+                business_name: "Transaction Status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_status"
+
+              - name: "fiscal_year_id"
+                display_name: "Fiscal Year ID"
+                type: "bigint"
+                description: |
+                  Foreign key to fiscal_year. Links transaction to fiscal year for
+                  year-end closing and reporting.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "fiscal_year"
+                    referenced_column: "fiscal_year_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Fiscal Year"
+                indexing:
+                  - type: "btree"
+                    name: "idx_tax_trans_fiscal_year"
+
+              - name: "is_automatically_allocated"
+                display_name: "Is Automatically Allocated"
+                type: "boolean"
+                description: |
+                  Flag indicating if payment was automatically allocated by the system
+                  per allocation rules (true) or manually allocated by user (false).
+                constraints:
+                  not_null: true
+                  default: "true"
+                business_name: "Auto Allocated"
+
+              - name: "allocation_sequence"
+                display_name: "Allocation Sequence"
+                type: "integer"
+                description: |
+                  For payment transactions, the order in which payments were allocated
+                  across multiple liabilities. Used to determine which liability was
+                  paid first when payment insufficient for all obligations.
+                constraints:
+                  not_null: false
+                business_name: "Allocation Sequence"
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(50)"
+                description: "User or system process that created the transaction"
+                constraints:
+                  not_null: true
+                business_name: "Created By"
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when transaction record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+                business_name: "Created Date"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(50)"
+                description: "User or system process that last modified the transaction"
+                constraints:
+                  not_null: false
+                business_name: "Modified By"
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when transaction was last modified"
+                constraints:
+                  not_null: false
+                business_name: "Modified Date"
+
+            indexes:
+              - name: "idx_tax_trans_composite"
+                columns: ["tax_account_id", "tax_period_id", "transaction_date"]
+                type: "btree"
+                description: "Composite index for common query pattern"
+
+              - name: "idx_tax_trans_status_date"
+                columns: ["transaction_status_code", "transaction_date"]
+                type: "btree"
+                description: "For querying transactions by status and date"
+
+              - name: "idx_tax_trans_fiscal"
+                columns: ["fiscal_year_id", "transaction_type_code"]
+                type: "btree"
+                description: "For fiscal year reporting"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "tax_account"
+                source_column: "tax_account_id"
+                target_column: "tax_account_id"
+                cardinality: "N:1"
+                description: "Each transaction belongs to one tax account"
+
+              - type: "many_to_one"
+                target_table: "tax_period"
+                source_column: "tax_period_id"
+                target_column: "tax_period_id"
+                cardinality: "N:1"
+                description: "Each transaction is for one tax period"
+
+              - type: "one_to_one"
+                target_table: "tax_transaction"
+                source_column: "reversal_of_transaction_id"
+                target_column: "transaction_id"
+                cardinality: "1:1"
+                description: "Links reversal to original transaction"
+
+          # ===================================================================
+          # SUB-TRANSACTION DETAILS
+          # ===================================================================
+
+          - name: "tax_sub_transaction"
+            display_name: "Tax Sub-Transaction"
+            description: |
+              Detail breakdown of tax transactions by charge type. A single
+              transaction may have multiple sub-transactions if it affects
+              different charge types (e.g., principal, penalty, and interest).
+
+              This table enables detailed tracking of how amounts are distributed
+              across different charge categories, supporting complex allocation
+              rules and detailed reporting.
+
+              Example: A single payment of $1,000 might be broken down as:
+              - $800 to principal tax
+              - $150 to penalties
+              - $50 to interest
+
+              Each of these would be a separate sub-transaction record.
+
+              Sourced from: SIGTAS CASHIERING.TAX_SUB_TRANS
+
+            business_rule: |
+              1. Sum of sub-transaction amounts must equal parent transaction amount
+              2. Each sub-transaction must have distinct charge type
+              3. Cannot exist without parent transaction
+              4. Sub-transactions inherit transaction date from parent
+              5. Used for detailed allocation tracking
+              6. Supports audit reporting by charge type
+
+            type: "transaction"
+
+            tags:
+              - "detail"
+              - "very_high_volume"
+
+            estimated_rows:
+              initial: 150000000
+              annual_growth: 30000000
+              five_year: 300000000
+
+            columns:
+              - name: "sub_transaction_id"
+                display_name: "Sub-Transaction ID"
+                type: "bigint"
+                description: "Unique identifier for the sub-transaction"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "transaction_id"
+                display_name: "Transaction ID"
+                type: "bigint"
+                description: "Foreign key to parent tax_transaction"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_transaction"
+                    referenced_column: "transaction_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+                business_name: "Parent Transaction"
+                indexing:
+                  - type: "btree"
+                    name: "idx_sub_trans_transaction"
+
+              - name: "charge_type_code"
+                display_name: "Charge Type Code"
+                type: "varchar(30)"
+                description: |
+                  Foreign key to ref_charge_type. Identifies which charge type
+                  this sub-transaction affects (PRINCIPAL_TAX, PENALTY, INTEREST,
+                  SURCHARGE, FEE).
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "ref_charge_type"
+                    referenced_column: "charge_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Charge Type"
+
+              - name: "amount"
+                display_name: "Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Amount allocated to this charge type. Must be same sign as parent
+                  transaction amount.
+                constraints:
+                  not_null: true
+                  check: "amount <> 0"
+                business_name: "Sub-Transaction Amount"
+
+              - name: "assessment_id"
+                display_name: "Assessment ID"
+                type: "bigint"
+                description: |
+                  Foreign key to assessment table (if this sub-transaction is paying
+                  a specific assessment). Used for detailed allocation tracking.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    referenced_table: "assessment"
+                    referenced_column: "assessment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Related Assessment"
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(50)"
+                description: "User or system process that created the sub-transaction"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when sub-transaction was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_sub_trans_composite"
+                columns: ["transaction_id", "charge_type_code"]
+                type: "btree"
+                description: "Composite index for lookups"
+
+            constraints:
+              - name: "chk_sub_trans_unique_charge"
+                type: "unique"
+                columns: ["transaction_id", "charge_type_code"]
+                description: "Each transaction can have only one sub-trans per charge type"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "tax_transaction"
+                source_column: "transaction_id"
+                target_column: "transaction_id"
+                cardinality: "N:1"
+                description: "Multiple sub-transactions belong to one transaction"
+
+          # ===================================================================
+          # ACCOUNT BALANCE MANAGEMENT
+          # ===================================================================
+
+          - name: "account_balance"
+            display_name: "Account Balance"
+            description: |
+              Maintains current and historical balances for each tax account by
+              period and charge type. This is a critical table for real-time
+              balance queries and balance forward accounting.
+
+              Balance Types:
+              - PRINCIPAL: Main tax balance
+              - PENALTY: Accumulated penalties
+              - INTEREST: Accumulated interest
+              - SURCHARGE: Additional charges
+
+              Balance States:
+              - Positive (Debit): Taxpayer owes money
+              - Negative (Credit): Taxpayer has overpayment
+              - Zero: Fully reconciled
+
+              This table is updated in real-time as transactions are posted,
+              maintaining an accurate running balance for each account/period/charge
+              type combination.
+
+              Sourced from: SIGTAS TAX_ACCOUNT.TAX_BALANCE
+
+            business_rule: |
+              1. Balance updated atomically with transaction posting
+              2. One record per tax account, period, and charge type combination
+              3. Balances can be positive (debit), negative (credit), or zero
+              4. Historical balances preserved when period closes
+              5. Current period balance marked with is_current flag
+              6. Sum of all charge type balances = total account balance
+              7. Balance recalculation function available for reconciliation
+              8. Negative balances indicate overpayment/credit position
+
+            type: "master"
+
+            tags:
+              - "critical"
+              - "real_time"
+              - "high_volume"
+              - "performance_sensitive"
+
+            estimated_rows:
+              initial: 10000000
+              annual_growth: 2000000
+              five_year: 20000000
+
+            columns:
+              - name: "account_balance_id"
+                display_name: "Account Balance ID"
+                type: "bigint"
+                description: "Unique identifier for the account balance record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account ID"
+                type: "bigint"
+                description: "Foreign key to tax_account (TIN-Tax Type)"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Account"
+                indexing:
+                  - type: "btree"
+                    name: "idx_acct_bal_account"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period ID"
+                type: "bigint"
+                description: "Foreign key to tax_period"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Period"
+                indexing:
+                  - type: "btree"
+                    name: "idx_acct_bal_period"
+
+              - name: "charge_type_code"
+                display_name: "Charge Type Code"
+                type: "varchar(30)"
+                description: |
+                  Foreign key to ref_charge_type. Identifies which charge type
+                  this balance represents (PRINCIPAL_TAX, PENALTY, INTEREST, etc.).
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "ref_charge_type"
+                    referenced_column: "charge_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Charge Type"
+
+              - name: "opening_balance"
+                display_name: "Opening Balance"
+                type: "decimal(19,2)"
+                description: |
+                  Balance at the start of the period (brought forward from previous
+                  period closing balance). Zero for first period of tax account.
+                constraints:
+                  not_null: true
+                  default: "0"
+                business_name: "Opening Balance"
+
+              - name: "debit_amount"
+                display_name: "Debit Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Sum of all debit transactions in the period (increases liability).
+                  Includes assessments, penalties, interest, adjustments.
+                constraints:
+                  not_null: true
+                  default: "0"
+                business_name: "Total Debits"
+
+              - name: "credit_amount"
+                display_name: "Credit Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Sum of all credit transactions in the period (decreases liability).
+                  Includes payments, refunds, write-offs, adjustments.
+                constraints:
+                  not_null: true
+                  default: "0"
+                business_name: "Total Credits"
+
+              - name: "closing_balance"
+                display_name: "Closing Balance"
+                type: "decimal(19,2)"
+                description: |
+                  Balance at end of period. Calculated as: opening_balance +
+                  debit_amount - credit_amount. Positive = owe, Negative = overpaid.
+                constraints:
+                  not_null: true
+                business_name: "Closing Balance"
+                usage_note: "Auto-calculated: opening + debits - credits"
+
+              - name: "is_current"
+                display_name: "Is Current"
+                type: "boolean"
+                description: |
+                  Flag indicating if this is the current period balance (true) or
+                  historical period (false). Only one current balance per account
+                  and charge type.
+                constraints:
+                  not_null: true
+                  default: "true"
+                business_name: "Current Period Flag"
+                indexing:
+                  - type: "btree"
+                    name: "idx_acct_bal_current"
+
+              - name: "period_closed_date"
+                display_name: "Period Closed Date"
+                type: "date"
+                description: |
+                  Date when this period was closed. Null if period still open.
+                  After closing, no more transactions can be posted to this period.
+                constraints:
+                  not_null: false
+                business_name: "Period Closed Date"
+
+              - name: "last_transaction_id"
+                display_name: "Last Transaction ID"
+                type: "bigint"
+                description: |
+                  Foreign key to tax_transaction. References the most recent
+                  transaction that affected this balance. Used for audit trail.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    referenced_table: "tax_transaction"
+                    referenced_column: "transaction_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Last Transaction"
+
+              - name: "last_updated_date"
+                display_name: "Last Updated Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when balance was last updated"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+                business_name: "Last Updated"
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(50)"
+                description: "User or system that created the balance record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when balance record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(50)"
+                description: "User or system that last modified the balance"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when balance was last modified"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_acct_bal_composite"
+                columns: ["tax_account_id", "tax_period_id", "charge_type_code"]
+                type: "btree"
+                unique: true
+                description: "Unique index for account/period/charge combination"
+
+              - name: "idx_acct_bal_current_query"
+                columns: ["tax_account_id", "is_current"]
+                type: "btree"
+                description: "For querying current balances"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "tax_account"
+                source_column: "tax_account_id"
+                target_column: "tax_account_id"
+                cardinality: "N:1"
+                description: "Each balance belongs to one tax account"
+
+          # ===================================================================
+          # OPENING BALANCES (FISCAL YEAR START)
+          # ===================================================================
+
+          - name: "opening_balance"
+            display_name: "Opening Balance"
+            description: |
+              Stores opening balances for tax accounts at the start of fiscal years
+              or when accounts are first activated. Essential for fiscal year
+              management and historical balance tracking.
+
+              Opening balances are typically:
+              - Brought forward from previous year closing balance
+              - Initial balance when migrating from legacy system
+              - Zero balance for newly registered taxpayers
+
+              Supports balance forward accounting method by maintaining the chain
+              of balances across periods and fiscal years.
+
+              Sourced from: SIGTAS TAX_ACCOUNT.OPENING_TAX, OPENING_PEN, OPENING_INT
+
+            business_rule: |
+              1. One record per account, period, and charge type
+              2. Opening balance for period N = closing balance from period N-1
+              3. First period opening balance can be manually set (data migration)
+              4. Cannot modify opening balance after period has transactions
+              5. Opening balances sum across charge types = total opening position
+              6. Must reconcile with previous period closing
+
+            type: "master"
+
+            tags:
+              - "fiscal_management"
+              - "historical"
+
+            estimated_rows:
+              initial: 5000000
+              annual_growth: 1000000
+              five_year: 10000000
+
+            columns:
+              - name: "opening_balance_id"
+                display_name: "Opening Balance ID"
+                type: "bigint"
+                description: "Unique identifier for opening balance record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account ID"
+                type: "bigint"
+                description: "Foreign key to tax_account"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Account"
+                indexing:
+                  - type: "btree"
+                    name: "idx_opening_bal_account"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period ID"
+                type: "bigint"
+                description: "Foreign key to tax_period (period being opened)"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Period"
+
+              - name: "charge_type_code"
+                display_name: "Charge Type Code"
+                type: "varchar(30)"
+                description: "Foreign key to ref_charge_type"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "ref_charge_type"
+                    referenced_column: "charge_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Charge Type"
+
+              - name: "opening_amount"
+                display_name: "Opening Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Opening balance amount for this account/period/charge type.
+                  Positive = debit (owes), negative = credit (overpaid), zero = cleared.
+                constraints:
+                  not_null: true
+                business_name: "Opening Amount"
+
+              - name: "source"
+                display_name: "Source"
+                type: "varchar(30)"
+                description: |
+                  Source of opening balance: CLOSING_BALANCE (from prior period),
+                  MANUAL_ENTRY (data migration), SYSTEM_GENERATED (first period),
+                  ADJUSTMENT (corrected balance).
+                constraints:
+                  not_null: true
+                business_name: "Balance Source"
+
+              - name: "reference_period_id"
+                display_name: "Reference Period ID"
+                type: "bigint"
+                description: |
+                  Foreign key to tax_period. If opening balance came from closing
+                  balance of previous period, this references that period.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    referenced_table: "tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Reference Period"
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(50)"
+                description: "User or system that created opening balance"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when opening balance was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(50)"
+                description: "User or system that last modified opening balance"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when opening balance was last modified"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_opening_bal_composite"
+                columns: ["tax_account_id", "tax_period_id", "charge_type_code"]
+                type: "btree"
+                unique: true
+                description: "Unique index for account/period/charge combination"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "tax_account"
+                source_column: "tax_account_id"
+                target_column: "tax_account_id"
+                cardinality: "N:1"
+                description: "Each opening balance belongs to one tax account"
+
+          # ===================================================================
+          # REVENUE ACCOUNTING
+          # ===================================================================
+
+          - name: "revenue_account"
+            display_name: "Revenue Account"
+            description: |
+              Master table for revenue accounts (government accounts). Each revenue
+              account represents a specific tax type's revenue tracking for a
+              jurisdiction (national, regional, municipal).
+
+              Revenue accounts track:
+              - Expected revenue (from assessments)
+              - Collected revenue (from payments)
+              - Refunded revenue (from refunds)
+              - Disbursed revenue (transferred to budget accounts)
+
+              Revenue accounting operates on a fiscal year basis and supports
+              revenue distribution rules (e.g., property tax revenue goes to
+              municipality where property located).
+
+              Double-Entry Integration:
+              - Taxpayer assessment (debit) = Revenue expected (credit)
+              - Taxpayer payment (credit) = Revenue collected (debit)
+
+              Sourced from: Tax capabilities (Revenue Accounting section)
+
+            business_rule: |
+              1. One revenue account per tax type per jurisdiction
+              2. Revenue accounts maintained by fiscal year
+              3. Expected revenue = sum of all assessments
+              4. Collected revenue = sum of all payments
+              5. Variance = expected - collected
+              6. Revenue distribution follows configured rules
+              7. Budget account integration for disbursement
+              8. Year-end closing transfers to budget
+
+            type: "master"
+
+            tags:
+              - "critical"
+              - "revenue"
+              - "government_accounting"
+
+            estimated_rows:
+              initial: 500
+              annual_growth: 50
+              five_year: 750
+
+            columns:
+              - name: "revenue_account_id"
+                display_name: "Revenue Account ID"
+                type: "bigint"
+                description: "Unique identifier for revenue account"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "revenue_account_code"
+                display_name: "Revenue Account Code"
+                type: "varchar(30)"
+                description: |
+                  Unique code for revenue account, typically aligned with government
+                  chart of accounts or budget codes.
+                constraints:
+                  not_null: true
+                  unique: true
+                business_name: "Account Code"
+                indexing:
+                  - type: "btree"
+                    name: "idx_rev_acct_code"
+
+              - name: "revenue_account_name"
+                display_name: "Revenue Account Name"
+                type: "varchar(200)"
+                description: "Descriptive name for the revenue account"
+                constraints:
+                  not_null: true
+                business_name: "Account Name"
+
+              - name: "tax_type_code"
+                display_name: "Tax Type Code"
+                type: "varchar(20)"
+                description: |
+                  Foreign key to tax_type. Identifies which tax type this revenue
+                  account tracks.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_type"
+                    referenced_column: "tax_type_code"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Type"
+                indexing:
+                  - type: "btree"
+                    name: "idx_rev_acct_tax_type"
+
+              - name: "jurisdiction_code"
+                display_name: "Jurisdiction Code"
+                type: "varchar(20)"
+                description: |
+                  Code identifying jurisdiction that receives this revenue (NATIONAL,
+                  REGIONAL_XX, MUNICIPAL_XXXX). Supports revenue distribution.
+                constraints:
+                  not_null: true
+                business_name: "Jurisdiction"
+
+              - name: "budget_account_code"
+                display_name: "Budget Account Code"
+                type: "varchar(50)"
+                description: |
+                  External budget account code in government financial management
+                  system where revenue is disbursed.
+                constraints:
+                  not_null: false
+                business_name: "Budget Account"
+
+              - name: "is_active"
+                display_name: "Is Active"
+                type: "boolean"
+                description: "Flag indicating if revenue account is currently active"
+                constraints:
+                  not_null: true
+                  default: "true"
+                business_name: "Active Status"
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(50)"
+                description: "User who created revenue account"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when revenue account was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(50)"
+                description: "User who last modified revenue account"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when revenue account was last modified"
+                constraints:
+                  not_null: false
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "tax_type"
+                source_column: "tax_type_code"
+                target_column: "tax_type_code"
+                cardinality: "N:1"
+                description: "Each revenue account is for one tax type"
+
+          # ===================================================================
+          # REVENUE BALANCE
+          # ===================================================================
+
+          - name: "revenue_balance"
+            display_name: "Revenue Balance"
+            description: |
+              Tracks revenue account balances by fiscal year and period. Maintains
+              expected revenue (from assessments), collected revenue (from payments),
+              and refunded revenue.
+
+              Revenue balance provides real-time visibility into:
+              - How much revenue expected for the year
+              - How much revenue actually collected
+              - Collection rate (collected / expected)
+              - Outstanding revenue to be collected
+              - Revenue refunded
+
+              Critical for budget management, forecasting, and performance monitoring.
+
+            business_rule: |
+              1. One record per revenue account and fiscal period
+              2. Expected revenue = sum of assessments posted
+              3. Collected revenue = sum of payments received
+              4. Refunded revenue = sum of refunds issued
+              5. Outstanding = expected - collected - refunded
+              6. Collection rate = (collected / expected) * 100
+              7. Updated in real-time with transactions
+              8. Historical balances preserved
+
+            type: "transaction"
+
+            tags:
+              - "critical"
+              - "revenue"
+              - "high_volume"
+
+            estimated_rows:
+              initial: 50000
+              annual_growth: 10000
+              five_year: 100000
+
+            columns:
+              - name: "revenue_balance_id"
+                display_name: "Revenue Balance ID"
+                type: "bigint"
+                description: "Unique identifier for revenue balance record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "revenue_account_id"
+                display_name: "Revenue Account ID"
+                type: "bigint"
+                description: "Foreign key to revenue_account"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "revenue_account"
+                    referenced_column: "revenue_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Revenue Account"
+                indexing:
+                  - type: "btree"
+                    name: "idx_rev_bal_account"
+
+              - name: "fiscal_year_id"
+                display_name: "Fiscal Year ID"
+                type: "bigint"
+                description: "Foreign key to fiscal_year"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "fiscal_year"
+                    referenced_column: "fiscal_year_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Fiscal Year"
+                indexing:
+                  - type: "btree"
+                    name: "idx_rev_bal_fiscal_year"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period ID"
+                type: "bigint"
+                description: |
+                  Foreign key to tax_period. Allows tracking revenue by period
+                  within fiscal year for detailed analysis.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    referenced_table: "tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Period"
+
+              - name: "expected_revenue"
+                display_name: "Expected Revenue"
+                type: "decimal(19,2)"
+                description: |
+                  Total revenue expected based on assessments posted in this
+                  fiscal year/period.
+                constraints:
+                  not_null: true
+                  default: "0"
+                business_name: "Expected Revenue"
+
+              - name: "collected_revenue"
+                display_name: "Collected Revenue"
+                type: "decimal(19,2)"
+                description: |
+                  Total revenue actually collected (payments received) in this
+                  fiscal year/period.
+                constraints:
+                  not_null: true
+                  default: "0"
+                business_name: "Collected Revenue"
+
+              - name: "refunded_revenue"
+                display_name: "Refunded Revenue"
+                type: "decimal(19,2)"
+                description: |
+                  Total revenue refunded to taxpayers in this fiscal year/period.
+                constraints:
+                  not_null: true
+                  default: "0"
+                business_name: "Refunded Revenue"
+
+              - name: "written_off_revenue"
+                display_name: "Written Off Revenue"
+                type: "decimal(19,2)"
+                description: |
+                  Total revenue written off as uncollectible in this fiscal
+                  year/period.
+                constraints:
+                  not_null: true
+                  default: "0"
+                business_name: "Written Off Revenue"
+
+              - name: "disbursed_revenue"
+                display_name: "Disbursed Revenue"
+                type: "decimal(19,2)"
+                description: |
+                  Total revenue transferred to budget accounts (disbursed to
+                  government) in this fiscal year/period.
+                constraints:
+                  not_null: true
+                  default: "0"
+                business_name: "Disbursed Revenue"
+
+              - name: "outstanding_revenue"
+                display_name: "Outstanding Revenue"
+                type: "decimal(19,2)"
+                description: |
+                  Revenue still to be collected. Calculated as: expected_revenue -
+                  collected_revenue - refunded_revenue - written_off_revenue
+                constraints:
+                  not_null: true
+                business_name: "Outstanding Revenue"
+                usage_note: "Computed field"
+
+              - name: "collection_rate_percent"
+                display_name: "Collection Rate Percent"
+                type: "decimal(5,2)"
+                description: |
+                  Collection rate percentage: (collected / expected) * 100.
+                  Key performance indicator for revenue administration.
+                constraints:
+                  not_null: false
+                business_name: "Collection Rate %"
+                usage_note: "Computed field"
+
+              - name: "last_updated_date"
+                display_name: "Last Updated Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when revenue balance was last updated"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(50)"
+                description: "User or system that created revenue balance record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when revenue balance record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(50)"
+                description: "User or system that last modified revenue balance"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when revenue balance was last modified"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_rev_bal_composite"
+                columns: ["revenue_account_id", "fiscal_year_id", "tax_period_id"]
+                type: "btree"
+                unique: true
+                description: "Unique index for account/year/period combination"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "revenue_account"
+                source_column: "revenue_account_id"
+                target_column: "revenue_account_id"
+                cardinality: "N:1"
+                description: "Each balance record belongs to one revenue account"
+
+          # ===================================================================
+          # FISCAL YEAR MANAGEMENT
+          # ===================================================================
+
+          - name: "fiscal_year"
+            display_name: "Fiscal Year"
+            description: |
+              Defines fiscal years for accounting purposes. Fiscal year may or may
+              not align with calendar year depending on jurisdiction.
+
+              Fiscal year management controls:
+              - When revenue accounting starts
+              - When revenue accounting closes
+              - Period structure within fiscal year
+              - Year-end closing procedures
+              - Opening balance calculations
+
+              Each fiscal year has distinct lifecycle: PLANNED -> OPEN -> CLOSED
+
+            business_rule: |
+              1. Fiscal year must have non-overlapping start and end dates
+              2. Only one fiscal year can be OPEN at a time
+              3. Cannot close fiscal year with unreconciled accounts
+              4. Closed fiscal years cannot have new transactions
+              5. Opening balances for new year = closing balances of prior year
+              6. Year-end closing process locks all transactions
+
+            type: "reference"
+
+            tags:
+              - "fiscal_management"
+              - "configuration"
+
+            estimated_rows:
+              initial: 10
+              annual_growth: 1
+              five_year: 15
+
+            columns:
+              - name: "fiscal_year_id"
+                display_name: "Fiscal Year ID"
+                type: "bigint"
+                description: "Unique identifier for fiscal year"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "fiscal_year"
+                display_name: "Fiscal Year"
+                type: "integer"
+                description: |
+                  Calendar year of fiscal year (e.g., 2025). If fiscal year spans
+                  calendar years, use year when fiscal year starts.
+                constraints:
+                  not_null: true
+                  unique: true
+                business_name: "Fiscal Year"
+                indexing:
+                  - type: "btree"
+                    name: "idx_fiscal_year_year"
+
+              - name: "start_date"
+                display_name: "Start Date"
+                type: "date"
+                description: "First day of fiscal year"
+                constraints:
+                  not_null: true
+                business_name: "Fiscal Year Start"
+
+              - name: "end_date"
+                display_name: "End Date"
+                type: "date"
+                description: "Last day of fiscal year"
+                constraints:
+                  not_null: true
+                  check: "end_date > start_date"
+                business_name: "Fiscal Year End"
+
+              - name: "fiscal_year_status"
+                display_name: "Fiscal Year Status"
+                type: "varchar(20)"
+                description: |
+                  Status of fiscal year: PLANNED (not yet started), OPEN (current
+                  year, transactions allowed), CLOSING (year-end procedures in
+                  progress), CLOSED (locked, no more transactions).
+                constraints:
+                  not_null: true
+                  default: "'PLANNED'"
+                business_name: "Status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_fiscal_year_status"
+
+              - name: "closed_date"
+                display_name: "Closed Date"
+                type: "date"
+                description: |
+                  Date when fiscal year was officially closed. Null if still open.
+                constraints:
+                  not_null: false
+                business_name: "Closed Date"
+
+              - name: "description"
+                display_name: "Description"
+                type: "text"
+                description: "Additional information about this fiscal year"
+                constraints:
+                  not_null: false
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(50)"
+                description: "User who created fiscal year record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when fiscal year record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(50)"
+                description: "User who last modified fiscal year"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when fiscal year was last modified"
+                constraints:
+                  not_null: false
+
+          # ===================================================================
+          # ACCOUNT RECONCILIATION
+          # ===================================================================
+
+          - name: "account_reconciliation"
+            display_name: "Account Reconciliation"
+            description: |
+              Tracks account reconciliation activities - comparing calculated balances
+              against actual balances and resolving discrepancies. Essential for
+              maintaining financial integrity and identifying data quality issues.
+
+              Reconciliation Types:
+              - PERIODIC: Regular scheduled reconciliation (monthly, quarterly)
+              - AD_HOC: Investigative reconciliation for specific accounts
+              - YEAR_END: Annual reconciliation as part of fiscal close
+              - SYSTEM: Automated system reconciliation
+
+              Reconciliation validates:
+              - Transaction totals = balance changes
+              - Opening + debits - credits = closing balance
+              - Taxpayer balances = revenue balances (opposite sign)
+              - No orphaned transactions
+              - No negative balances where not allowed
+
+            business_rule: |
+              1. Reconciliation must specify date range
+              2. System automatically calculates expected balance
+              3. Actual balance from account_balance table
+              4. Variance = expected - actual
+              5. Variances exceeding threshold require investigation
+              6. Reconciliation status: PENDING -> IN_PROGRESS -> RECONCILED/DISCREPANCY
+              7. All discrepancies must be documented
+              8. Approved reconciliations cannot be modified
+
+            type: "transaction"
+
+            tags:
+              - "audit"
+              - "data_quality"
+              - "reconciliation"
+
+            estimated_rows:
+              initial: 100000
+              annual_growth: 50000
+              five_year: 350000
+
+            columns:
+              - name: "reconciliation_id"
+                display_name: "Reconciliation ID"
+                type: "bigint"
+                description: "Unique identifier for reconciliation record"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account ID"
+                type: "bigint"
+                description: "Foreign key to tax_account being reconciled"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Account"
+                indexing:
+                  - type: "btree"
+                    name: "idx_recon_account"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period ID"
+                type: "bigint"
+                description: "Foreign key to tax_period being reconciled"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_period"
+                    referenced_column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Period"
+
+              - name: "reconciliation_type"
+                display_name: "Reconciliation Type"
+                type: "varchar(30)"
+                description: |
+                  Type of reconciliation: PERIODIC, AD_HOC, YEAR_END, SYSTEM,
+                  INVESTIGATION.
+                constraints:
+                  not_null: true
+                business_name: "Reconciliation Type"
+
+              - name: "reconciliation_date"
+                display_name: "Reconciliation Date"
+                type: "date"
+                description: "Date when reconciliation was performed"
+                constraints:
+                  not_null: true
+                business_name: "Reconciliation Date"
+                indexing:
+                  - type: "btree"
+                    name: "idx_recon_date"
+
+              - name: "opening_balance_expected"
+                display_name: "Opening Balance Expected"
+                type: "decimal(19,2)"
+                description: |
+                  Expected opening balance from previous period closing balance.
+                constraints:
+                  not_null: true
+                business_name: "Expected Opening"
+
+              - name: "opening_balance_actual"
+                display_name: "Opening Balance Actual"
+                type: "decimal(19,2)"
+                description: |
+                  Actual opening balance in account_balance table.
+                constraints:
+                  not_null: true
+                business_name: "Actual Opening"
+
+              - name: "total_debits_expected"
+                display_name: "Total Debits Expected"
+                type: "decimal(19,2)"
+                description: |
+                  Expected total debits based on summing transactions.
+                constraints:
+                  not_null: true
+                business_name: "Expected Debits"
+
+              - name: "total_debits_actual"
+                display_name: "Total Debits Actual"
+                type: "decimal(19,2)"
+                description: |
+                  Actual total debits in account_balance table.
+                constraints:
+                  not_null: true
+                business_name: "Actual Debits"
+
+              - name: "total_credits_expected"
+                display_name: "Total Credits Expected"
+                type: "decimal(19,2)"
+                description: |
+                  Expected total credits based on summing transactions.
+                constraints:
+                  not_null: true
+                business_name: "Expected Credits"
+
+              - name: "total_credits_actual"
+                display_name: "Total Credits Actual"
+                type: "decimal(19,2)"
+                description: |
+                  Actual total credits in account_balance table.
+                constraints:
+                  not_null: true
+                business_name: "Actual Credits"
+
+              - name: "closing_balance_expected"
+                display_name: "Closing Balance Expected"
+                type: "decimal(19,2)"
+                description: |
+                  Expected closing balance: opening + debits - credits.
+                constraints:
+                  not_null: true
+                business_name: "Expected Closing"
+
+              - name: "closing_balance_actual"
+                display_name: "Closing Balance Actual"
+                type: "decimal(19,2)"
+                description: |
+                  Actual closing balance in account_balance table.
+                constraints:
+                  not_null: true
+                business_name: "Actual Closing"
+
+              - name: "variance_amount"
+                display_name: "Variance Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Difference between expected and actual closing balance.
+                  Zero = reconciled, non-zero = discrepancy.
+                constraints:
+                  not_null: true
+                business_name: "Variance"
+                usage_note: "expected_closing - actual_closing"
+
+              - name: "reconciliation_status"
+                display_name: "Reconciliation Status"
+                type: "varchar(30)"
+                description: |
+                  Status: PENDING (not started), IN_PROGRESS (being reconciled),
+                  RECONCILED (no discrepancy or resolved), DISCREPANCY (unresolved
+                  variance), APPROVED (reconciliation approved).
+                constraints:
+                  not_null: true
+                  default: "'PENDING'"
+                business_name: "Status"
+                indexing:
+                  - type: "btree"
+                    name: "idx_recon_status"
+
+              - name: "variance_explanation"
+                display_name: "Variance Explanation"
+                type: "text"
+                description: |
+                  Explanation of any variance found. Required if variance is non-zero.
+                  Documents the cause and resolution of discrepancy.
+                constraints:
+                  not_null: false
+                business_name: "Variance Explanation"
+
+              - name: "reconciled_by"
+                display_name: "Reconciled By"
+                type: "varchar(50)"
+                description: "User who performed the reconciliation"
+                constraints:
+                  not_null: false
+                business_name: "Reconciled By"
+
+              - name: "approved_by"
+                display_name: "Approved By"
+                type: "varchar(50)"
+                description: "Supervisor who approved the reconciliation"
+                constraints:
+                  not_null: false
+                business_name: "Approved By"
+
+              - name: "approved_date"
+                display_name: "Approved Date"
+                type: "date"
+                description: "Date when reconciliation was approved"
+                constraints:
+                  not_null: false
+                business_name: "Approved Date"
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(50)"
+                description: "User or system that created reconciliation record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when reconciliation record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(50)"
+                description: "User who last modified reconciliation"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when reconciliation was last modified"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_recon_composite"
+                columns: ["tax_account_id", "tax_period_id"]
+                type: "btree"
+                description: "For querying reconciliations by account and period"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "tax_account"
+                source_column: "tax_account_id"
+                target_column: "tax_account_id"
+                cardinality: "N:1"
+                description: "Each reconciliation is for one tax account"
+
+          # ===================================================================
+          # ACCOUNT STATEMENT
+          # ===================================================================
+
+          - name: "account_statement"
+            display_name: "Account Statement"
+            description: |
+              Generates and stores account statements for taxpayers. Account statements
+              provide a complete history of transactions, showing all debits (liabilities)
+              and credits (payments) for a tax account over a specified period.
+
+              Account statements are:
+              - Generated on-demand by taxpayers via self-service portal
+              - Sent automatically at period end
+              - Included in collection notices
+              - Required for objections and appeals
+              - Available for download
+
+              Statement Format:
+              - Opening balance
+              - List of transactions (chronological order)
+              - Running balance after each transaction
+              - Closing balance
+              - Summary by charge type
+
+            business_rule: |
+              1. One statement record per generation request
+              2. Statement data frozen at generation time
+              3. Historical statements preserved (cannot be modified)
+              4. Statement includes all transactions in date range
+              5. Statement shows running balance
+              6. Multiple formats: PDF, HTML, XML
+              7. Digital signature for authentication
+              8. Accessible via taxpayer portal
+
+            type: "transaction"
+
+            tags:
+              - "reporting"
+              - "taxpayer_service"
+
+            estimated_rows:
+              initial: 5000000
+              annual_growth: 2000000
+              five_year: 15000000
+
+            columns:
+              - name: "statement_id"
+                display_name: "Statement ID"
+                type: "bigint"
+                description: "Unique identifier for account statement"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account ID"
+                type: "bigint"
+                description: "Foreign key to tax_account"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    referenced_table: "tax_account"
+                    referenced_column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_name: "Tax Account"
+                indexing:
+                  - type: "btree"
+                    name: "idx_statement_account"
+
+              - name: "statement_date"
+                display_name: "Statement Date"
+                type: "date"
+                description: "Date when statement was generated"
+                constraints:
+                  not_null: true
+                business_name: "Statement Date"
+                indexing:
+                  - type: "btree"
+                    name: "idx_statement_date"
+
+              - name: "period_from_date"
+                display_name: "Period From Date"
+                type: "date"
+                description: "Start date of period covered by statement"
+                constraints:
+                  not_null: true
+                business_name: "Period From"
+
+              - name: "period_to_date"
+                display_name: "Period To Date"
+                type: "date"
+                description: "End date of period covered by statement"
+                constraints:
+                  not_null: true
+                  check: "period_to_date >= period_from_date"
+                business_name: "Period To"
+
+              - name: "opening_balance"
+                display_name: "Opening Balance"
+                type: "decimal(19,2)"
+                description: "Balance at start of statement period"
+                constraints:
+                  not_null: true
+                business_name: "Opening Balance"
+
+              - name: "total_debits"
+                display_name: "Total Debits"
+                type: "decimal(19,2)"
+                description: "Sum of all debit transactions in period"
+                constraints:
+                  not_null: true
+                business_name: "Total Debits"
+
+              - name: "total_credits"
+                display_name: "Total Credits"
+                type: "decimal(19,2)"
+                description: "Sum of all credit transactions in period"
+                constraints:
+                  not_null: true
+                business_name: "Total Credits"
+
+              - name: "closing_balance"
+                display_name: "Closing Balance"
+                type: "decimal(19,2)"
+                description: "Balance at end of statement period"
+                constraints:
+                  not_null: true
+                business_name: "Closing Balance"
+
+              - name: "transaction_count"
+                display_name: "Transaction Count"
+                type: "integer"
+                description: "Number of transactions included in statement"
+                constraints:
+                  not_null: true
+                business_name: "Transaction Count"
+
+              - name: "statement_format"
+                display_name: "Statement Format"
+                type: "varchar(20)"
+                description: "Format of statement: PDF, HTML, XML, JSON"
+                constraints:
+                  not_null: true
+                  default: "'PDF'"
+                business_name: "Statement Format"
+
+              - name: "statement_file_path"
+                display_name: "Statement File Path"
+                type: "varchar(500)"
+                description: |
+                  Path to generated statement file in document storage system.
+                constraints:
+                  not_null: false
+                business_name: "File Path"
+
+              - name: "digital_signature"
+                display_name: "Digital Signature"
+                type: "text"
+                description: |
+                  Digital signature of statement for authentication and non-repudiation.
+                constraints:
+                  not_null: false
+                business_name: "Digital Signature"
+
+              - name: "generation_method"
+                display_name: "Generation Method"
+                type: "varchar(30)"
+                description: |
+                  How statement was generated: TAXPAYER_REQUEST (self-service),
+                  AUTOMATIC (system-generated), OFFICER_REQUEST (manual), API (third-party).
+                constraints:
+                  not_null: true
+                business_name: "Generation Method"
+
+              - name: "delivery_method"
+                display_name: "Delivery Method"
+                type: "varchar(30)"
+                description: |
+                  How statement delivered: PORTAL_DOWNLOAD, EMAIL, POSTAL_MAIL, API
+                constraints:
+                  not_null: false
+                business_name: "Delivery Method"
+
+              - name: "delivered_date"
+                display_name: "Delivered Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when statement was delivered to taxpayer"
+                constraints:
+                  not_null: false
+                business_name: "Delivered Date"
+
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(50)"
+                description: "User or system that generated the statement"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when statement was generated"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+            indexes:
+              - name: "idx_statement_composite"
+                columns: ["tax_account_id", "statement_date"]
+                type: "btree"
+                description: "For querying statements by account and date"
+
+            relationships:
+              - type: "many_to_one"
+                target_table: "tax_account"
+                source_column: "tax_account_id"
+                target_column: "tax_account_id"
+                cardinality: "N:1"
+                description: "Each statement is for one tax account"
+
+# =============================================================================
+# REFERENCE DATA
+# =============================================================================
+
+reference_data:
+  - name: "ref_transaction_type"
+    description: |
+      Reference table for transaction types in accounting system.
+
+    schema: "reference"
+    type: "static"
+
+    columns:
+      - name: "transaction_type_code"
+        type: "varchar(30)"
+        primary_key: true
+        description: "Unique code for transaction type"
+
+      - name: "transaction_type_name"
+        type: "varchar(100)"
+        description: "Display name for transaction type"
+
+      - name: "is_debit"
+        type: "boolean"
+        description: "True if transaction increases liability (debit)"
+
+      - name: "is_reversible"
+        type: "boolean"
+        description: "True if transaction can be reversed"
+
+      - name: "display_order"
+        type: "integer"
+        description: "Sort order for display"
+
+    sample_values:
+      - code: "LIABILITY"
+        name: "Tax Liability Assessment"
+        is_debit: true
+        is_reversible: true
+      - code: "PAYMENT"
+        name: "Payment Received"
+        is_debit: false
+        is_reversible: true
+      - code: "REFUND"
+        name: "Refund Issued"
+        is_debit: true
+        is_reversible: false
+      - code: "PENALTY"
+        name: "Penalty Imposed"
+        is_debit: true
+        is_reversible: true
+      - code: "INTEREST"
+        name: "Interest Charged"
+        is_debit: true
+        is_reversible: true
+      - code: "WRITE_OFF"
+        name: "Write-Off"
+        is_debit: false
+        is_reversible: false
+      - code: "TRANSFER_TO"
+        name: "Transfer To Another Account"
+        is_debit: false
+        is_reversible: true
+      - code: "TRANSFER_FROM"
+        name: "Transfer From Another Account"
+        is_debit: true
+        is_reversible: true
+      - code: "ADJUSTMENT"
+        name: "Manual Adjustment"
+        is_debit: null
+        is_reversible: true
+      - code: "REVERSAL"
+        name: "Transaction Reversal"
+        is_debit: null
+        is_reversible: false
+
+  - name: "ref_charge_type"
+    description: |
+      Reference table for charge types (what is being charged).
+
+    schema: "reference"
+    type: "static"
+
+    columns:
+      - name: "charge_type_code"
+        type: "varchar(30)"
+        primary_key: true
+        description: "Unique code for charge type"
+
+      - name: "charge_type_name"
+        type: "varchar(100)"
+        description: "Display name for charge type"
+
+      - name: "allocation_priority"
+        type: "integer"
+        description: "Priority for payment allocation (1=highest)"
+
+      - name: "is_refundable"
+        type: "boolean"
+        description: "True if charge type is refundable"
+
+      - name: "display_order"
+        type: "integer"
+        description: "Sort order for display"
+
+    sample_values:
+      - code: "PRINCIPAL_TAX"
+        name: "Principal Tax"
+        allocation_priority: 3
+        is_refundable: true
+      - code: "PENALTY"
+        name: "Penalty"
+        allocation_priority: 1
+        is_refundable: false
+      - code: "INTEREST"
+        name: "Interest"
+        allocation_priority: 2
+        is_refundable: false
+      - code: "SURCHARGE"
+        name: "Surcharge"
+        allocation_priority: 4
+        is_refundable: false
+      - code: "FEE"
+        name: "Administrative Fee"
+        allocation_priority: 5
+        is_refundable: false
+
+# =============================================================================
+# BUSINESS RULES
+# =============================================================================
+
+business_rules:
+  - id: "BR-AC-001"
+    domain: "accounting"
+    name: "Transaction Immutability"
+    description: |
+      Once a transaction is posted (status = POSTED or FINAL), it cannot be
+      updated or deleted. Corrections must be made through reversal transactions
+      and new transactions.
+    severity: "CRITICAL"
+    affected_tables:
+      - "tax_transaction"
+    validation_query: |
+      -- Check for any modifications to posted transactions
+      SELECT transaction_id, transaction_status_code
+      FROM tax_transaction
+      WHERE transaction_status_code IN ('POSTED', 'FINAL')
+        AND modified_date > created_date + INTERVAL '1 minute'
+    enforcement: "database"
+
+  - id: "BR-AC-002"
+    domain: "accounting"
+    name: "Balance Calculation Integrity"
+    description: |
+      Account closing balance must equal opening balance plus debits minus credits.
+      Formula: closing_balance = opening_balance + debit_amount - credit_amount
+    severity: "CRITICAL"
+    affected_tables:
+      - "account_balance"
+    validation_query: |
+      SELECT account_balance_id, tax_account_id, tax_period_id,
+             opening_balance, debit_amount, credit_amount, closing_balance,
+             (opening_balance + debit_amount - credit_amount) AS calculated_closing
+      FROM account_balance
+      WHERE closing_balance <> (opening_balance + debit_amount - credit_amount)
+    enforcement: "database"
+
+  - id: "BR-AC-003"
+    domain: "accounting"
+    name: "Double-Entry Consistency"
+    description: |
+      Every taxpayer transaction must have corresponding revenue account entry
+      with opposite sign. Taxpayer debit = Revenue credit, and vice versa.
+    severity: "CRITICAL"
+    affected_tables:
+      - "tax_transaction"
+      - "revenue_balance"
+    validation_query: |
+      -- Verify taxpayer debits equal revenue credits for same tax type/period
+      SELECT tt.tax_type_code, tt.tax_period_id,
+             SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) AS taxpayer_debits,
+             rb.expected_revenue
+      FROM tax_transaction t
+      JOIN tax_account ta ON t.tax_account_id = ta.tax_account_id
+      JOIN tax_type tt ON ta.tax_type_code = tt.tax_type_code
+      JOIN revenue_balance rb ON rb.tax_period_id = t.tax_period_id
+      WHERE t.transaction_type_code = 'LIABILITY'
+      GROUP BY tt.tax_type_code, tt.tax_period_id, rb.expected_revenue
+      HAVING SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) <> rb.expected_revenue
+    enforcement: "application"
+
+  - id: "BR-AC-004"
+    domain: "accounting"
+    name: "Period Closure Finality"
+    description: |
+      Once a period is closed (period_closed_date is set), no new transactions
+      can be posted to that period. Opening balance for next period must be
+      set before closing current period.
+    severity: "HIGH"
+    affected_tables:
+      - "account_balance"
+      - "tax_transaction"
+    validation_query: |
+      -- Check for transactions after period closure
+      SELECT t.transaction_id, t.tax_account_id, t.tax_period_id,
+             t.transaction_date, ab.period_closed_date
+      FROM tax_transaction t
+      JOIN account_balance ab ON t.tax_account_id = ab.tax_account_id
+                              AND t.tax_period_id = ab.tax_period_id
+      WHERE ab.period_closed_date IS NOT NULL
+        AND t.transaction_date > ab.period_closed_date
+    enforcement: "database"
+
+  - id: "BR-AC-005"
+    domain: "accounting"
+    name: "Zero Amount Prohibition"
+    description: |
+      Transactions with zero amount are not allowed. Zero-amount transactions
+      provide no accounting value and should be prevented at validation.
+    severity: "HIGH"
+    affected_tables:
+      - "tax_transaction"
+      - "tax_sub_transaction"
+    validation_query: |
+      SELECT transaction_id, amount
+      FROM tax_transaction
+      WHERE amount = 0
+      UNION
+      SELECT sub_transaction_id, amount
+      FROM tax_sub_transaction
+      WHERE amount = 0
+    enforcement: "database"
+
+  - id: "BR-AC-006"
+    domain: "accounting"
+    name: "Sub-Transaction Sum Equality"
+    description: |
+      Sum of all sub-transaction amounts for a transaction must equal the
+      parent transaction amount. Ensures charge type allocation is complete
+      and accurate.
+    severity: "CRITICAL"
+    affected_tables:
+      - "tax_transaction"
+      - "tax_sub_transaction"
+    validation_query: |
+      SELECT t.transaction_id, t.amount AS parent_amount,
+             SUM(st.amount) AS sub_total
+      FROM tax_transaction t
+      LEFT JOIN tax_sub_transaction st ON t.transaction_id = st.transaction_id
+      GROUP BY t.transaction_id, t.amount
+      HAVING t.amount <> COALESCE(SUM(st.amount), 0)
+    enforcement: "application"
+
+  - id: "BR-AC-007"
+    domain: "accounting"
+    name: "Fiscal Year Consistency"
+    description: |
+      All transactions must be assigned to appropriate fiscal year based on
+      transaction date. Transaction date must fall within fiscal year date range.
+    severity: "HIGH"
+    affected_tables:
+      - "tax_transaction"
+      - "fiscal_year"
+    validation_query: |
+      SELECT t.transaction_id, t.transaction_date, t.fiscal_year_id,
+             fy.start_date, fy.end_date
+      FROM tax_transaction t
+      JOIN fiscal_year fy ON t.fiscal_year_id = fy.fiscal_year_id
+      WHERE t.transaction_date NOT BETWEEN fy.start_date AND fy.end_date
+    enforcement: "application"
+
+  - id: "BR-AC-008"
+    domain: "accounting"
+    name: "Revenue Collection Rate"
+    description: |
+      Revenue collection rate should be monitored and collection rate below 70%
+      should trigger alerts for review. Formula: (collected / expected) * 100
+    severity: "MEDIUM"
+    affected_tables:
+      - "revenue_balance"
+    validation_query: |
+      SELECT revenue_balance_id, revenue_account_id,
+             expected_revenue, collected_revenue,
+             (collected_revenue / NULLIF(expected_revenue, 0) * 100) AS collection_rate
+      FROM revenue_balance
+      WHERE expected_revenue > 0
+        AND (collected_revenue / expected_revenue * 100) < 70
+    enforcement: "application"
+
+  - id: "BR-AC-009"
+    domain: "accounting"
+    name: "Reconciliation Variance Threshold"
+    description: |
+      Account reconciliation variances exceeding configured threshold (e.g., $100
+      or 1% of balance) must be investigated and documented before reconciliation
+      can be approved.
+    severity: "HIGH"
+    affected_tables:
+      - "account_reconciliation"
+    validation_query: |
+      SELECT reconciliation_id, tax_account_id, variance_amount,
+             reconciliation_status, variance_explanation
+      FROM account_reconciliation
+      WHERE ABS(variance_amount) > 100  -- Configurable threshold
+        AND reconciliation_status = 'APPROVED'
+        AND (variance_explanation IS NULL OR variance_explanation = '')
+    enforcement: "application"
+
+  - id: "BR-AC-010"
+    domain: "accounting"
+    name: "Future Transaction Date Prevention"
+    description: |
+      Transaction dates cannot be in the future. System should validate that
+      transaction_date <= current date when transaction is created.
+    severity: "HIGH"
+    affected_tables:
+      - "tax_transaction"
+    validation_query: |
+      SELECT transaction_id, transaction_date, created_date
+      FROM tax_transaction
+      WHERE transaction_date > CURRENT_DATE
+    enforcement: "database"
+
+# =============================================================================
+# DATA QUALITY RULES
+# =============================================================================
+
+data_quality_rules:
+  - id: "DQ-AC-001"
+    name: "Balance Non-Negativity (Where Required)"
+    description: |
+      For tax types that do not allow negative balances (pre-payments), closing
+      balance should not be negative unless specifically allowed.
+    check_query: |
+      SELECT ab.account_balance_id, ab.tax_account_id, ab.closing_balance,
+             tt.allows_prepayment
+      FROM account_balance ab
+      JOIN tax_account ta ON ab.tax_account_id = ta.tax_account_id
+      JOIN tax_type tt ON ta.tax_type_code = tt.tax_type_code
+      WHERE ab.closing_balance < 0
+        AND tt.allows_prepayment = false
+    severity: "MEDIUM"
+    expected_result: "No rows"
+
+  - id: "DQ-AC-002"
+    name: "Transaction Status Progression"
+    description: |
+      Transaction status should follow logical progression: DRAFT -> POSTED -> FINAL.
+      Status should never go backward.
+    check_query: |
+      SELECT transaction_id, transaction_status_code, created_date, modified_date
+      FROM tax_transaction
+      WHERE (transaction_status_code = 'DRAFT' AND modified_date IS NOT NULL)
+         OR (transaction_status_code = 'POSTED' AND created_date > modified_date)
+    severity: "HIGH"
+    expected_result: "No rows"
+
+  - id: "DQ-AC-003"
+    name: "Orphaned Sub-Transactions"
+    description: |
+      All sub-transactions must have valid parent transaction. No orphaned records.
+    check_query: |
+      SELECT st.sub_transaction_id, st.transaction_id
+      FROM tax_sub_transaction st
+      LEFT JOIN tax_transaction t ON st.transaction_id = t.transaction_id
+      WHERE t.transaction_id IS NULL
+    severity: "CRITICAL"
+    expected_result: "No rows"
+
+  - id: "DQ-AC-004"
+    name: "Revenue Balance Completeness"
+    description: |
+      Every revenue account should have revenue_balance records for all open
+      fiscal years.
+    check_query: |
+      SELECT ra.revenue_account_id, fy.fiscal_year_id
+      FROM revenue_account ra
+      CROSS JOIN fiscal_year fy
+      LEFT JOIN revenue_balance rb ON ra.revenue_account_id = rb.revenue_account_id
+                                   AND fy.fiscal_year_id = rb.fiscal_year_id
+      WHERE fy.fiscal_year_status = 'OPEN'
+        AND rb.revenue_balance_id IS NULL
+    severity: "HIGH"
+    expected_result: "No rows"
+
+  - id: "DQ-AC-005"
+    name: "Posting Date Reasonableness"
+    description: |
+      Posting date should be close to transaction date (within 30 days) unless
+      there's a specific reason for delay.
+    check_query: |
+      SELECT transaction_id, transaction_date, posting_date,
+             (posting_date - transaction_date) AS days_difference
+      FROM tax_transaction
+      WHERE (posting_date - transaction_date) > 30
+        AND transaction_status_code <> 'DRAFT'
+    severity: "LOW"
+    expected_result: "Minimal rows"
+
+# =============================================================================
+# INTEGRATIONS
+# =============================================================================
+
+integrations:
+  - system_name: "Filing & Assessment System"
+    integration_type: "internal"
+    description: |
+      Assessment domain creates liability transactions that are automatically
+      posted to accounting. Every assessment must generate accounting transaction.
+
+    data_flow:
+      direction: "inbound"
+      frequency: "real_time"
+
+    key_entities:
+      - source_table: "assessment"
+        target_table: "tax_transaction"
+        mapping: "Assessment amount creates liability transaction"
+
+      - source_table: "penalty"
+        target_table: "tax_transaction"
+        mapping: "Penalty creates separate transaction with charge_type=PENALTY"
+
+      - source_table: "interest"
+        target_table: "tax_transaction"
+        mapping: "Interest creates separate transaction with charge_type=INTEREST"
+
+  - system_name: "Payment & Refund System"
+    integration_type: "internal"
+    description: |
+      Payment domain processes payments and refunds that are automatically posted
+      to accounting. Payments credit taxpayer accounts, refunds debit accounts.
+
+    data_flow:
+      direction: "inbound"
+      frequency: "real_time"
+
+    key_entities:
+      - source_table: "payment"
+        target_table: "tax_transaction"
+        mapping: "Payment creates credit transaction"
+
+      - source_table: "refund"
+        target_table: "tax_transaction"
+        mapping: "Refund creates debit transaction"
+
+  - system_name: "Government Financial Management System (GFMS)"
+    integration_type: "external"
+    description: |
+      Revenue accounts interface with government budget accounts. Daily or
+      monthly transfer of collected revenue to budget accounts.
+
+    data_flow:
+      direction: "outbound"
+      frequency: "daily"
+
+    key_entities:
+      - source_table: "revenue_balance"
+        target_table: "GFMS.BUDGET_ACCOUNT"
+        mapping: "Collected revenue transferred to budget accounts"
+
+  - system_name: "Data Warehouse / BI"
+    integration_type: "internal"
+    description: |
+      Accounting data feeds data warehouse for reporting and analytics.
+
+    data_flow:
+      direction: "outbound"
+      frequency: "nightly"
+
+    key_entities:
+      - source_table: "tax_transaction"
+        target_table: "DW.FACT_TRANSACTION"
+        mapping: "All transactions exported nightly"
+
+# =============================================================================
+# SECURITY POLICIES
+# =============================================================================
+
+security_policies:
+  - policy_name: "Transaction Audit Logging"
+    description: |
+      All transaction creation, reversal, and status changes must be logged
+      for audit trail. No transaction can be created without proper authentication.
+
+    affected_tables:
+      - "tax_transaction"
+      - "tax_sub_transaction"
+
+    controls:
+      - "All transaction creation requires authenticated user"
+      - "Transaction reversals require supervisor approval"
+      - "All modifications logged with timestamp and user"
+      - "Audit log cannot be modified or deleted"
+
+  - policy_name: "Account Balance Access Control"
+    description: |
+      Account balances are sensitive financial information. Access restricted
+      based on role and data ownership.
+
+    affected_tables:
+      - "account_balance"
+      - "revenue_balance"
+
+    controls:
+      - "Taxpayers can only view their own account balances"
+      - "Tax officers can view balances for accounts in their jurisdiction"
+      - "Accountants have read-only access to all balances"
+      - "Revenue balances restricted to accounting and senior management"
+
+  - policy_name: "Reconciliation Approval Workflow"
+    description: |
+      Account reconciliations must follow approval workflow for financial controls.
+
+    affected_tables:
+      - "account_reconciliation"
+
+    controls:
+      - "Reconciliation performed by accounting staff"
+      - "Variances > threshold require supervisor approval"
+      - "All approved reconciliations locked from modification"
+      - "Annual reconciliations require CFO sign-off"
+
+# =============================================================================
+# END OF ACCOUNTING DOMAIN
+# =============================================================================

@@ -1,0 +1,709 @@
+# =============================================================================
+# Malta L3 Warehouse: dim_registration Dimension
+# =============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Phase: C - L3 Warehouse Model Development
+# Step: 10b - Tax & Registration Dimensions
+# =============================================================================
+
+dimension:
+  name: "dim_registration"
+  schema: "warehouse"
+  description: |
+    Conformed dimension for tracking registration status history across all
+    Malta tax registration types. Implements SCD Type 2 to preserve complete
+    history of status changes for compliance analysis. Covers:
+    - Tax account registrations (TIN-based)
+    - VAT registrations (Article 10/11/12 schemes)
+    - EORI registrations (customs operations)
+    - Gaming licenses (MGA)
+    - Corporate tax accounts (imputation system)
+    
+  scd_type: 2
+  natural_key: ["registration_source_id", "tax_type_code"]
+  surrogate_key: "registration_key"
+  
+  business_context:
+    domain: "Registration Management"
+    grain: "One row per registration per version (status change)"
+    usage: "Filing, assessment, refund, and compliance fact tables"
+    refresh: "Daily incremental with change detection"
+    
+  estimated_volume:
+    initial: 700000
+    with_history: 900000
+    annual_growth_percent: 8
+    notes: "~55K VAT + ~600K TIN + ~15K EORI + ~500 Gaming + history versions"
+    
+  columns:
+    # =========================================================================
+    # KEYS
+    # =========================================================================
+    - name: "registration_key"
+      data_type: "BIGINT"
+      nullable: false
+      auto_increment: true
+      description: "Surrogate key - auto-generated unique identifier"
+      role: "SURROGATE_KEY"
+      
+    - name: "registration_source_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: |
+        Source system registration identifier.
+        From: tax_account.tax_account_id, vat_registration.vat_registration_id,
+        eori_registration.eori_registration_id, gaming_license.gaming_license_id
+      role: "NATURAL_KEY_PART"
+      
+    - name: "registration_type"
+      data_type: "VARCHAR(30)"
+      nullable: false
+      description: "Type of registration"
+      allowed_values: ["TAX_ACCOUNT", "VAT_REGISTRATION", "EORI", "GAMING_LICENSE", "CORPORATE_TAX_ACCOUNT"]
+      
+    # =========================================================================
+    # FOREIGN KEYS TO OTHER DIMENSIONS
+    # =========================================================================
+    - name: "party_key"
+      data_type: "BIGINT"
+      nullable: false
+      foreign_key: "warehouse.dim_party(party_key)"
+      description: "FK to dim_party (current version at time of load)"
+      
+    - name: "party_source_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "Source party_id for consistent joining across versions"
+      
+    - name: "tax_type_key"
+      data_type: "INT"
+      nullable: false
+      foreign_key: "warehouse.dim_tax_type(tax_type_key)"
+      description: "FK to dim_tax_type"
+      
+    - name: "tax_type_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Tax type code (denormalized for query convenience)"
+      role: "NATURAL_KEY_PART"
+      
+    # =========================================================================
+    # REGISTRATION IDENTIFICATION
+    # =========================================================================
+    - name: "account_number"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "Tax account number (for tax_account registrations)"
+      source: "registration.tax_account.account_number"
+      
+    - name: "tin"
+      data_type: "VARCHAR(9)"
+      nullable: true
+      description: "Tax Identification Number (denormalized from party)"
+      
+    - name: "vat_number"
+      data_type: "VARCHAR(15)"
+      nullable: true
+      description: "VAT registration number (MT + 8 digits)"
+      validation: "^MT[0-9]{8}$"
+      source: "registration.vat_registration.vat_number"
+      
+    - name: "eori_number"
+      data_type: "VARCHAR(17)"
+      nullable: true
+      description: "EORI number for customs operations"
+      validation: "^MT[0-9]{8,15}$"
+      source: "registration.eori_registration.eori_number"
+      
+    - name: "gaming_license_number"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "MGA gaming license number"
+      source: "registration.gaming_license.license_number"
+      
+    # =========================================================================
+    # STATUS
+    # =========================================================================
+    - name: "registration_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Current registration status"
+      allowed_values: ["ACTIVE", "SUSPENDED", "DEREGISTERED", "CANCELLED", "PENDING", "EXPIRED"]
+      tracked: true
+      
+    - name: "registration_status_name"
+      data_type: "VARCHAR(100)"
+      nullable: false
+      description: "Descriptive status name"
+      derived: true
+      
+    - name: "status_reason_code"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "Reason for current status (especially for non-active statuses)"
+      
+    - name: "status_reason_description"
+      data_type: "VARCHAR(200)"
+      nullable: true
+      description: "Detailed explanation for status"
+      
+    # =========================================================================
+    # KEY DATES
+    # =========================================================================
+    - name: "registration_date"
+      data_type: "DATE"
+      nullable: false
+      description: "Original registration date (does not change with status)"
+      
+    - name: "effective_from_date"
+      data_type: "DATE"
+      nullable: false
+      description: "Date from which registration is effective"
+      
+    - name: "effective_to_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date until which registration is effective (NULL = ongoing)"
+      
+    - name: "application_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date application was submitted"
+      
+    - name: "approval_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date registration was approved"
+      
+    - name: "deregistration_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date of deregistration (if applicable)"
+      tracked: true
+      
+    - name: "deregistration_reason"
+      data_type: "VARCHAR(200)"
+      nullable: true
+      description: "Reason for deregistration"
+      
+    - name: "suspension_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date registration was suspended (if applicable)"
+      
+    - name: "reinstatement_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date registration was reinstated after suspension"
+      
+    # =========================================================================
+    # FILING ATTRIBUTES
+    # =========================================================================
+    - name: "filing_frequency_code"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Required filing frequency for this registration"
+      allowed_values: ["ANNUAL", "QUARTERLY", "MONTHLY", "SEMI_ANNUAL", "TRANSACTIONAL"]
+      tracked: true
+      
+    - name: "filing_frequency_name"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Descriptive filing frequency"
+      
+    - name: "assessment_basis"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "Basis for tax assessment"
+      allowed_values: ["ACTUAL", "PRESUMPTIVE", "SIMPLIFIED", "FLAT_RATE"]
+      
+    - name: "accounting_period_start_month"
+      data_type: "SMALLINT"
+      nullable: true
+      description: "Month when accounting period starts (1-12)"
+      applicable_when: "tax_type_code = 'CIT'"
+      
+    - name: "accounting_period_end_month"
+      data_type: "SMALLINT"
+      nullable: true
+      description: "Month when accounting period ends (1-12)"
+      applicable_when: "tax_type_code = 'CIT'"
+      
+    # =========================================================================
+    # VAT-SPECIFIC ATTRIBUTES
+    # =========================================================================
+    - name: "vat_scheme_code"
+      data_type: "VARCHAR(10)"
+      nullable: true
+      description: "Malta VAT scheme classification"
+      allowed_values: ["ART10", "ART11", "ART12", "ART10_VOL"]
+      tracked: true
+      applicable_when: "tax_type_code LIKE 'VAT%'"
+      
+    - name: "vat_scheme_name"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Full name of VAT scheme"
+      derived: true
+      derivation_values:
+        ART10: "Article 10 - Standard VAT Registration"
+        ART11: "Article 11 - Small Undertaking Exemption"
+        ART12: "Article 12 - IC Acquisitions Only"
+        ART10_VOL: "Article 10 - Voluntary Registration"
+        
+    - name: "article_11_turnover_limit"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "€35,000 threshold for Article 11 at registration time"
+      applicable_when: "vat_scheme_code = 'ART11'"
+      
+    - name: "article_11_ytd_turnover"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Year-to-date turnover for threshold monitoring"
+      applicable_when: "vat_scheme_code = 'ART11'"
+      update_frequency: "Monthly"
+      
+    - name: "is_voluntary_registration"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if registered voluntarily below threshold"
+      
+    - name: "minimum_registration_end_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Minimum 24-month commitment end date for voluntary registrations"
+      applicable_when: "is_voluntary_registration = TRUE"
+      
+    # =========================================================================
+    # VAT GROUP ATTRIBUTES
+    # =========================================================================
+    - name: "is_vat_group_member"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if part of a VAT group"
+      tracked: true
+      
+    - name: "is_vat_group_representative"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if this is the representative member of VAT group"
+      
+    - name: "vat_group_id"
+      data_type: "BIGINT"
+      nullable: true
+      description: "VAT group identifier (if member)"
+      foreign_key: "registration.vat_group(vat_group_id)"
+      
+    - name: "vat_group_name"
+      data_type: "VARCHAR(200)"
+      nullable: true
+      description: "Name of the VAT group"
+      
+    # =========================================================================
+    # EU REPORTING FLAGS
+    # =========================================================================
+    - name: "intrastat_arrivals_required"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if Intrastat arrivals reporting required"
+      tracked: true
+      
+    - name: "intrastat_dispatches_required"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if Intrastat dispatches reporting required"
+      tracked: true
+      
+    - name: "intrastat_threshold_arrivals"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Threshold for Intrastat arrivals reporting (€700)"
+      
+    - name: "intrastat_threshold_dispatches"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Threshold for Intrastat dispatches reporting (€700)"
+      
+    - name: "vies_registered"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if registered for VIES (intra-EU supplies)"
+      
+    - name: "vies_registration_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Date of VIES registration"
+      
+    - name: "oss_registered"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if registered for One-Stop Shop (OSS)"
+      tracked: true
+      
+    - name: "oss_scheme_type"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Type of OSS scheme"
+      allowed_values: ["UNION", "NON_UNION", "IOSS"]
+      applicable_when: "oss_registered = TRUE"
+      
+    # =========================================================================
+    # EORI-SPECIFIC ATTRIBUTES
+    # =========================================================================
+    - name: "eori_status_code"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "EORI-specific status"
+      allowed_values: ["ACTIVE", "SUSPENDED", "DEACTIVATED", "PENDING_VALIDATION", "EXPIRED"]
+      applicable_when: "registration_type = 'EORI'"
+      
+    - name: "is_aeo_certified"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "TRUE if Authorized Economic Operator certified"
+      applicable_when: "registration_type = 'EORI'"
+      
+    - name: "aeo_certification_type"
+      data_type: "VARCHAR(10)"
+      nullable: true
+      description: "Type of AEO certification"
+      allowed_values: ["AEOC", "AEOS", "AEOF"]
+      applicable_when: "is_aeo_certified = TRUE"
+      
+    - name: "customs_activity_codes"
+      data_type: "VARCHAR(100)"
+      nullable: true
+      description: "Comma-separated customs activity codes"
+      
+    # =========================================================================
+    # GAMING-SPECIFIC ATTRIBUTES
+    # =========================================================================
+    - name: "gaming_license_type"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Type of gaming license"
+      allowed_values: ["B2C", "B2B", "LAND_BASED"]
+      applicable_when: "registration_type = 'GAMING_LICENSE'"
+      
+    - name: "gaming_license_subtype"
+      data_type: "VARCHAR(30)"
+      nullable: true
+      description: "Gaming license subtype"
+      allowed_values: ["B2C_TYPE1", "B2C_TYPE2", "B2C_TYPE3", "B2C_TYPE4", "B2B", "LAND_CASINO", "LAND_GAMING", "LAND_BINGO"]
+      
+    - name: "gaming_license_expiry_date"
+      data_type: "DATE"
+      nullable: true
+      description: "Gaming license expiry date"
+      
+    # =========================================================================
+    # CORPORATE TAX ACCOUNT ATTRIBUTES
+    # =========================================================================
+    - name: "imputation_account_type"
+      data_type: "VARCHAR(10)"
+      nullable: true
+      description: "Malta imputation account type"
+      allowed_values: ["FTA", "MTA", "FIA", "IPA", "UA"]
+      applicable_when: "registration_type = 'CORPORATE_TAX_ACCOUNT'"
+      
+    - name: "imputation_account_balance"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Current balance in imputation account"
+      update_frequency: "Monthly"
+      
+    # =========================================================================
+    # TAXPAYER SEGMENT
+    # =========================================================================
+    - name: "segment_code"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Taxpayer segment at registration time"
+      allowed_values: ["LARGE", "MEDIUM", "SMALL", "MICRO"]
+      tracked: true
+      
+    - name: "segment_name"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Taxpayer segment name"
+      
+    - name: "relationship_manager_id"
+      data_type: "BIGINT"
+      nullable: true
+      description: "Assigned relationship manager (for large taxpayers)"
+      applicable_when: "segment_code = 'LARGE'"
+      
+    # =========================================================================
+    # SCD TYPE 2 TRACKING
+    # =========================================================================
+    - name: "valid_from_date"
+      data_type: "DATE"
+      nullable: false
+      description: "Start date of this dimension row version"
+      role: "SCD2_START_DATE"
+      
+    - name: "valid_to_date"
+      data_type: "DATE"
+      nullable: true
+      description: "End date of this dimension row version (NULL = current)"
+      role: "SCD2_END_DATE"
+      default_value_for_current: "'9999-12-31'"
+      
+    - name: "is_current_flag"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: true
+      description: "TRUE if this is the current version of the registration"
+      role: "SCD2_CURRENT_FLAG"
+      
+    - name: "version_number"
+      data_type: "INT"
+      nullable: false
+      default_value: 1
+      description: "Version number (increments with each change)"
+      role: "SCD2_VERSION"
+      
+    - name: "change_reason"
+      data_type: "VARCHAR(200)"
+      nullable: true
+      description: "Reason for the change that created this version"
+      
+    # =========================================================================
+    # ETL METADATA
+    # =========================================================================
+    - name: "etl_batch_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for data lineage"
+      
+    - name: "etl_load_timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "Timestamp when record was loaded"
+      default_value: "CURRENT_TIMESTAMP"
+      
+    - name: "source_checksum"
+      data_type: "VARCHAR(64)"
+      nullable: true
+      description: "Hash of tracked columns for change detection"
+      
+    - name: "source_system"
+      data_type: "VARCHAR(50)"
+      nullable: true
+      description: "Source system identifier"
+
+  # ===========================================================================
+  # INDEXES
+  # ===========================================================================
+  indexes:
+    - name: "pk_dim_registration"
+      columns: ["registration_key"]
+      primary: true
+      
+    - name: "idx_dim_reg_source_current"
+      columns: ["registration_source_id", "tax_type_code", "is_current_flag"]
+      description: "Current version lookup by source key"
+      
+    - name: "idx_dim_reg_party_current"
+      columns: ["party_key", "is_current_flag"]
+      description: "Party registrations lookup"
+      
+    - name: "idx_dim_reg_party_source"
+      columns: ["party_source_id", "tax_type_code"]
+      description: "Party registrations by source ID"
+      
+    - name: "idx_dim_reg_tax_type_current"
+      columns: ["tax_type_key", "is_current_flag"]
+      description: "Registrations by tax type"
+      
+    - name: "idx_dim_reg_status_current"
+      columns: ["registration_status_code", "is_current_flag"]
+      description: "Status-based filtering"
+      
+    - name: "idx_dim_reg_vat_scheme"
+      columns: ["vat_scheme_code", "is_current_flag"]
+      where: "vat_scheme_code IS NOT NULL"
+      description: "VAT scheme analysis"
+      
+    - name: "idx_dim_reg_vat_number"
+      columns: ["vat_number"]
+      where: "vat_number IS NOT NULL"
+      description: "VAT number lookup"
+      
+    - name: "idx_dim_reg_eori"
+      columns: ["eori_number"]
+      where: "eori_number IS NOT NULL"
+      description: "EORI number lookup"
+      
+    - name: "idx_dim_reg_validity"
+      columns: ["valid_from_date", "valid_to_date"]
+      description: "Point-in-time queries"
+      
+    - name: "idx_dim_reg_segment"
+      columns: ["segment_code", "is_current_flag"]
+      description: "Segment-based analysis"
+      
+    - name: "idx_dim_reg_type_status"
+      columns: ["registration_type", "registration_status_code", "is_current_flag"]
+      description: "Registration type and status filtering"
+
+  # ===========================================================================
+  # SOURCE MAPPING
+  # ===========================================================================
+  source_mapping:
+    primary_tables:
+      - table: "registration.tax_account"
+        registration_type: "TAX_ACCOUNT"
+        id_column: "tax_account_id"
+        
+      - table: "registration.vat_registration"
+        registration_type: "VAT_REGISTRATION"
+        id_column: "vat_registration_id"
+        
+      - table: "registration.eori_registration"
+        registration_type: "EORI"
+        id_column: "eori_registration_id"
+        
+      - table: "registration.gaming_license"
+        registration_type: "GAMING_LICENSE"
+        id_column: "gaming_license_id"
+        
+      - table: "registration.corporate_tax_account"
+        registration_type: "CORPORATE_TAX_ACCOUNT"
+        id_column: "corporate_tax_account_id"
+        
+    joins:
+      - table: "party.party"
+        alias: "p"
+        type: "INNER"
+        condition: "source.party_id = p.party_id"
+        
+      - table: "reference.ref_malta_tax_type"
+        alias: "tt"
+        type: "INNER"
+        condition: "source.tax_type_code = tt.tax_type_code"
+        
+      - table: "registration.vat_group"
+        alias: "vg"
+        type: "LEFT"
+        condition: "vat_registration.vat_group_id = vg.vat_group_id"
+        applicable_when: "registration_type = 'VAT_REGISTRATION'"
+        
+    change_detection:
+      tracked_columns:
+        - "registration_status_code"
+        - "filing_frequency_code"
+        - "vat_scheme_code"
+        - "deregistration_date"
+        - "is_vat_group_member"
+        - "intrastat_arrivals_required"
+        - "intrastat_dispatches_required"
+        - "oss_registered"
+        - "segment_code"
+      hash_algorithm: "SHA-256"
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+  business_rules:
+    - rule_id: "REG_001"
+      description: "Only one current row per source registration"
+      validation_sql: |
+        SELECT registration_source_id, tax_type_code, COUNT(*) as cnt
+        FROM warehouse.dim_registration
+        WHERE is_current_flag = TRUE
+        GROUP BY registration_source_id, tax_type_code
+        HAVING COUNT(*) > 1
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "REG_002"
+      description: "No overlapping validity periods for same registration"
+      validation_sql: |
+        SELECT a.registration_key, b.registration_key, a.registration_source_id
+        FROM warehouse.dim_registration a
+        JOIN warehouse.dim_registration b
+          ON a.registration_source_id = b.registration_source_id
+          AND a.tax_type_code = b.tax_type_code
+          AND a.registration_key < b.registration_key
+        WHERE a.valid_from_date < COALESCE(b.valid_to_date, '9999-12-31')
+          AND b.valid_from_date < COALESCE(a.valid_to_date, '9999-12-31')
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "REG_003"
+      description: "VAT scheme required for VAT registrations"
+      validation_sql: |
+        SELECT registration_key, registration_source_id, tax_type_code
+        FROM warehouse.dim_registration
+        WHERE tax_type_code LIKE 'VAT%'
+          AND is_current_flag = TRUE
+          AND vat_scheme_code IS NULL
+      expected_result: "0 rows"
+      severity: "WARNING"
+      
+    - rule_id: "REG_004"
+      description: "Article 11 must have turnover limit"
+      validation_sql: |
+        SELECT registration_key, vat_scheme_code
+        FROM warehouse.dim_registration
+        WHERE vat_scheme_code = 'ART11'
+          AND is_current_flag = TRUE
+          AND article_11_turnover_limit IS NULL
+      expected_result: "0 rows"
+      severity: "WARNING"
+      
+    - rule_id: "REG_005"
+      description: "Voluntary registration must have minimum end date"
+      validation_sql: |
+        SELECT registration_key, vat_scheme_code, is_voluntary_registration
+        FROM warehouse.dim_registration
+        WHERE is_voluntary_registration = TRUE
+          AND is_current_flag = TRUE
+          AND minimum_registration_end_date IS NULL
+      expected_result: "0 rows"
+      severity: "WARNING"
+      
+    - rule_id: "REG_006"
+      description: "VAT group representative must be group member"
+      validation_sql: |
+        SELECT registration_key, vat_number
+        FROM warehouse.dim_registration
+        WHERE is_vat_group_representative = TRUE
+          AND is_vat_group_member = FALSE
+          AND is_current_flag = TRUE
+      expected_result: "0 rows"
+      severity: "ERROR"
+      
+    - rule_id: "REG_007"
+      description: "OSS scheme type required when OSS registered"
+      validation_sql: |
+        SELECT registration_key, oss_registered
+        FROM warehouse.dim_registration
+        WHERE oss_registered = TRUE
+          AND is_current_flag = TRUE
+          AND oss_scheme_type IS NULL
+      expected_result: "0 rows"
+      severity: "WARNING"
+      
+    - rule_id: "REG_008"
+      description: "Version numbers must be sequential per registration"
+      validation_sql: |
+        SELECT registration_source_id, tax_type_code, 
+               GROUP_CONCAT(version_number ORDER BY version_number) as versions
+        FROM warehouse.dim_registration
+        GROUP BY registration_source_id, tax_type_code
+        HAVING MAX(version_number) <> COUNT(*)
+      expected_result: "0 rows"
+      severity: "WARNING"

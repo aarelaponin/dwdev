@@ -1,0 +1,688 @@
+# =============================================================================
+# Malta L3 Warehouse: fact_risk_score Fact Table
+# =============================================================================
+# Version: 1.0.0
+# Date: 2025-12-10
+# Project: MTCA Operational Reporting System (ORS)
+# Phase: C - L3 Warehouse Model Development
+# Step: 11c - Compliance & Risk Facts
+# =============================================================================
+
+fact_table:
+  name: "fact_risk_score"
+  schema: "warehouse"
+  description: |
+    Periodic snapshot fact table tracking taxpayer risk scores over time.
+    Each row represents a risk assessment for a taxpayer at the end of
+    a calendar quarter.
+    
+    Key design principles (OECD CRM aligned):
+    - Risk measured as MONETARY TAX GAP (not abstract scores)
+    - Focus on voluntary compliance improvement
+    - Track behavioral changes over time
+    - Enable ROI-based intervention prioritization
+    
+  fact_type: "PERIODIC_SNAPSHOT"
+  grain: "One row per taxpayer per risk assessment quarter"
+  snapshot_frequency: "QUARTERLY"
+  snapshot_timing: "Last day of calendar quarter"
+  
+  business_context:
+    domain: "Compliance & Control"
+    primary_use: "Risk trend analysis, tax gap estimation, intervention prioritization"
+    usage_pattern: "Medium read volume for risk management and executive dashboards"
+    refresh: "Quarterly batch load after quarter close"
+    philosophy: |
+      Aligned with OECD Compliance Risk Management approach:
+      - Measure risk as probability-weighted monetary tax gap
+      - Enable comparison of intervention costs vs. expected yield
+      - Track whether interventions improve future compliance
+      - Support transition from enforcement-heavy to voluntary compliance model
+    
+  estimated_volume:
+    initial_rows: 10000000
+    annual_growth_rows: 2000000
+    quarterly_inserts: 500000
+    note: "~500K active taxpayers × 4 quarters + historical"
+
+  # ===========================================================================
+  # DIMENSION FOREIGN KEYS
+  # ===========================================================================
+  dimension_keys:
+    - name: "party_key"
+      data_type: "BIGINT"
+      nullable: false
+      dimension: "dim_party"
+      description: "Taxpayer being assessed"
+      
+    - name: "tax_type_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_tax_type"
+      description: "Tax type if assessment is tax-specific (NULL for overall)"
+      default_value: -1
+      note: "NULL = overall risk across all tax types"
+      
+    - name: "registration_key"
+      data_type: "BIGINT"
+      nullable: true
+      dimension: "dim_registration"
+      description: "Registration status at snapshot date"
+      default_value: -1
+      
+    - name: "geography_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_geography"
+      description: "Taxpayer location at snapshot date"
+      default_value: -1
+      
+    - name: "risk_category_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_risk_category"
+      description: "Current risk category classification"
+      
+    - name: "prior_risk_category_key"
+      data_type: "INT"
+      nullable: true
+      dimension: "dim_risk_category"
+      description: "Risk category in prior quarter (for trend analysis)"
+      default_value: -1
+      note: "NULL for first assessment of taxpayer"
+
+  # ===========================================================================
+  # SNAPSHOT DATE KEY
+  # ===========================================================================
+  date_keys:
+    - name: "snapshot_date_key"
+      data_type: "INT"
+      nullable: false
+      dimension: "dim_date"
+      role: "Snapshot Date"
+      description: "Last day of assessment quarter"
+      format: "YYYYMMDD smart key"
+      source: "Last day of calendar quarter"
+      note: |
+        For periodic snapshots, there is only ONE date key (the snapshot date).
+        Unlike transactional facts which have multiple role-playing dates.
+        Example: 20240331 for Q1 2024, 20240630 for Q2 2024, etc.
+
+  # ===========================================================================
+  # DEGENERATE DIMENSIONS
+  # ===========================================================================
+  degenerate_dimensions:
+    - name: "risk_assessment_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "Source system risk assessment record ID"
+      source: "compliance_control.risk_assessment.risk_assessment_id"
+      role: "PRIMARY_KEY"
+      
+    - name: "snapshot_period"
+      data_type: "VARCHAR(10)"
+      nullable: false
+      description: "Assessment quarter in YYYY-QN format"
+      source: "Derived from snapshot_date"
+      format: "YYYY-QN"
+      examples: ["2024-Q1", "2024-Q2", "2024-Q3", "2024-Q4"]
+      
+    - name: "risk_model_version"
+      data_type: "VARCHAR(20)"
+      nullable: false
+      description: "Version of risk model used for assessment"
+      source: "risk_assessment.model_version"
+      examples: ["RM-2024.1", "RM-2024.2"]
+      note: "Important for comparing assessments across model changes"
+      
+    - name: "segment_code"
+      data_type: "VARCHAR(20)"
+      nullable: true
+      description: "Taxpayer segment at time of assessment"
+      source: "risk_assessment.taxpayer_segment_code"
+      allowed_values:
+        - "INDIVIDUAL"
+        - "MICRO"
+        - "SMALL"
+        - "MEDIUM"
+        - "LARGE"
+        - "MULTINATIONAL"
+        - "HIGH_NET_WORTH"
+
+  # ===========================================================================
+  # SEMI-ADDITIVE MEASURES - RISK SCORES (Point-in-Time)
+  # ===========================================================================
+  # Note: Risk scores are semi-additive - cannot SUM across time
+  # Use AVG, MAX, LAST, or filter to single date for meaningful aggregation
+  measures_semi_additive:
+    # Overall Risk
+    - name: "overall_risk_score"
+      data_type: "INT"
+      nullable: false
+      description: "Composite risk score (0-100)"
+      source: "risk_assessment.overall_risk_score"
+      aggregation: "AVG or LAST"
+      range: "0-100"
+      interpretation: |
+        0-20: Very Low Risk
+        21-40: Low Risk
+        41-60: Medium Risk
+        61-80: High Risk
+        81-100: Very High Risk
+        
+    - name: "overall_risk_percentile"
+      data_type: "DECIMAL(5,2)"
+      nullable: true
+      description: "Percentile rank among all assessed taxpayers"
+      source: "risk_assessment.risk_percentile"
+      aggregation: "AVG"
+      range: "0.00-100.00"
+      note: "95.00 means taxpayer is riskier than 95% of population"
+      
+    # Component Risk Scores
+    - name: "registration_risk_score"
+      data_type: "INT"
+      nullable: true
+      description: "Registration compliance risk score (0-100)"
+      source: "risk_assessment.registration_risk_score"
+      aggregation: "AVG"
+      range: "0-100"
+      factors: "Unregistered activity, threshold breaches, anomalies"
+      
+    - name: "filing_risk_score"
+      data_type: "INT"
+      nullable: true
+      description: "Filing compliance risk score (0-100)"
+      source: "risk_assessment.filing_risk_score"
+      aggregation: "AVG"
+      range: "0-100"
+      factors: "Late filings, non-filings, amendment frequency"
+      
+    - name: "payment_risk_score"
+      data_type: "INT"
+      nullable: true
+      description: "Payment compliance risk score (0-100)"
+      source: "risk_assessment.payment_risk_score"
+      aggregation: "AVG"
+      range: "0-100"
+      factors: "Late payments, arrears history, payment agreements"
+      
+    - name: "reporting_risk_score"
+      data_type: "INT"
+      nullable: true
+      description: "Reporting accuracy risk score (0-100)"
+      source: "risk_assessment.reporting_risk_score"
+      aggregation: "AVG"
+      range: "0-100"
+      factors: "Discrepancies, anomalies, third-party mismatches"
+      
+    - name: "fraud_risk_score"
+      data_type: "INT"
+      nullable: true
+      description: "Fraud/evasion risk score (0-100)"
+      source: "risk_assessment.fraud_risk_score"
+      aggregation: "AVG"
+      range: "0-100"
+      factors: "Red flags, pattern matching, network analysis"
+      
+    # Monetary Tax Gap Estimates (OECD CRM Key Measures)
+    - name: "estimated_tax_gap"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Point estimate of unreported tax liability (EUR)"
+      source: "risk_assessment.estimated_tax_gap"
+      aggregation: "SUM (within single date)"
+      unit: "EUR"
+      note: |
+        CRITICAL MEASURE for ROI-based intervention prioritization.
+        Represents expected value of additional tax if fully compliant.
+        
+    - name: "estimated_tax_gap_low"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "Low bound of tax gap confidence interval (EUR)"
+      source: "risk_assessment.estimated_tax_gap_low"
+      aggregation: "SUM (within single date)"
+      unit: "EUR"
+      note: "Lower bound of 80% confidence interval"
+      
+    - name: "estimated_tax_gap_high"
+      data_type: "DECIMAL(15,2)"
+      nullable: true
+      description: "High bound of tax gap confidence interval (EUR)"
+      source: "risk_assessment.estimated_tax_gap_high"
+      aggregation: "SUM (within single date)"
+      unit: "EUR"
+      note: "Upper bound of 80% confidence interval"
+      
+    - name: "tax_gap_probability"
+      data_type: "DECIMAL(5,4)"
+      nullable: true
+      description: "Probability that tax gap exists"
+      source: "risk_assessment.tax_gap_probability"
+      aggregation: "AVG"
+      range: "0.0000-1.0000"
+      interpretation: "0.8500 = 85% probability of tax gap existing"
+      
+    # Score Changes (Trend Analysis)
+    - name: "score_change_from_prior"
+      data_type: "SMALLINT"
+      nullable: true
+      description: "Change in overall risk score from prior quarter"
+      source: "current.overall_risk_score - prior.overall_risk_score"
+      aggregation: "AVG"
+      range: "-100 to +100"
+      note: "Positive = increased risk, Negative = decreased risk"
+      
+    - name: "score_change_from_year_ago"
+      data_type: "SMALLINT"
+      nullable: true
+      description: "Change from same quarter last year (YoY)"
+      source: "current.overall_risk_score - year_ago.overall_risk_score"
+      aggregation: "AVG"
+      range: "-100 to +100"
+
+  # ===========================================================================
+  # ADDITIVE MEASURES - RISK INDICATORS (Can sum for counts)
+  # ===========================================================================
+  measures_additive:
+    - name: "risk_indicator_count"
+      data_type: "SMALLINT"
+      nullable: false
+      description: "Total number of risk indicators triggered"
+      source: "COUNT of triggered risk_indicator records"
+      aggregation: "SUM"
+      
+    - name: "high_risk_indicator_count"
+      data_type: "SMALLINT"
+      nullable: false
+      description: "Number of high-severity risk indicators"
+      source: "COUNT of risk_indicator WHERE severity >= 4"
+      aggregation: "SUM"
+      
+    - name: "compliance_event_count"
+      data_type: "INT"
+      nullable: true
+      description: "Number of compliance events in assessment period"
+      source: "COUNT of compliance_event in quarter"
+      aggregation: "SUM"
+      
+    - name: "intervention_count"
+      data_type: "SMALLINT"
+      nullable: true
+      description: "Number of interventions applied in period"
+      source: "COUNT of compliance_action in quarter"
+      aggregation: "SUM"
+
+  # ===========================================================================
+  # NON-ADDITIVE MEASURES
+  # ===========================================================================
+  measures_non_additive:
+    - name: "confidence_level"
+      data_type: "DECIMAL(5,4)"
+      nullable: true
+      description: "Confidence in the risk assessment (0-1)"
+      source: "risk_assessment.assessment_confidence"
+      aggregation: "NONE"
+      range: "0.0000-1.0000"
+      factors: "Data completeness, model accuracy, historical correlation"
+      
+    - name: "data_quality_score"
+      data_type: "DECIMAL(5,2)"
+      nullable: true
+      description: "Quality of input data used for assessment (0-100)"
+      source: "risk_assessment.data_quality_score"
+      aggregation: "NONE"
+      range: "0.00-100.00"
+      factors: "Completeness, timeliness, consistency, accuracy"
+
+  # ===========================================================================
+  # FLAGS
+  # ===========================================================================
+  flags:
+    - name: "is_high_risk"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Risk score >= 61 (High or Very High)"
+      derivation: "overall_risk_score >= 61"
+      
+    - name: "is_very_high_risk"
+      data_type: "BOOLEAN"
+      nullable: false
+      description: "Risk score >= 81 (Very High only)"
+      derivation: "overall_risk_score >= 81"
+      
+    - name: "is_new_taxpayer"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "First risk assessment for this taxpayer"
+      derivation: "prior_risk_category_key IS NULL"
+      
+    - name: "risk_increased"
+      data_type: "BOOLEAN"
+      nullable: true
+      description: "Risk score increased from prior period"
+      derivation: "score_change_from_prior > 0"
+      note: "NULL for first assessment"
+      
+    - name: "risk_decreased"
+      data_type: "BOOLEAN"
+      nullable: true
+      description: "Risk score decreased from prior period"
+      derivation: "score_change_from_prior < 0"
+      note: "NULL for first assessment"
+      
+    - name: "requires_review"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Risk assessment requires manual review"
+      derivation: "confidence_level < 0.70 OR data_quality_score < 50"
+      
+    - name: "is_audit_candidate"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Taxpayer is candidate for audit selection"
+      derivation: "overall_risk_score >= 61 AND estimated_tax_gap >= 10000"
+      
+    - name: "has_active_intervention"
+      data_type: "BOOLEAN"
+      nullable: false
+      default_value: false
+      description: "Taxpayer has active compliance intervention"
+      derivation: "intervention_count > 0"
+
+  # ===========================================================================
+  # ETL METADATA
+  # ===========================================================================
+  metadata:
+    - name: "etl_batch_id"
+      data_type: "BIGINT"
+      nullable: false
+      description: "ETL batch identifier for lineage tracking"
+      
+    - name: "etl_load_timestamp"
+      data_type: "TIMESTAMP"
+      nullable: false
+      description: "When record was loaded into warehouse"
+      
+    - name: "source_system"
+      data_type: "VARCHAR(50)"
+      nullable: false
+      description: "Source system identifier"
+      allowed_values: ["MTCA_RISK_ENGINE", "MTCA_COMPLIANCE"]
+
+  # ===========================================================================
+  # INDEXES
+  # ===========================================================================
+  indexes:
+    - name: "pk_fact_risk_score"
+      columns: ["risk_assessment_id"]
+      primary: true
+      description: "Primary key on source system ID"
+      
+    - name: "uk_fact_risk_party_period"
+      columns: ["party_key", "snapshot_date_key", "tax_type_key"]
+      unique: true
+      description: "Unique constraint on party-period-tax_type"
+      
+    - name: "idx_fact_risk_snapshot"
+      columns: ["snapshot_date_key"]
+      description: "Snapshot date for quarterly analysis"
+      
+    - name: "idx_fact_risk_category"
+      columns: ["risk_category_key", "snapshot_date_key"]
+      description: "Risk category distribution"
+      
+    - name: "idx_fact_risk_high"
+      columns: ["is_high_risk", "snapshot_date_key"]
+      description: "High risk taxpayer queries"
+      condition: "is_high_risk = TRUE"
+      
+    - name: "idx_fact_risk_score"
+      columns: ["overall_risk_score", "snapshot_date_key"]
+      description: "Score-based queries"
+      
+    - name: "idx_fact_risk_gap"
+      columns: ["estimated_tax_gap", "snapshot_date_key"]
+      description: "Tax gap ranking"
+
+  # ===========================================================================
+  # PARTITIONING STRATEGY
+  # ===========================================================================
+  partitioning:
+    enabled: true
+    strategy: "RANGE"
+    column: "snapshot_date_key"
+    interval: "YEARLY"
+    description: "Partition by calendar year"
+    retention_years: 7
+    archive_strategy: "Move to cold storage after retention"
+
+  # ===========================================================================
+  # SOURCE MAPPING
+  # ===========================================================================
+  source_mapping:
+    primary_table: "compliance_control.risk_assessment"
+    alias: "ra"
+    
+    joins:
+      - table: "warehouse.dim_party"
+        alias: "dp"
+        type: "INNER"
+        condition: "ra.party_id = dp.party_source_id AND dp.is_current_flag = TRUE"
+        
+      - table: "warehouse.dim_risk_category"
+        alias: "drc"
+        type: "INNER"
+        condition: "ra.risk_category_code = drc.risk_category_code"
+        
+      - table: "warehouse.dim_date"
+        alias: "dd"
+        type: "INNER"
+        condition: "DATE_FORMAT(ra.assessment_date, '%Y%m%d') = dd.date_key"
+        
+      - table: "compliance_control.risk_assessment"
+        alias: "ra_prior"
+        type: "LEFT"
+        condition: |
+          ra.party_id = ra_prior.party_id
+          AND ra_prior.assessment_date = DATE_SUB(ra.assessment_date, INTERVAL 3 MONTH)
+        description: "Self-join for prior quarter comparison"
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+  business_rules:
+    - rule_id: "FRS_001"
+      description: "Overall risk score must be in valid range (0-100)"
+      validation_sql: |
+        SELECT COUNT(*) AS violations
+        FROM warehouse.fact_risk_score
+        WHERE overall_risk_score < 0 OR overall_risk_score > 100
+      expected_result: "0"
+      severity: "CRITICAL"
+      
+    - rule_id: "FRS_002"
+      description: "Tax gap estimates must maintain ordering (low <= point <= high)"
+      validation_sql: |
+        SELECT COUNT(*) AS violations
+        FROM warehouse.fact_risk_score
+        WHERE estimated_tax_gap IS NOT NULL
+          AND (estimated_tax_gap < COALESCE(estimated_tax_gap_low, 0)
+               OR estimated_tax_gap > COALESCE(estimated_tax_gap_high, estimated_tax_gap + 1))
+      expected_result: "0"
+      severity: "ERROR"
+      
+    - rule_id: "FRS_003"
+      description: "Probability must be in valid range (0-1)"
+      validation_sql: |
+        SELECT COUNT(*) AS violations
+        FROM warehouse.fact_risk_score
+        WHERE tax_gap_probability IS NOT NULL
+          AND (tax_gap_probability < 0 OR tax_gap_probability > 1)
+      expected_result: "0"
+      severity: "ERROR"
+      
+    - rule_id: "FRS_004"
+      description: "High risk flag must be consistent with score"
+      validation_sql: |
+        SELECT COUNT(*) AS violations
+        FROM warehouse.fact_risk_score
+        WHERE (is_high_risk = TRUE AND overall_risk_score < 61)
+           OR (is_high_risk = FALSE AND overall_risk_score >= 61)
+      expected_result: "0"
+      severity: "ERROR"
+      
+    - rule_id: "FRS_005"
+      description: "Score change calculation must be correct"
+      validation_sql: |
+        SELECT COUNT(*) AS violations
+        FROM warehouse.fact_risk_score curr
+        JOIN warehouse.fact_risk_score prior
+            ON curr.party_key = prior.party_key
+            AND curr.COALESCE(tax_type_key, -1) = COALESCE(prior.tax_type_key, -1)
+            AND prior.snapshot_period = CONCAT(
+                CASE 
+                    WHEN SUBSTR(curr.snapshot_period, 7, 1) = '1' THEN CAST(SUBSTR(curr.snapshot_period, 1, 4) - 1 AS CHAR)
+                    ELSE SUBSTR(curr.snapshot_period, 1, 4)
+                END, '-Q',
+                CASE SUBSTR(curr.snapshot_period, 7, 1)
+                    WHEN '1' THEN '4' WHEN '2' THEN '1' WHEN '3' THEN '2' WHEN '4' THEN '3'
+                END
+            )
+        WHERE curr.score_change_from_prior IS NOT NULL
+          AND ABS(curr.score_change_from_prior - (curr.overall_risk_score - prior.overall_risk_score)) > 0
+      expected_result: "0"
+      severity: "WARNING"
+      
+    - rule_id: "FRS_006"
+      description: "Unique party-period-tax_type combination"
+      validation_sql: |
+        SELECT party_key, snapshot_date_key, tax_type_key, COUNT(*) AS cnt
+        FROM warehouse.fact_risk_score
+        GROUP BY party_key, snapshot_date_key, tax_type_key
+        HAVING COUNT(*) > 1
+      expected_result: "0 rows"
+      severity: "CRITICAL"
+
+  # ===========================================================================
+  # SAMPLE QUERIES
+  # ===========================================================================
+  sample_queries:
+    - name: "Tax Gap Distribution by Risk Category"
+      description: "Total estimated tax gap by risk level"
+      sql: |
+        SELECT 
+            drc.risk_level_name,
+            drc.treatment_strategy_name,
+            COUNT(*) AS taxpayer_count,
+            SUM(frs.estimated_tax_gap) AS total_estimated_gap,
+            AVG(frs.estimated_tax_gap) AS avg_gap_per_taxpayer,
+            AVG(frs.tax_gap_probability) AS avg_probability,
+            AVG(frs.confidence_level) AS avg_confidence
+        FROM warehouse.fact_risk_score frs
+        JOIN warehouse.dim_risk_category drc 
+            ON frs.risk_category_key = drc.risk_category_key
+        WHERE frs.snapshot_period = '2024-Q4'
+        GROUP BY drc.risk_level_name, drc.treatment_strategy_name, drc.risk_level
+        ORDER BY drc.risk_level DESC;
+        
+    - name: "Risk Migration Analysis"
+      description: "Taxpayers moving between risk categories"
+      sql: |
+        SELECT 
+            curr_rc.risk_level_name AS current_risk,
+            prior_rc.risk_level_name AS prior_risk,
+            COUNT(*) AS taxpayer_count,
+            SUM(frs.estimated_tax_gap) AS total_gap,
+            CASE 
+                WHEN curr_rc.risk_level > prior_rc.risk_level THEN 'INCREASED'
+                WHEN curr_rc.risk_level < prior_rc.risk_level THEN 'DECREASED'
+                ELSE 'UNCHANGED'
+            END AS movement
+        FROM warehouse.fact_risk_score frs
+        JOIN warehouse.dim_risk_category curr_rc 
+            ON frs.risk_category_key = curr_rc.risk_category_key
+        JOIN warehouse.dim_risk_category prior_rc 
+            ON frs.prior_risk_category_key = prior_rc.risk_category_key
+        WHERE frs.snapshot_period = '2024-Q4'
+        GROUP BY curr_rc.risk_level_name, prior_rc.risk_level_name, 
+                 curr_rc.risk_level, prior_rc.risk_level
+        ORDER BY curr_rc.risk_level DESC, prior_rc.risk_level DESC;
+        
+    - name: "Risk Score Trends"
+      description: "Average risk score over time by segment"
+      sql: |
+        SELECT 
+            frs.snapshot_period,
+            frs.segment_code,
+            COUNT(*) AS taxpayer_count,
+            AVG(frs.overall_risk_score) AS avg_risk_score,
+            SUM(frs.estimated_tax_gap) AS total_gap,
+            SUM(CASE WHEN frs.is_high_risk THEN 1 ELSE 0 END) AS high_risk_count,
+            ROUND(100.0 * SUM(CASE WHEN frs.is_high_risk THEN 1 ELSE 0 END) / 
+                  COUNT(*), 2) AS high_risk_pct
+        FROM warehouse.fact_risk_score frs
+        WHERE frs.snapshot_period >= '2023-Q1'
+        GROUP BY frs.snapshot_period, frs.segment_code
+        ORDER BY frs.snapshot_period, frs.segment_code;
+        
+    - name: "Intervention ROI Analysis"
+      description: "Compare risk reduction for audited vs non-audited taxpayers"
+      sql: |
+        WITH intervention_targets AS (
+            SELECT DISTINCT party_key
+            FROM warehouse.fact_compliance_event
+            WHERE event_type_code = 'AUDIT_COMPLETE'
+              AND event_date_key BETWEEN 20240101 AND 20240630
+        ),
+        risk_change AS (
+            SELECT 
+                curr.party_key,
+                pre.estimated_tax_gap AS pre_gap,
+                curr.estimated_tax_gap AS post_gap,
+                pre.estimated_tax_gap - curr.estimated_tax_gap AS gap_reduction,
+                pre.overall_risk_score AS pre_score,
+                curr.overall_risk_score AS post_score
+            FROM warehouse.fact_risk_score curr
+            JOIN warehouse.fact_risk_score pre 
+                ON curr.party_key = pre.party_key
+                AND pre.snapshot_period = '2024-Q1'
+            WHERE curr.snapshot_period = '2024-Q3'
+        )
+        SELECT 
+            CASE WHEN it.party_key IS NOT NULL THEN 'Audited' ELSE 'Not Audited' END AS group_type,
+            COUNT(*) AS taxpayer_count,
+            AVG(rc.gap_reduction) AS avg_gap_reduction,
+            SUM(rc.gap_reduction) AS total_gap_reduction,
+            AVG(rc.pre_score - rc.post_score) AS avg_score_improvement
+        FROM risk_change rc
+        LEFT JOIN intervention_targets it ON rc.party_key = it.party_key
+        GROUP BY CASE WHEN it.party_key IS NOT NULL THEN 'Audited' ELSE 'Not Audited' END;
+        
+    - name: "Audit Candidate Prioritization"
+      description: "Top audit candidates by expected tax gap yield"
+      sql: |
+        SELECT 
+            dp.tin,
+            dp.party_name,
+            dp.segment_name,
+            drc.risk_level_name,
+            frs.overall_risk_score,
+            frs.estimated_tax_gap,
+            frs.estimated_tax_gap_low,
+            frs.estimated_tax_gap_high,
+            frs.tax_gap_probability,
+            frs.estimated_tax_gap * frs.tax_gap_probability AS expected_yield,
+            frs.confidence_level
+        FROM warehouse.fact_risk_score frs
+        JOIN warehouse.dim_party dp ON frs.party_key = dp.party_key
+        JOIN warehouse.dim_risk_category drc ON frs.risk_category_key = drc.risk_category_key
+        WHERE frs.snapshot_period = '2024-Q4'
+          AND frs.is_audit_candidate = TRUE
+          AND dp.is_current_flag = TRUE
+        ORDER BY frs.estimated_tax_gap * frs.tax_gap_probability DESC
+        LIMIT 100;

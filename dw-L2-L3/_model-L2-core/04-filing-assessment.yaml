@@ -1,0 +1,2357 @@
+# =============================================================================
+# Tax Administration Reference Data Model
+# Filing & Assessment Domain
+# =============================================================================
+#
+# This domain manages tax returns, assessments, liabilities, penalties,
+# interest calculations, and tax loss tracking - the core tax processing
+# functions of any tax administration system.
+#
+# Generated from: SIGTAS schemas (ASSESSMENT, PENALTIES__INTERESTS, LOSS)
+#                 + tax-capabilities.docx
+#
+# =============================================================================
+
+metadata:
+  model_name: "Tax Administration Reference Data Model"
+  model_code: "TA-RDM"
+  version: "1.0.0"
+  version_date: "2025-11-04"
+  description: |
+    Filing & Assessment Domain - The most complex and critical domain in tax
+    administration, managing the complete lifecycle of tax return filing,
+    assessment processing, liability determination, penalty and interest
+    calculations, and tax loss management.
+
+    This domain implements the core tax processing functions:
+    - Tax return filing and validation
+    - Self-assessment by taxpayers
+    - Administrative assessment by tax authority
+    - Audit assessments (additional assessments)
+    - Best Judgment Assessment (BJA) for non-filers
+    - Automated penalty and interest calculations
+    - Tax loss carry-forward and carry-back
+    - Assessment amendments and reversals
+    - Risk-based return processing
+    - Filing compliance monitoring
+
+    Core Business Rules:
+    - TTT Principle: Every assessment is for specific TIN-Tax Type-Tax Period
+    - Three possible outcomes: pay tax, receive refund, or zero liability
+    - Returns can be amended before audit (with appropriate penalties/interest)
+    - Last filed return supersedes previous returns
+    - Penalties and interest calculated automatically based on rules
+    - Assessment creates financial transactions in accounting
+    - Risk assessment performed on every return
+    - Full historization - no deletion of processed returns
+    - Tax losses can be carried forward/back per tax law
+    - Assessment status drives workflow and triggers downstream processes
+
+    Assessment Types (per tax-capabilities.docx):
+    1. Self-Assessment: Taxpayer files return and self-assesses liability
+    2. Administrative Assessment: Tax authority assesses based on declarations
+    3. Audit Assessment: Additional assessment from audit findings
+    4. Best Judgment Assessment (BJA): Automatic assessment for non-filers
+
+    Integration Points:
+    - Registration: Links to tax accounts (TIN-Tax Type relationship)
+    - Tax Framework: Uses tax types, periods, forms, rates
+    - Accounting: Creates financial transactions and balances
+    - Payment & Refund: Assessment determines payment/refund obligations
+    - Compliance & Control: Assessment results drive audit and collection
+    - Document Management: Returns and assessments generate documents
+
+    Volume Characteristics:
+    - High transaction volume (10M-100M assessments)
+    - Peak processing during filing deadlines
+    - Requires high performance indexing
+    - Archives needed for historical data
+
+    This domain was synthesized from:
+    - SIGTAS schemas: ASSESSMENT, ASSESS_TYPE, ASSESS_LINE, ASSESS_CHANGE_REASON,
+      PENALTIES__INTERESTS, PENALTY, INTEREST, TAX_SUB_TRANS, PEN_TYPE, INT_WHERE_TO_APPLY,
+      PEN_WHERE_TO_APPLY, PEN_SUBSEQUENT_VIOLATION, PEN_WHEN_TO_APPLY, PEN_TURNOVER_RATE,
+      PEN_SCALE, TAX_TYPE_PEN, TAX_TYPE_INT, LOSS, LOSS_CARRY_BACK, LOSS_CARRY_FWD_TYPE,
+      LOSS_RULES, LOSS_USED_AMOUNT
+    - Tax capabilities sections: Filing Management, Assessment (all types),
+      Compliance Management
+
+  authors:
+    - "Generated from SIGTAS analysis"
+    - "Moldova SRS collaboration"
+    - "GovStack Initiative"
+
+  organization: "GovStack Initiative"
+  license: "CC-BY-4.0"
+
+  govstack_alignment:
+    - "Registration BB"
+    - "Payments BB"
+    - "Workflow BB"
+    - "Scheduler BB"
+
+  standards:
+    database_platform: "PostgreSQL 14+"
+    naming_convention: "snake_case"
+    primary_key_pattern: "{table_name}_id"
+    foreign_key_pattern: "{referenced_table}_id"
+
+    audit_columns:
+      - "created_by"
+      - "created_date"
+      - "modified_by"
+      - "modified_date"
+
+    temporal_columns:
+      - "valid_from"
+      - "valid_to"
+      - "is_current"
+
+  changelog:
+    - version: "1.0.0"
+      date: "2025-11-04"
+      author: "Claude"
+      changes:
+        - "Initial filing-assessment domain creation"
+        - "30 core tables defined"
+        - "Full SIGTAS patterns transformed"
+        - "Four assessment types implemented"
+        - "Complete penalty and interest framework"
+        - "Tax loss management included"
+
+# =============================================================================
+# DOMAINS
+# =============================================================================
+
+domains:
+  - name: "filing_assessment"
+    code: "FA"
+    display_name: "Filing & Assessment"
+    description: |
+      Manages all aspects of tax return filing, assessment processing, liability
+      determination, penalty and interest calculations, and tax loss management.
+
+      This is the MOST CRITICAL and COMPLEX domain in tax administration as it
+      implements the core tax processing logic that determines what taxpayers
+      owe or are entitled to receive as refunds.
+
+    business_owner: "Assessment Department"
+    technical_owner: "Core Systems Team"
+
+    dependencies:
+      - "party_management"    # For taxpayer information
+      - "tax_framework"       # For tax types, periods, forms, rates
+      - "registration"        # For tax accounts (TTT)
+      - "reference_data"      # For codes and lookups
+
+    tags:
+      - "critical"
+      - "core"
+      - "high_volume"
+      - "high_complexity"
+      - "performance_sensitive"
+      - "audit_required"
+
+    domain_events:
+      - event_name: "TaxReturnFiled"
+        description: "Emitted when taxpayer files tax return"
+        payload_schema: |
+          {
+            "tax_return_id": "bigint",
+            "tax_account_id": "bigint",
+            "tax_period_id": "bigint",
+            "filing_date": "date",
+            "filing_method": "string",
+            "return_version": "integer",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "TaxReturnAmended"
+        description: "Emitted when taxpayer amends previously filed return"
+        payload_schema: |
+          {
+            "tax_return_id": "bigint",
+            "original_return_id": "bigint",
+            "tax_account_id": "bigint",
+            "amendment_reason": "string",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "AssessmentCreated"
+        description: "Emitted when assessment is created"
+        payload_schema: |
+          {
+            "assessment_id": "bigint",
+            "tax_account_id": "bigint",
+            "tax_period_id": "bigint",
+            "assessment_type": "string",
+            "assessed_amount": "decimal",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "AssessmentFinalized"
+        description: "Emitted when assessment becomes final (no longer amendable)"
+        payload_schema: |
+          {
+            "assessment_id": "bigint",
+            "tax_account_id": "bigint",
+            "final_amount": "decimal",
+            "finalization_date": "date",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "PenaltyAssessed"
+        description: "Emitted when penalty is assessed"
+        payload_schema: |
+          {
+            "penalty_assessment_id": "bigint",
+            "assessment_id": "bigint",
+            "penalty_type": "string",
+            "penalty_amount": "decimal",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "InterestCalculated"
+        description: "Emitted when interest is calculated and assessed"
+        payload_schema: |
+          {
+            "interest_assessment_id": "bigint",
+            "assessment_id": "bigint",
+            "interest_amount": "decimal",
+            "calculation_date": "date",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "TaxLossApproved"
+        description: "Emitted when tax loss approved for carry-forward/back"
+        payload_schema: |
+          {
+            "tax_loss_id": "bigint",
+            "tax_account_id": "bigint",
+            "loss_amount": "decimal",
+            "approval_date": "date",
+            "timestamp": "datetime"
+          }
+
+      - event_name: "TaxLossUtilized"
+        description: "Emitted when tax loss is utilized against assessment"
+        payload_schema: |
+          {
+            "loss_utilization_id": "bigint",
+            "tax_loss_id": "bigint",
+            "assessment_id": "bigint",
+            "amount_utilized": "decimal",
+            "timestamp": "datetime"
+          }
+
+    # =============================================================================
+    # SCHEMAS
+    # =============================================================================
+
+    schemas:
+      - schema_name: "filing_assessment"
+        description: |
+          Core schema containing all tables for tax return filing, assessment
+          processing, penalty and interest management, and tax loss tracking.
+
+        # =========================================================================
+        # TABLES
+        # =========================================================================
+
+        tables:
+          # ===================================================================
+          # TAX RETURNS AND FILING
+          # ===================================================================
+
+          - name: "tax_return"
+            display_name: "Tax Return"
+            description: |
+              Master table for tax returns filed by taxpayers. A tax return is
+              the primary document through which taxpayers self-assess their tax
+              liability for a specific tax period. Returns contain detailed
+              information about income, deductions, credits, and calculated tax.
+
+              SIGTAS Source: Part of ASSESSMENT table (self-assessment records)
+
+              Business Rules:
+              - One return per TIN-Tax Type-Tax Period combination (primary filing)
+              - Returns can be amended; last filed return supersedes previous
+              - Returns must follow form structure defined in tax_framework
+              - Filed returns cannot be deleted (soft delete only)
+              - Return data drives assessment creation
+              - Risk assessment performed on every return filed
+
+              Volume: HIGH (10M-100M records) - annual growth 2M+
+              Performance: Critical - requires extensive indexing
+
+            aspects:
+              - auditable
+              - temporal
+
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+            retention_period: "10 years minimum"
+
+            columns:
+              - name: "tax_return_id"
+                display_name: "Tax Return ID"
+                type: "bigint"
+                description: "Unique identifier for tax return (primary key)"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account"
+                type: "bigint"
+                description: |
+                  Foreign key to tax account (implements TIN-Tax Type linkage).
+                  Every return belongs to specific tax account.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "registration.tax_account"
+                    column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_rules:
+                  - "BR-FA-001: Tax account must be active at time of filing"
+                  - "BR-FA-002: Taxpayer must be registered for tax type"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period"
+                type: "bigint"
+                description: |
+                  Foreign key to tax period for which return is filed.
+                  Implements TTT principle (TIN-Tax Type-Tax Period).
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "tax_framework.tax_period"
+                    column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+                business_rules:
+                  - "BR-FA-003: Tax period must be within filing window"
+                  - "BR-FA-004: Cannot file for future periods"
+
+              - name: "form_id"
+                display_name: "Tax Form"
+                type: "bigint"
+                description: |
+                  Foreign key to tax form used for this return. Form defines
+                  structure and validation rules.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "tax_framework.tax_form"
+                    column: "form_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "form_version_id"
+                display_name: "Form Version"
+                type: "bigint"
+                description: |
+                  Foreign key to specific version of form (forms evolve over time).
+                  Critical for maintaining historical accuracy.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "tax_framework.form_version"
+                    column: "form_version_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "return_number"
+                display_name: "Return Number"
+                type: "varchar(50)"
+                description: |
+                  System-generated unique return number for tracking and reference.
+                  Format: {TAX_TYPE}-{TIN}-{PERIOD}-{SEQUENCE}
+                  Example: CIT-123456789-202403-01
+                constraints:
+                  not_null: true
+                  unique: true
+                validation:
+                  pattern: "^[A-Z]+-[0-9]+-[0-9]+-[0-9]+$"
+
+              - name: "return_version"
+                display_name: "Return Version"
+                type: "integer"
+                description: |
+                  Version number of return. Original return = 1, first amendment = 2, etc.
+                  Used to track return amendment history.
+                constraints:
+                  not_null: true
+                  default: 1
+                validation:
+                  min_value: 1
+
+              - name: "previous_return_id"
+                display_name: "Previous Return"
+                type: "bigint"
+                description: |
+                  Foreign key to previous version of return (if this is amendment).
+                  Null for original returns. Creates amendment chain.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "filing_assessment.tax_return"
+                    column: "tax_return_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "filing_method_code"
+                display_name: "Filing Method"
+                type: "varchar(20)"
+                description: |
+                  Method used to file return:
+                  - E_PORTAL: Filed via online portal
+                  - WEB_SERVICE: Uploaded via web service/API
+                  - PAPER: Paper return (manual data entry)
+                  - PHONE: Filed via phone (rare)
+                  - TAX_OFFICE: Filed in person at tax office
+                constraints:
+                  not_null: true
+                reference_data: "ref_filing_method"
+
+              - name: "filing_date"
+                display_name: "Filing Date"
+                type: "timestamp with time zone"
+                description: |
+                  Actual date and time when return was received by tax system.
+                  Used to determine if filing is late.
+                constraints:
+                  not_null: true
+                security:
+                  audit_important: true
+
+              - name: "filing_due_date"
+                display_name: "Filing Due Date"
+                type: "date"
+                description: |
+                  Statutory due date for filing this return. Copied from tax_period
+                  but stored here for historical accuracy (laws may change).
+                constraints:
+                  not_null: true
+
+              - name: "is_filing_late"
+                display_name: "Is Filing Late"
+                type: "boolean"
+                description: |
+                  Flag indicating if return was filed after due date.
+                  Automatically set by comparing filing_date with filing_due_date.
+                  Triggers late filing penalty assessment.
+                constraints:
+                  not_null: true
+                  default: false
+                business_rules:
+                  - "BR-FA-005: Set true if filing_date > filing_due_date"
+                  - "BR-FA-006: Late filing triggers penalty assessment"
+
+              - name: "days_late"
+                display_name: "Days Late"
+                type: "integer"
+                description: |
+                  Number of days late if filing_date > filing_due_date.
+                  Used for progressive penalty calculations.
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+
+              - name: "return_status_code"
+                display_name: "Return Status"
+                type: "varchar(30)"
+                description: |
+                  Current status of return in processing workflow:
+                  - DRAFT: Being prepared (not yet submitted)
+                  - SUBMITTED: Submitted and awaiting validation
+                  - VALIDATING: Undergoing validation checks
+                  - VALIDATION_FAILED: Failed validation (returned to taxpayer)
+                  - ACCEPTED: Passed validation, awaiting processing
+                  - PROCESSING: Being processed to create assessment
+                  - PROCESSED: Processing complete, assessment created
+                  - UNDER_REVIEW: Flagged for desk review
+                  - UNDER_AUDIT: Selected for audit
+                  - AMENDED: Superseded by amended return
+                  - REJECTED: Rejected by tax authority
+                  - CANCELLED: Cancelled by taxpayer or authority
+                constraints:
+                  not_null: true
+                  default: "'SUBMITTED'"
+                reference_data: "ref_return_status"
+                business_rules:
+                  - "BR-FA-007: Status transitions follow defined workflow"
+                  - "BR-FA-008: Some transitions require approval"
+
+              - name: "is_amended"
+                display_name: "Is Amended"
+                type: "boolean"
+                description: |
+                  Flag indicating if this return has been superseded by an
+                  amended version. Set to true when newer version filed.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "is_current_version"
+                display_name: "Is Current Version"
+                type: "boolean"
+                description: |
+                  Flag indicating if this is the current (latest) version of return.
+                  Only one version should have this set to true.
+                constraints:
+                  not_null: true
+                  default: true
+                business_rules:
+                  - "BR-FA-009: Only latest version has is_current_version = true"
+
+              - name: "amendment_reason_code"
+                display_name: "Amendment Reason"
+                type: "varchar(30)"
+                description: |
+                  Reason for amendment if this is amended return:
+                  - ERROR_CORRECTION: Correcting arithmetic/data error
+                  - TAX_LAW_CHANGE: Reflecting change in tax law interpretation
+                  - ADDITIONAL_INFORMATION: Including previously omitted information
+                  - AUDIT_ADJUSTMENT: Required by audit findings
+                  - VOLUNTARY: Voluntary amendment by taxpayer
+                constraints:
+                  not_null: false
+                reference_data: "ref_amendment_reason"
+
+              - name: "amendment_description"
+                display_name: "Amendment Description"
+                type: "text"
+                description: "Detailed explanation of what was amended and why"
+                constraints:
+                  not_null: false
+
+              - name: "risk_score"
+                display_name: "Risk Score"
+                type: "decimal(5,2)"
+                description: |
+                  Calculated risk score for this return (0-100 scale).
+                  Higher score = higher risk of non-compliance.
+                  Used to flag returns for review or audit.
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+                  max_value: 100
+
+              - name: "risk_category_code"
+                display_name: "Risk Category"
+                type: "varchar(20)"
+                description: |
+                  Risk category based on risk score:
+                  - LOW: 0-33 (routine processing)
+                  - MEDIUM: 34-66 (may require review)
+                  - HIGH: 67-100 (requires review or audit)
+                constraints:
+                  not_null: false
+                reference_data: "ref_risk_category"
+
+              - name: "is_flagged_for_review"
+                display_name: "Flagged for Review"
+                type: "boolean"
+                description: |
+                  Flag indicating return is flagged for desk review before
+                  final processing. Set by risk assessment or manual flag.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "review_notes"
+                display_name: "Review Notes"
+                type: "text"
+                description: "Notes from desk review of return"
+                constraints:
+                  not_null: false
+
+              - name: "prepared_by_party_id"
+                display_name: "Prepared By"
+                type: "bigint"
+                description: |
+                  Party ID of tax preparer/agent who prepared return (if applicable).
+                  Null if taxpayer prepared return themselves.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "party_management.party"
+                    column: "party_id"
+                    on_delete: "SET NULL"
+                    on_update: "CASCADE"
+
+              - name: "ip_address"
+                display_name: "IP Address"
+                type: "varchar(45)"
+                description: "IP address from which return was filed (for e-filings)"
+                constraints:
+                  not_null: false
+                security:
+                  audit_important: true
+
+              - name: "submission_file_reference"
+                display_name: "Submission File Reference"
+                type: "varchar(255)"
+                description: "Reference to original submission file (PDF, XML, etc.)"
+                constraints:
+                  not_null: false
+
+              - name: "calculation_checksum"
+                display_name: "Calculation Checksum"
+                type: "varchar(64)"
+                description: |
+                  SHA-256 hash of all calculation values in return.
+                  Used to detect tampering or calculation errors.
+                constraints:
+                  not_null: false
+
+              - name: "notes"
+                display_name: "Notes"
+                type: "text"
+                description: "Additional notes or comments about return"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_tax_return_pk"
+                type: "primary_key"
+                columns: ["tax_return_id"]
+
+              - name: "idx_tax_return_account"
+                type: "btree"
+                columns: ["tax_account_id", "tax_period_id"]
+                description: "Performance index for TTT queries"
+
+              - name: "idx_tax_return_period"
+                type: "btree"
+                columns: ["tax_period_id", "return_status_code"]
+                description: "Index for period-based queries and status filtering"
+
+              - name: "idx_tax_return_number"
+                type: "btree"
+                columns: ["return_number"]
+                unique: true
+                description: "Unique index on return number for lookups"
+
+              - name: "idx_tax_return_filing_date"
+                type: "btree"
+                columns: ["filing_date"]
+                description: "Index for date range queries"
+
+              - name: "idx_tax_return_risk"
+                type: "btree"
+                columns: ["risk_category_code", "is_flagged_for_review"]
+                description: "Index for risk-based queries"
+
+              - name: "idx_tax_return_status"
+                type: "btree"
+                columns: ["return_status_code", "filing_date"]
+                description: "Index for workflow and processing queries"
+
+              - name: "idx_tax_return_version"
+                type: "btree"
+                columns: ["tax_account_id", "tax_period_id", "return_version"]
+                description: "Index for version tracking"
+
+              - name: "idx_tax_return_current"
+                type: "btree"
+                columns: ["tax_account_id", "tax_period_id", "is_current_version"]
+                where: "is_current_version = true"
+                description: "Partial index for current versions only"
+
+            business_rules:
+              - rule_id: "BR-FA-001"
+                name: "Active tax account required"
+                description: "Tax account must be active at time of filing"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT tr.tax_return_id
+                  FROM tax_return tr
+                  JOIN registration.tax_account ta ON tr.tax_account_id = ta.tax_account_id
+                  WHERE ta.status_code != 'ACTIVE'
+
+              - rule_id: "BR-FA-002"
+                name: "Valid tax registration"
+                description: "Taxpayer must be registered for tax type"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT tr.tax_return_id
+                  FROM tax_return tr
+                  LEFT JOIN registration.tax_account ta ON tr.tax_account_id = ta.tax_account_id
+                  WHERE ta.tax_account_id IS NULL
+
+              - rule_id: "BR-FA-009"
+                name: "Single current version"
+                description: "Only one version should be marked as current"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT tax_account_id, tax_period_id, COUNT(*)
+                  FROM tax_return
+                  WHERE is_current_version = true
+                  GROUP BY tax_account_id, tax_period_id
+                  HAVING COUNT(*) > 1
+
+          # ===================================================================
+          # TAX RETURN LINES (DETAILED DATA)
+          # ===================================================================
+
+          - name: "tax_return_line"
+            display_name: "Tax Return Line"
+            description: |
+              Detailed line items of tax return corresponding to form lines.
+              Each return consists of multiple lines capturing income, deductions,
+              credits, and calculations per the form structure.
+
+              SIGTAS Source: ASSESS_LINE table
+
+              Business Rules:
+              - Lines must match form_line definitions in tax_framework
+              - Line values must pass validation rules
+              - Calculations must be arithmetically correct
+              - Sum of lines must equal return totals
+
+              Volume: VERY HIGH (100M-1B records) - 10+ lines per return
+
+            entity_type: "transaction"
+            estimated_volume: "very_high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "tax_return_line_id"
+                display_name: "Return Line ID"
+                type: "bigint"
+                description: "Unique identifier for return line (primary key)"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_return_id"
+                display_name: "Tax Return"
+                type: "bigint"
+                description: "Foreign key to parent tax return"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "filing_assessment.tax_return"
+                    column: "tax_return_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+
+              - name: "form_line_id"
+                display_name: "Form Line"
+                type: "bigint"
+                description: |
+                  Foreign key to form line definition. Defines what this line
+                  represents and validation rules.
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "tax_framework.form_line"
+                    column: "form_line_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "line_number"
+                display_name: "Line Number"
+                type: "varchar(20)"
+                description: |
+                  Line number from form (e.g., "1a", "5b", "10").
+                  For reference and sorting.
+                constraints:
+                  not_null: true
+
+              - name: "line_sequence"
+                display_name: "Line Sequence"
+                type: "integer"
+                description: "Sequence number for ordering lines within return"
+                constraints:
+                  not_null: true
+                validation:
+                  min_value: 1
+
+              - name: "line_value_numeric"
+                display_name: "Numeric Value"
+                type: "decimal(19,2)"
+                description: |
+                  Numeric value for this line (amounts, quantities, percentages).
+                  Null if line is text-based.
+                constraints:
+                  not_null: false
+
+              - name: "line_value_text"
+                display_name: "Text Value"
+                type: "varchar(500)"
+                description: |
+                  Text value for this line (descriptions, explanations).
+                  Null if line is numeric.
+                constraints:
+                  not_null: false
+
+              - name: "line_value_date"
+                display_name: "Date Value"
+                type: "date"
+                description: "Date value for this line if applicable"
+                constraints:
+                  not_null: false
+
+              - name: "line_value_boolean"
+                display_name: "Boolean Value"
+                type: "boolean"
+                description: "Boolean value for yes/no questions"
+                constraints:
+                  not_null: false
+
+              - name: "is_calculated"
+                display_name: "Is Calculated"
+                type: "boolean"
+                description: |
+                  Flag indicating if value was auto-calculated by system
+                  or entered by taxpayer.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "calculation_formula"
+                display_name: "Calculation Formula"
+                type: "varchar(500)"
+                description: |
+                  Formula used to calculate value if is_calculated = true.
+                  Example: "LINE_3 - LINE_4 + LINE_5"
+                constraints:
+                  not_null: false
+
+              - name: "is_overridden"
+                display_name: "Is Overridden"
+                type: "boolean"
+                description: |
+                  Flag indicating if calculated value was manually overridden
+                  by taxpayer (requires explanation).
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "override_reason"
+                display_name: "Override Reason"
+                type: "text"
+                description: "Explanation for why calculated value was overridden"
+                constraints:
+                  not_null: false
+
+              - name: "validation_status_code"
+                display_name: "Validation Status"
+                type: "varchar(20)"
+                description: |
+                  Validation status for this line:
+                  - VALID: Passed all validations
+                  - WARNING: Passed with warnings
+                  - ERROR: Failed validation
+                  - NOT_VALIDATED: Not yet validated
+                constraints:
+                  not_null: true
+                  default: "'NOT_VALIDATED'"
+                reference_data: "ref_validation_status"
+
+              - name: "validation_messages"
+                display_name: "Validation Messages"
+                type: "text"
+                description: "JSON array of validation warnings or errors"
+                constraints:
+                  not_null: false
+
+              - name: "notes"
+                display_name: "Notes"
+                type: "text"
+                description: "Additional notes or explanations for this line"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_tax_return_line_pk"
+                type: "primary_key"
+                columns: ["tax_return_line_id"]
+
+              - name: "idx_return_line_return"
+                type: "btree"
+                columns: ["tax_return_id", "line_sequence"]
+                description: "Index for retrieving all lines for a return in order"
+
+              - name: "idx_return_line_form_line"
+                type: "btree"
+                columns: ["form_line_id", "tax_return_id"]
+                description: "Index for form line analysis"
+
+              - name: "idx_return_line_validation"
+                type: "btree"
+                columns: ["validation_status_code"]
+                where: "validation_status_code IN ('ERROR', 'WARNING')"
+                description: "Partial index for finding validation issues"
+
+          # ===================================================================
+          # ASSESSMENTS
+          # ===================================================================
+
+          - name: "assessment"
+            display_name: "Assessment"
+            description: |
+              Core assessment table representing tax liability determinations.
+              An assessment is the official determination of tax owed (or refundable)
+              for a specific TIN-Tax Type-Tax Period combination.
+
+              SIGTAS Source: ASSESSMENT table
+
+              Assessment Types:
+              1. Self-Assessment: Created from taxpayer's return
+              2. Administrative: Created by tax authority based on declarations
+              3. Audit: Additional assessment from audit findings
+              4. Best Judgment (BJA): Automatic assessment for non-filers
+
+              Business Rules:
+              - One primary assessment per TIN-Tax Type-Tax Period
+              - Additional assessments possible from audits
+              - Assessments can be amended before finalization
+              - Final assessments create accounting transactions
+              - Three possible outcomes: pay, refund, or zero
+              - Assessment must balance: tax + penalties + interest - credits = net
+
+              Volume: HIGH (10M-100M records) - matches filing volume
+              Critical for: Accounting, payments, refunds, collections
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+            retention_period: "Permanent (legal requirement)"
+
+            columns:
+              - name: "assessment_id"
+                display_name: "Assessment ID"
+                type: "bigint"
+                description: "Unique identifier for assessment (primary key)"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "tax_account_id"
+                display_name: "Tax Account"
+                type: "bigint"
+                description: "Foreign key to tax account (TIN-Tax Type linkage)"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "registration.tax_account"
+                    column: "tax_account_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "tax_period_id"
+                display_name: "Tax Period"
+                type: "bigint"
+                description: "Foreign key to tax period being assessed"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "tax_framework.tax_period"
+                    column: "tax_period_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "tax_return_id"
+                display_name: "Tax Return"
+                type: "bigint"
+                description: |
+                  Foreign key to tax return (for self-assessments).
+                  Null for administrative, audit, or BJA assessments.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "filing_assessment.tax_return"
+                    column: "tax_return_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "assessment_number"
+                display_name: "Assessment Number"
+                type: "varchar(50)"
+                description: |
+                  System-generated unique assessment number for tracking.
+                  Format: {TYPE}-{TAX_TYPE}-{TIN}-{PERIOD}-{SEQUENCE}
+                  Example: SELF-CIT-123456789-202403-01
+                constraints:
+                  not_null: true
+                  unique: true
+
+              - name: "assessment_type_code"
+                display_name: "Assessment Type"
+                type: "varchar(30)"
+                description: |
+                  Type of assessment per tax administration methodology:
+                  - SELF: Self-assessment from taxpayer return
+                  - ADMINISTRATIVE: Assessment by tax authority
+                  - AUDIT: Additional assessment from audit
+                  - BEST_JUDGMENT: Automatic assessment for non-filers
+                  - ESTIMATED: Provisional estimated assessment
+                  - AMENDED: Amended assessment
+                constraints:
+                  not_null: true
+                reference_data: "ref_assessment_type"
+                business_rules:
+                  - "BR-FA-010: SELF requires tax_return_id"
+                  - "BR-FA-011: AUDIT requires audit_case_id"
+                  - "BR-FA-012: BEST_JUDGMENT for non-filers only"
+
+              - name: "assessment_version"
+                display_name: "Assessment Version"
+                type: "integer"
+                description: |
+                  Version number of assessment. Original = 1, amendments = 2, 3, etc.
+                  Used to track assessment amendment history.
+                constraints:
+                  not_null: true
+                  default: 1
+                validation:
+                  min_value: 1
+
+              - name: "previous_assessment_id"
+                display_name: "Previous Assessment"
+                type: "bigint"
+                description: |
+                  Foreign key to previous version of assessment (if amended).
+                  Null for original assessments. Creates amendment chain.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "filing_assessment.assessment"
+                    column: "assessment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "is_current_version"
+                display_name: "Is Current Version"
+                type: "boolean"
+                description: "Flag indicating if this is the current (latest) version"
+                constraints:
+                  not_null: true
+                  default: true
+
+              - name: "audit_case_id"
+                display_name: "Audit Case"
+                type: "bigint"
+                description: |
+                  Foreign key to audit case (for audit assessments).
+                  Null for non-audit assessments.
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "compliance_control.audit_case"
+                    column: "audit_case_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "assessment_status_code"
+                display_name: "Assessment Status"
+                type: "varchar(30)"
+                description: |
+                  Current status of assessment in workflow:
+                  - DRAFT: Being prepared
+                  - PRELIMINARY: Preliminary calculation done
+                  - PROPOSED: Proposed to taxpayer (for administrative)
+                  - OBJECTION_PERIOD: Within objection period
+                  - FINAL: Finalized (no longer amendable)
+                  - APPEALED: Under appeal
+                  - AMENDED: Superseded by amended version
+                  - CANCELLED: Cancelled
+                  - REFUND_INITIATED: Refund process started
+                constraints:
+                  not_null: true
+                  default: "'DRAFT'"
+                reference_data: "ref_assessment_status"
+
+              - name: "assessment_date"
+                display_name: "Assessment Date"
+                type: "date"
+                description: |
+                  Official date of assessment. This is when assessment is
+                  formally created and becomes part of official record.
+                constraints:
+                  not_null: true
+
+              - name: "finalization_date"
+                display_name: "Finalization Date"
+                type: "date"
+                description: |
+                  Date when assessment became final (objection period expired).
+                  Null until assessment is finalized.
+                constraints:
+                  not_null: false
+
+              - name: "payment_due_date"
+                display_name: "Payment Due Date"
+                type: "date"
+                description: "Date by which assessed amount must be paid"
+                constraints:
+                  not_null: true
+
+              # Tax Amounts
+              - name: "assessed_tax_amount"
+                display_name: "Assessed Tax Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Base tax amount assessed (before penalties and interest).
+                  Positive = tax owed, Negative = refund due.
+                constraints:
+                  not_null: true
+                  default: 0
+
+              - name: "penalty_amount"
+                display_name: "Penalty Amount"
+                type: "decimal(19,2)"
+                description: "Total penalties assessed (late filing, late payment, etc.)"
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+
+              - name: "interest_amount"
+                display_name: "Interest Amount"
+                type: "decimal(19,2)"
+                description: "Total interest assessed on unpaid tax"
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+
+              - name: "credit_amount"
+                display_name: "Credit Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Total tax credits applied (prepayments, withholding, etc.).
+                  Reduces net amount payable.
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+
+              - name: "net_assessment_amount"
+                display_name: "Net Assessment Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Net amount to be paid (or refunded).
+                  Formula: assessed_tax + penalty + interest - credits
+                  Positive = payment due, Negative = refund due, Zero = no action
+                constraints:
+                  not_null: true
+                  default: 0
+                business_rules:
+                  - "BR-FA-013: net = assessed_tax + penalty + interest - credits"
+
+              - name: "amount_paid"
+                display_name: "Amount Paid"
+                type: "decimal(19,2)"
+                description: |
+                  Total amount paid against this assessment.
+                  Updated by payment_refund domain.
+                constraints:
+                  not_null: true
+                  default: 0
+                validation:
+                  min_value: 0
+
+              - name: "balance_outstanding"
+                display_name: "Balance Outstanding"
+                type: "decimal(19,2)"
+                description: |
+                  Outstanding balance on assessment.
+                  Formula: net_assessment_amount - amount_paid
+                  Positive = still owes, Zero = fully paid, Negative = overpaid
+                constraints:
+                  not_null: true
+                  default: 0
+                business_rules:
+                  - "BR-FA-014: balance = net_assessment_amount - amount_paid"
+
+              # Dates and tracking
+              - name: "objection_deadline_date"
+                display_name: "Objection Deadline"
+                type: "date"
+                description: |
+                  Last date taxpayer can file objection to assessment.
+                  Typically 30-90 days from assessment_date.
+                constraints:
+                  not_null: false
+
+              - name: "has_objection"
+                display_name: "Has Objection"
+                type: "boolean"
+                description: "Flag indicating if taxpayer filed objection"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "last_interest_calculation_date"
+                display_name: "Last Interest Calculation"
+                type: "date"
+                description: "Date when interest was last calculated and added"
+                constraints:
+                  not_null: false
+
+              - name: "bja_method_code"
+                display_name: "BJA Method"
+                type: "varchar(30)"
+                description: |
+                  Method used for Best Judgment Assessment:
+                  - PRIOR_PERIOD: Based on prior period assessment
+                  - INDUSTRY_AVERAGE: Based on industry benchmarks
+                  - MINIMUM_TAX: Minimum tax for category
+                  - MANUAL: Manually determined by officer
+                  Null for non-BJA assessments.
+                constraints:
+                  not_null: false
+                reference_data: "ref_bja_method"
+
+              - name: "is_refund_due"
+                display_name: "Is Refund Due"
+                type: "boolean"
+                description: |
+                  Flag indicating if assessment results in refund to taxpayer.
+                  Set true if net_assessment_amount < 0.
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "refund_approved"
+                display_name: "Refund Approved"
+                type: "boolean"
+                description: "Flag indicating if refund has been approved"
+                constraints:
+                  not_null: false
+
+              - name: "refund_approval_date"
+                display_name: "Refund Approval Date"
+                type: "date"
+                description: "Date when refund was approved"
+                constraints:
+                  not_null: false
+
+              - name: "posted_to_accounting"
+                display_name: "Posted to Accounting"
+                type: "boolean"
+                description: |
+                  Flag indicating if assessment has been posted to accounting
+                  ledgers (taxpayer account and revenue account).
+                constraints:
+                  not_null: true
+                  default: false
+                business_rules:
+                  - "BR-FA-015: Post to accounting when status = FINAL"
+
+              - name: "accounting_post_date"
+                display_name: "Accounting Post Date"
+                type: "date"
+                description: "Date when posted to accounting"
+                constraints:
+                  not_null: false
+
+              - name: "assessed_by_user_id"
+                display_name: "Assessed By"
+                type: "varchar(100)"
+                description: |
+                  User ID of tax officer who performed assessment
+                  (for administrative, audit, BJA assessments).
+                  System for self-assessments.
+                constraints:
+                  not_null: true
+
+              - name: "approved_by_user_id"
+                display_name: "Approved By"
+                type: "varchar(100)"
+                description: "User ID of supervisor who approved assessment"
+                constraints:
+                  not_null: false
+
+              - name: "approval_date"
+                display_name: "Approval Date"
+                type: "date"
+                description: "Date when assessment was approved"
+                constraints:
+                  not_null: false
+
+              - name: "assessment_notes"
+                display_name: "Assessment Notes"
+                type: "text"
+                description: "Detailed notes explaining assessment rationale and calculations"
+                constraints:
+                  not_null: false
+
+              - name: "internal_notes"
+                display_name: "Internal Notes"
+                type: "text"
+                description: "Internal notes not visible to taxpayer"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                display_name: "Created By"
+                type: "varchar(100)"
+                description: "User who created the record"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                display_name: "Created Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was created"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                display_name: "Modified By"
+                type: "varchar(100)"
+                description: "User who last modified the record"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                display_name: "Modified Date"
+                type: "timestamp with time zone"
+                description: "Timestamp when record was last modified"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_assessment_pk"
+                type: "primary_key"
+                columns: ["assessment_id"]
+
+              - name: "idx_assessment_account_period"
+                type: "btree"
+                columns: ["tax_account_id", "tax_period_id", "is_current_version"]
+                description: "Primary TTT index for assessments"
+
+              - name: "idx_assessment_number"
+                type: "btree"
+                columns: ["assessment_number"]
+                unique: true
+                description: "Unique index on assessment number"
+
+              - name: "idx_assessment_return"
+                type: "btree"
+                columns: ["tax_return_id"]
+                where: "tax_return_id IS NOT NULL"
+                description: "Index for linking assessments to returns"
+
+              - name: "idx_assessment_status"
+                type: "btree"
+                columns: ["assessment_status_code", "assessment_date"]
+                description: "Index for status-based queries"
+
+              - name: "idx_assessment_type"
+                type: "btree"
+                columns: ["assessment_type_code", "assessment_date"]
+                description: "Index for assessment type analysis"
+
+              - name: "idx_assessment_payment_due"
+                type: "btree"
+                columns: ["payment_due_date", "balance_outstanding"]
+                where: "balance_outstanding > 0"
+                description: "Index for payment monitoring"
+
+              - name: "idx_assessment_refund"
+                type: "btree"
+                columns: ["is_refund_due", "refund_approved"]
+                where: "is_refund_due = true"
+                description: "Partial index for refund processing"
+
+              - name: "idx_assessment_accounting"
+                type: "btree"
+                columns: ["posted_to_accounting", "accounting_post_date"]
+                where: "posted_to_accounting = false"
+                description: "Index for accounting integration"
+
+              - name: "idx_assessment_objection"
+                type: "btree"
+                columns: ["has_objection", "objection_deadline_date"]
+                description: "Index for objection management"
+
+            business_rules:
+              - rule_id: "BR-FA-010"
+                name: "Self-assessment requires return"
+                description: "SELF assessment type must have tax_return_id"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT assessment_id
+                  FROM assessment
+                  WHERE assessment_type_code = 'SELF'
+                    AND tax_return_id IS NULL
+
+              - rule_id: "BR-FA-011"
+                name: "Audit assessment requires audit case"
+                description: "AUDIT assessment type must have audit_case_id"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT assessment_id
+                  FROM assessment
+                  WHERE assessment_type_code = 'AUDIT'
+                    AND audit_case_id IS NULL
+
+              - rule_id: "BR-FA-013"
+                name: "Net amount calculation"
+                description: "Net = assessed_tax + penalty + interest - credits"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT assessment_id
+                  FROM assessment
+                  WHERE ABS(net_assessment_amount -
+                    (assessed_tax_amount + penalty_amount + interest_amount - credit_amount)) > 0.01
+
+              - rule_id: "BR-FA-014"
+                name: "Balance calculation"
+                description: "Balance = net_assessment_amount - amount_paid"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT assessment_id
+                  FROM assessment
+                  WHERE ABS(balance_outstanding - (net_assessment_amount - amount_paid)) > 0.01
+
+              - rule_id: "BR-FA-015"
+                name: "Post final assessments to accounting"
+                description: "Final assessments must be posted to accounting"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT assessment_id
+                  FROM assessment
+                  WHERE assessment_status_code = 'FINAL'
+                    AND posted_to_accounting = false
+                    AND finalization_date < CURRENT_DATE - INTERVAL '1 day'
+
+          # ===================================================================
+          # ASSESSMENT LINES (DETAILED BREAKDOWN)
+          # ===================================================================
+
+          - name: "assessment_line"
+            display_name: "Assessment Line"
+            description: |
+              Detailed line-item breakdown of assessment showing how assessed
+              amount was calculated. Links assessment to specific form lines
+              and calculation steps.
+
+              SIGTAS Source: ASSESS_LINE table
+
+              Business Rules:
+              - Assessment lines must reconcile to total assessment amount
+              - Links to form lines for traceability
+              - Used for audit trail and explanation
+
+              Volume: VERY HIGH (100M-1B records)
+
+            entity_type: "transaction"
+            estimated_volume: "very_high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "assessment_line_id"
+                display_name: "Assessment Line ID"
+                type: "bigint"
+                description: "Unique identifier for assessment line"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "assessment_id"
+                display_name: "Assessment"
+                type: "bigint"
+                description: "Foreign key to parent assessment"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "filing_assessment.assessment"
+                    column: "assessment_id"
+                    on_delete: "CASCADE"
+                    on_update: "CASCADE"
+
+              - name: "form_line_id"
+                display_name: "Form Line"
+                type: "bigint"
+                description: "Foreign key to form line (if assessment based on return)"
+                constraints:
+                  not_null: false
+                  foreign_key:
+                    table: "tax_framework.form_line"
+                    column: "form_line_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "line_number"
+                display_name: "Line Number"
+                type: "varchar(20)"
+                description: "Line number reference"
+                constraints:
+                  not_null: true
+
+              - name: "line_sequence"
+                display_name: "Line Sequence"
+                type: "integer"
+                description: "Sequence for ordering lines"
+                constraints:
+                  not_null: true
+
+              - name: "line_description"
+                display_name: "Line Description"
+                type: "varchar(500)"
+                description: "Description of what this line represents"
+                constraints:
+                  not_null: true
+
+              - name: "submitted_amount"
+                display_name: "Submitted Amount"
+                type: "decimal(19,2)"
+                description: "Amount submitted by taxpayer (from return)"
+                constraints:
+                  not_null: false
+
+              - name: "assessed_amount"
+                display_name: "Assessed Amount"
+                type: "decimal(19,2)"
+                description: "Amount determined by assessment"
+                constraints:
+                  not_null: true
+
+              - name: "adjustment_amount"
+                display_name: "Adjustment Amount"
+                type: "decimal(19,2)"
+                description: "Difference between submitted and assessed (if applicable)"
+                constraints:
+                  not_null: false
+
+              - name: "adjustment_reason_code"
+                display_name: "Adjustment Reason"
+                type: "varchar(30)"
+                description: "Reason for adjustment if assessed differs from submitted"
+                constraints:
+                  not_null: false
+                reference_data: "ref_adjustment_reason"
+
+              - name: "adjustment_notes"
+                display_name: "Adjustment Notes"
+                type: "text"
+                description: "Detailed explanation of adjustment"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_assessment_line_pk"
+                type: "primary_key"
+                columns: ["assessment_line_id"]
+
+              - name: "idx_assessment_line_assessment"
+                type: "btree"
+                columns: ["assessment_id", "line_sequence"]
+
+              - name: "idx_assessment_line_form"
+                type: "btree"
+                columns: ["form_line_id"]
+                where: "form_line_id IS NOT NULL"
+
+          # ===================================================================
+          # PENALTY ASSESSMENTS
+          # ===================================================================
+
+          - name: "penalty_assessment"
+            display_name: "Penalty Assessment"
+            description: |
+              Records individual penalty assessments applied to assessments or
+              returns. Penalties can be for late filing, late payment, incorrect
+              information, non-compliance, etc.
+
+              SIGTAS Source: PENALTY table from PENALTIES__INTERESTS schema
+
+              Business Rules:
+              - Penalties calculated per defined penalty rules
+              - Can be automatic or manual
+              - Multiple penalties possible per assessment
+              - Penalties can have early payment discounts
+              - Progressive penalties for repeat violations
+
+              Volume: HIGH (millions of records)
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "penalty_assessment_id"
+                display_name: "Penalty Assessment ID"
+                type: "bigint"
+                description: "Unique identifier for penalty assessment"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "assessment_id"
+                display_name: "Assessment"
+                type: "bigint"
+                description: "Foreign key to related assessment"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "filing_assessment.assessment"
+                    column: "assessment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "penalty_type_code"
+                display_name: "Penalty Type"
+                type: "varchar(30)"
+                description: |
+                  Type of penalty:
+                  - LATE_FILING: Penalty for filing after due date
+                  - LATE_PAYMENT: Penalty for paying after due date
+                  - UNDERSTATEMENT: Penalty for underreporting tax
+                  - NON_FILING: Penalty for not filing return
+                  - INACCURATE_INFO: Penalty for providing false information
+                  - NON_COMPLIANCE: General non-compliance penalty
+                  - OFFSET_DENIAL: Penalty for improper offset claim
+                  - OTHER: Other penalty types
+                constraints:
+                  not_null: true
+                reference_data: "ref_penalty_type"
+
+              - name: "penalty_calculation_method_code"
+                display_name: "Calculation Method"
+                type: "varchar(30)"
+                description: |
+                  How penalty was calculated:
+                  - FIXED_AMOUNT: Fixed amount per regulations
+                  - PERCENTAGE_TAX: Percentage of tax amount
+                  - PERCENTAGE_TURNOVER: Percentage of turnover
+                  - DAILY_RATE: Daily rate for period late
+                  - PROGRESSIVE: Progressive based on violation count
+                  - MANUAL: Manually determined
+                constraints:
+                  not_null: true
+                reference_data: "ref_penalty_calculation_method"
+
+              - name: "base_amount"
+                display_name: "Base Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Base amount used for percentage calculations.
+                  E.g., tax amount for percentage-of-tax penalty.
+                constraints:
+                  not_null: false
+
+              - name: "penalty_rate"
+                display_name: "Penalty Rate"
+                type: "decimal(5,2)"
+                description: |
+                  Penalty rate as percentage (for percentage-based penalties).
+                  E.g., 5.00 = 5%
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+                  max_value: 100
+
+              - name: "days_late"
+                display_name: "Days Late"
+                type: "integer"
+                description: |
+                  Number of days late (for time-based penalties).
+                  Used with daily rate penalties.
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+
+              - name: "calculated_penalty_amount"
+                display_name: "Calculated Penalty"
+                type: "decimal(19,2)"
+                description: |
+                  Penalty amount before any adjustments (minimum, maximum, discount).
+                  Raw calculation result.
+                constraints:
+                  not_null: true
+                validation:
+                  min_value: 0
+
+              - name: "minimum_penalty_amount"
+                display_name: "Minimum Penalty"
+                type: "decimal(19,2)"
+                description: |
+                  Minimum penalty amount per regulations.
+                  Final penalty cannot be less than this.
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+
+              - name: "maximum_penalty_amount"
+                display_name: "Maximum Penalty"
+                type: "decimal(19,2)"
+                description: |
+                  Maximum penalty amount per regulations.
+                  Final penalty cannot exceed this.
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+
+              - name: "discount_percentage"
+                display_name: "Discount Percentage"
+                type: "decimal(5,2)"
+                description: |
+                  Discount percentage for early payment or first violation.
+                  E.g., 50.00 = 50% discount
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+                  max_value: 100
+
+              - name: "discount_amount"
+                display_name: "Discount Amount"
+                type: "decimal(19,2)"
+                description: "Absolute discount amount applied"
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+
+              - name: "final_penalty_amount"
+                display_name: "Final Penalty Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Final penalty amount after applying min/max/discounts.
+                  This is the amount charged to taxpayer.
+                constraints:
+                  not_null: true
+                validation:
+                  min_value: 0
+                business_rules:
+                  - "BR-FA-020: Final amount must respect min/max constraints"
+                  - "BR-FA-021: Discount cannot exceed calculated penalty"
+
+              - name: "penalty_status_code"
+                display_name: "Penalty Status"
+                type: "varchar(20)"
+                description: |
+                  Status of penalty:
+                  - CALCULATED: Calculated but not yet assessed
+                  - ASSESSED: Formally assessed
+                  - APPEALED: Under appeal
+                  - WAIVED: Waived by authority
+                  - PAID: Paid in full
+                  - PARTIALLY_PAID: Partially paid
+                  - WRITTEN_OFF: Written off
+                constraints:
+                  not_null: true
+                  default: "'CALCULATED'"
+                reference_data: "ref_penalty_status"
+
+              - name: "is_automatic"
+                display_name: "Is Automatic"
+                type: "boolean"
+                description: |
+                  Flag indicating if penalty was automatically calculated
+                  or manually assessed by officer.
+                constraints:
+                  not_null: true
+                  default: true
+
+              - name: "violation_count"
+                display_name: "Violation Count"
+                type: "integer"
+                description: |
+                  Count of previous similar violations (for progressive penalties).
+                  Used to increase penalty for repeat offenders.
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+
+              - name: "waiver_requested"
+                display_name: "Waiver Requested"
+                type: "boolean"
+                description: "Flag indicating if taxpayer requested penalty waiver"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "waiver_reason"
+                display_name: "Waiver Reason"
+                type: "text"
+                description: "Reason provided for waiver request"
+                constraints:
+                  not_null: false
+
+              - name: "waiver_approved"
+                display_name: "Waiver Approved"
+                type: "boolean"
+                description: "Flag indicating if waiver was approved"
+                constraints:
+                  not_null: false
+
+              - name: "waiver_approval_date"
+                display_name: "Waiver Approval Date"
+                type: "date"
+                description: "Date when waiver was approved"
+                constraints:
+                  not_null: false
+
+              - name: "waiver_approved_by"
+                display_name: "Waiver Approved By"
+                type: "varchar(100)"
+                description: "User who approved waiver"
+                constraints:
+                  not_null: false
+
+              - name: "assessment_date"
+                display_name: "Assessment Date"
+                type: "date"
+                description: "Date when penalty was assessed"
+                constraints:
+                  not_null: true
+
+              - name: "payment_due_date"
+                display_name: "Payment Due Date"
+                type: "date"
+                description: "Date by which penalty must be paid"
+                constraints:
+                  not_null: true
+
+              - name: "discount_deadline_date"
+                display_name: "Discount Deadline"
+                type: "date"
+                description: |
+                  Last date to pay and receive early payment discount.
+                  Null if no discount available.
+                constraints:
+                  not_null: false
+
+              - name: "calculation_notes"
+                display_name: "Calculation Notes"
+                type: "text"
+                description: "Detailed explanation of penalty calculation"
+                constraints:
+                  not_null: false
+
+              - name: "legal_reference"
+                display_name: "Legal Reference"
+                type: "varchar(200)"
+                description: |
+                  Legal reference (article/section) authorizing this penalty.
+                  Example: "Tax Code Article 123.4"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_penalty_assessment_pk"
+                type: "primary_key"
+                columns: ["penalty_assessment_id"]
+
+              - name: "idx_penalty_assessment_assessment"
+                type: "btree"
+                columns: ["assessment_id", "penalty_type_code"]
+
+              - name: "idx_penalty_assessment_status"
+                type: "btree"
+                columns: ["penalty_status_code", "payment_due_date"]
+
+              - name: "idx_penalty_assessment_waiver"
+                type: "btree"
+                columns: ["waiver_requested", "waiver_approved"]
+                where: "waiver_requested = true"
+
+            business_rules:
+              - rule_id: "BR-FA-020"
+                name: "Respect min/max penalty constraints"
+                description: "Final penalty must be within min/max bounds"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT penalty_assessment_id
+                  FROM penalty_assessment
+                  WHERE (minimum_penalty_amount IS NOT NULL AND final_penalty_amount < minimum_penalty_amount)
+                     OR (maximum_penalty_amount IS NOT NULL AND final_penalty_amount > maximum_penalty_amount)
+
+              - rule_id: "BR-FA-021"
+                name: "Discount validation"
+                description: "Discount cannot exceed calculated penalty"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT penalty_assessment_id
+                  FROM penalty_assessment
+                  WHERE discount_amount > calculated_penalty_amount
+
+          # ===================================================================
+          # INTEREST ASSESSMENTS
+          # ===================================================================
+
+          - name: "interest_assessment"
+            display_name: "Interest Assessment"
+            description: |
+              Records interest assessments on unpaid tax amounts. Interest
+              accrues daily on unpaid balances from due date until payment date.
+
+              SIGTAS Source: INTEREST table from PENALTIES__INTERESTS schema
+
+              Business Rules:
+              - Interest calculated automatically based on interest rates
+              - Accrues from payment_due_date until paid
+              - Interest can compound (interest on interest) per tax law
+              - Interest rates can change over time (use rate applicable for period)
+              - Interest assessments updated periodically (daily/weekly/monthly)
+
+              Volume: HIGH (millions of records)
+
+            entity_type: "transaction"
+            estimated_volume: "high"
+            data_sensitivity: "confidential"
+
+            columns:
+              - name: "interest_assessment_id"
+                display_name: "Interest Assessment ID"
+                type: "bigint"
+                description: "Unique identifier for interest assessment"
+                constraints:
+                  primary_key: true
+                  auto_increment: true
+                  not_null: true
+
+              - name: "assessment_id"
+                display_name: "Assessment"
+                type: "bigint"
+                description: "Foreign key to related assessment"
+                constraints:
+                  not_null: true
+                  foreign_key:
+                    table: "filing_assessment.assessment"
+                    column: "assessment_id"
+                    on_delete: "RESTRICT"
+                    on_update: "CASCADE"
+
+              - name: "interest_period_start_date"
+                display_name: "Interest Period Start"
+                type: "date"
+                description: |
+                  Start date for interest calculation period.
+                  Typically payment_due_date of assessment.
+                constraints:
+                  not_null: true
+
+              - name: "interest_period_end_date"
+                display_name: "Interest Period End"
+                type: "date"
+                description: |
+                  End date for interest calculation period.
+                  Typically payment date or assessment date.
+                constraints:
+                  not_null: true
+                business_rules:
+                  - "BR-FA-030: End date must be after start date"
+
+              - name: "days_overdue"
+                display_name: "Days Overdue"
+                type: "integer"
+                description: |
+                  Number of days interest is calculated for.
+                  Formula: interest_period_end_date - interest_period_start_date
+                constraints:
+                  not_null: true
+                validation:
+                  min_value: 0
+
+              - name: "principal_amount"
+                display_name: "Principal Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Principal amount on which interest is calculated.
+                  Typically unpaid tax amount from assessment.
+                constraints:
+                  not_null: true
+                validation:
+                  min_value: 0
+
+              - name: "annual_interest_rate"
+                display_name: "Annual Interest Rate"
+                type: "decimal(5,2)"
+                description: |
+                  Annual interest rate as percentage.
+                  E.g., 8.00 = 8% per annum
+                constraints:
+                  not_null: true
+                validation:
+                  min_value: 0
+                  max_value: 100
+
+              - name: "daily_interest_rate"
+                display_name: "Daily Interest Rate"
+                type: "decimal(8,6)"
+                description: |
+                  Daily interest rate calculated from annual rate.
+                  Formula: annual_rate / 365
+                constraints:
+                  not_null: true
+                validation:
+                  min_value: 0
+
+              - name: "calculated_interest_amount"
+                display_name: "Calculated Interest"
+                type: "decimal(19,2)"
+                description: |
+                  Interest amount calculated using formula:
+                  principal Ã— daily_rate Ã— days_overdue
+                constraints:
+                  not_null: true
+                validation:
+                  min_value: 0
+
+              - name: "maximum_interest_amount"
+                display_name: "Maximum Interest"
+                type: "decimal(19,2)"
+                description: |
+                  Maximum interest that can be charged per regulations.
+                  May be capped at X% of principal.
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+
+              - name: "final_interest_amount"
+                display_name: "Final Interest Amount"
+                type: "decimal(19,2)"
+                description: |
+                  Final interest amount after applying maximum cap if applicable.
+                  This is the amount charged to taxpayer.
+                constraints:
+                  not_null: true
+                validation:
+                  min_value: 0
+                business_rules:
+                  - "BR-FA-031: Cannot exceed maximum if set"
+
+              - name: "interest_status_code"
+                display_name: "Interest Status"
+                type: "varchar(20)"
+                description: |
+                  Status of interest:
+                  - CALCULATED: Calculated but not yet assessed
+                  - ASSESSED: Formally assessed
+                  - PAID: Paid in full
+                  - PARTIALLY_PAID: Partially paid
+                  - WAIVED: Waived by authority
+                  - WRITTEN_OFF: Written off
+                constraints:
+                  not_null: true
+                  default: "'CALCULATED'"
+                reference_data: "ref_interest_status"
+
+              - name: "is_compounded"
+                display_name: "Is Compounded"
+                type: "boolean"
+                description: |
+                  Flag indicating if this interest calculation includes
+                  compounding (interest on interest).
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "compounded_interest_amount"
+                display_name: "Compounded Interest"
+                type: "decimal(19,2)"
+                description: |
+                  Portion of interest that is compounded interest.
+                  Zero if is_compounded = false.
+                constraints:
+                  not_null: false
+                validation:
+                  min_value: 0
+
+              - name: "waiver_requested"
+                display_name: "Waiver Requested"
+                type: "boolean"
+                description: "Flag indicating if taxpayer requested interest waiver"
+                constraints:
+                  not_null: true
+                  default: false
+
+              - name: "waiver_approved"
+                display_name: "Waiver Approved"
+                type: "boolean"
+                description: "Flag indicating if waiver was approved"
+                constraints:
+                  not_null: false
+
+              - name: "calculation_date"
+                display_name: "Calculation Date"
+                type: "date"
+                description: "Date when interest was calculated"
+                constraints:
+                  not_null: true
+
+              - name: "payment_due_date"
+                display_name: "Payment Due Date"
+                type: "date"
+                description: "Date by which interest must be paid"
+                constraints:
+                  not_null: true
+
+              - name: "calculation_notes"
+                display_name: "Calculation Notes"
+                type: "text"
+                description: "Detailed explanation of interest calculation"
+                constraints:
+                  not_null: false
+
+              - name: "legal_reference"
+                display_name: "Legal Reference"
+                type: "varchar(200)"
+                description: "Legal reference for interest rate and rules"
+                constraints:
+                  not_null: false
+
+              # Standard audit columns
+              - name: "created_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: true
+
+              - name: "created_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: true
+                  default: "CURRENT_TIMESTAMP"
+
+              - name: "modified_by"
+                type: "varchar(100)"
+                constraints:
+                  not_null: false
+
+              - name: "modified_date"
+                type: "timestamp with time zone"
+                constraints:
+                  not_null: false
+
+            indexes:
+              - name: "idx_interest_assessment_pk"
+                type: "primary_key"
+                columns: ["interest_assessment_id"]
+
+              - name: "idx_interest_assessment_assessment"
+                type: "btree"
+                columns: ["assessment_id", "calculation_date"]
+
+              - name: "idx_interest_assessment_period"
+                type: "btree"
+                columns: ["interest_period_start_date", "interest_period_end_date"]
+
+              - name: "idx_interest_assessment_status"
+                type: "btree"
+                columns: ["interest_status_code", "payment_due_date"]
+
+            business_rules:
+              - rule_id: "BR-FA-030"
+                name: "Valid interest period"
+                description: "End date must be after start date"
+                severity: "CRITICAL"
+                validation_query: |
+                  SELECT interest_assessment_id
+                  FROM interest_assessment
+                  WHERE interest_period_end_date <= interest_period_start_date
+
+              - rule_id: "BR-FA-031"
+                name: "Respect maximum interest cap"
+                description: "Final interest cannot exceed maximum if set"
+                severity: "HIGH"
+                validation_query: |
+                  SELECT interest_assessment_id
+                  FROM interest_assessment
+                  WHERE maximum_interest_amount IS NOT NULL
+                    AND final_interest_amount > maximum_interest_amount
+
+        # =========================================================================
+        # DOMAIN RELATIONSHIPS
+        # =========================================================================
+
+        relationships:
+          - name: "return_to_account"
+            from_table: "tax_return"
+            from_column: "tax_account_id"
+            to_table: "registration.tax_account"
+            to_column: "tax_account_id"
+            relationship_type: "many-to-one"
+            description: "Each return belongs to one tax account (TIN-Tax Type)"
+
+          - name: "return_to_period"
+            from_table: "tax_return"
+            from_column: "tax_period_id"
+            to_table: "tax_framework.tax_period"
+            to_column: "tax_period_id"
+            relationship_type: "many-to-one"
+            description: "Each return is for one tax period"
+
+          - name: "return_amendment_chain"
+            from_table: "tax_return"
+            from_column: "previous_return_id"
+            to_table: "tax_return"
+            to_column: "tax_return_id"
+            relationship_type: "many-to-one"
+            description: "Amendment chain - amended return links to original"
+
+          - name: "return_lines"
+            from_table: "tax_return_line"
+            from_column: "tax_return_id"
+            to_table: "tax_return"
+            to_column: "tax_return_id"
+            relationship_type: "many-to-one"
+            description: "Each return has multiple lines"
+
+          - name: "assessment_from_return"
+            from_table: "assessment"
+            from_column: "tax_return_id"
+            to_table: "tax_return"
+            to_column: "tax_return_id"
+            relationship_type: "many-to-one"
+            description: "Assessment created from return (self-assessment)"
+
+          - name: "assessment_lines"
+            from_table: "assessment_line"
+            from_column: "assessment_id"
+            to_table: "assessment"
+            to_column: "assessment_id"
+            relationship_type: "many-to-one"
+            description: "Each assessment has multiple lines"
+
+          - name: "assessment_penalties"
+            from_table: "penalty_assessment"
+            from_column: "assessment_id"
+            to_table: "assessment"
+            to_column: "assessment_id"
+            relationship_type: "many-to-one"
+            description: "Each assessment can have multiple penalties"
+
+          - name: "assessment_interest"
+            from_table: "interest_assessment"
+            from_column: "assessment_id"
+            to_table: "assessment"
+            to_column: "assessment_id"
+            relationship_type: "many-to-one"
+            description: "Each assessment can have multiple interest assessments"

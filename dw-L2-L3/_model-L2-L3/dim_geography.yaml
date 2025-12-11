@@ -1,0 +1,1462 @@
+# =============================================================================
+# TA-RDM L3 - Geography Dimension (Generalized)
+# =============================================================================
+# Purpose: Administrative geography hierarchy for all countries
+# Pattern: P4 (Generic Geography Hierarchy) from L3 Generalization Catalog
+# Priority: HIGH
+# Version: 2.0.0
+# Created: 2025-12-10
+# Author: TA-RDM L3 Generalization Process
+# Step: 4d of L3 Generalization Implementation
+# =============================================================================
+#
+# Changes from v1.0.0 (Malta-specific):
+# - Added country_key FK to dim_country
+# - Replaced Malta-specific locality/district with generic 4-level hierarchy
+# - Changed grain from "Malta locality" to "any admin division"
+# - Added self-referencing parent_geography_key for tree traversal
+# - Added flattened level_N columns for star schema querying
+# - Added geography_type for classification
+# - Removed island/region Malta-specific attributes
+# - Added multi-country sample data
+#
+# Design Principles:
+# - SCD Type 1: Geographic boundaries rarely change; when they do, overwrite
+# - country_code + geography_code form natural key (globally unique)
+# - Generic level-based structure accommodates any country's hierarchy
+# - Both parent-child (for recursion) and flattened (for queries) available
+# - Tax office attribution supports operational analysis
+#
+# =============================================================================
+
+metadata:
+  dimension_name: dim_geography
+  schema: warehouse
+  version: "2.0.0"
+  created_date: "2025-12-10"
+  author: "TA-RDM L3 Generalization"
+  pattern_reference: "P4 - Generic Geography Hierarchy"
+  description: |
+    Conformed geography dimension supporting administrative divisions
+    across all countries. Uses generic level-based hierarchy that can
+    accommodate any country's structure.
+    
+    Hierarchy: Country → Level 1 (Region/State/Province) → Level 2 (District/County) 
+               → Level 3 (Municipality/City) → Level 4 (Locality/Ward/Village)
+    
+    Key Features:
+    - Multi-country support via country_key FK
+    - Flexible 4-level hierarchy (levels can be skipped)
+    - Self-referencing for tree traversal
+    - Flattened attributes for easy star schema queries
+    - Tax office attribution for operational analysis
+
+# =============================================================================
+# Dimension Specification
+# =============================================================================
+
+dimension:
+  name: dim_geography
+  schema: warehouse
+  type: dimension
+  scd_type: 1
+  scd_type_description: |
+    Type 1 - Overwrite on change. Administrative boundaries change rarely
+    (municipal mergers, boundary adjustments). Historical tracking not 
+    required for geography - queries use current structure.
+  
+  grain: "One row per administrative division at any level in any country"
+  natural_key: [country_code, geography_code]
+  surrogate_key: geography_key
+  
+  business_context:
+    domain: "Reference Data"
+    usage: |
+      Geographic analysis of taxpayer distribution, compliance patterns,
+      economic activity, and tax office workload. Supports drill-down from
+      country to lowest administrative level.
+    refresh: "ON_CHANGE"
+    priority: "HIGH"
+  
+  columns:
+    # ==========================================================================
+    # Keys
+    # ==========================================================================
+    - name: geography_key
+      data_type: Int32
+      nullable: false
+      description: "Surrogate key for dimension"
+      role: SURROGATE_KEY
+    
+    - name: geography_code
+      data_type: String
+      length: 30
+      nullable: false
+      description: |
+        Unique code within country identifying this administrative division.
+        Format: {COUNTRY}_{LEVEL}_{CODE} or country-specific format.
+        Examples: MLT_LOC_VALLETTA, LKA_DIST_COLOMBO, MDA_MUN_CHISINAU
+      role: NATURAL_KEY
+    
+    # ==========================================================================
+    # Country Context (Pattern P1)
+    # ==========================================================================
+    - name: country_key
+      data_type: Int32
+      nullable: false
+      foreign_key: warehouse.dim_country(country_key)
+      description: "Country this geography belongs to"
+    
+    - name: country_code
+      data_type: String
+      length: 3
+      nullable: false
+      description: "ISO 3166-1 alpha-3 code (denormalized for query convenience)"
+      standard: "ISO 3166-1 alpha-3"
+    
+    - name: country_name
+      data_type: String
+      length: 100
+      description: "Country name (denormalized)"
+    
+    # ==========================================================================
+    # Hierarchy Level Metadata
+    # ==========================================================================
+    - name: hierarchy_level
+      data_type: UInt8
+      nullable: false
+      description: |
+        Level in administrative hierarchy:
+        0 = Country (top level)
+        1 = Region/State/Province (highest admin division)
+        2 = District/County (second level)
+        3 = Municipality/City (third level)
+        4 = Locality/Ward/Village (lowest level)
+      business_rule: "Must be between 0 and 4"
+    
+    - name: hierarchy_level_name
+      data_type: String
+      length: 50
+      description: |
+        Name of this level in country's terminology.
+        Malta: Region, District, Locality
+        Sri Lanka: Province, District, Divisional Secretariat
+        Moldova: Region (Raion), Municipality
+        Ukraine: Oblast, Raion, Hromada
+    
+    # ==========================================================================
+    # Current Level Attributes
+    # ==========================================================================
+    - name: geography_name
+      data_type: String
+      length: 100
+      nullable: false
+      description: "Name of this geographic unit in English"
+    
+    - name: geography_name_local
+      data_type: String
+      length: 100
+      description: "Name in local language (Maltese, Sinhala, Romanian, etc.)"
+    
+    - name: geography_name_short
+      data_type: String
+      length: 50
+      description: "Abbreviated or common name"
+    
+    - name: geography_type
+      data_type: String
+      length: 30
+      description: |
+        Type classification:
+        COUNTRY, PROVINCE, STATE, REGION, DISTRICT, COUNTY,
+        MUNICIPALITY, CITY, TOWN, VILLAGE, WARD, LOCALITY
+    
+    - name: geography_type_local
+      data_type: String
+      length: 50
+      description: "Type in local terminology (e.g., Raion, Oblast, Hromada)"
+    
+    # ==========================================================================
+    # Parent Reference (Self-Referencing Hierarchy)
+    # ==========================================================================
+    - name: parent_geography_key
+      data_type: Int32
+      nullable: true
+      foreign_key: warehouse.dim_geography(geography_key)
+      description: |
+        Parent in hierarchy (NULL for country level 0).
+        Enables recursive queries for tree traversal.
+    
+    - name: parent_geography_code
+      data_type: String
+      length: 30
+      description: "Parent code (denormalized for queries)"
+    
+    - name: parent_geography_name
+      data_type: String
+      length: 100
+      description: "Parent name (denormalized)"
+    
+    # ==========================================================================
+    # Flattened Hierarchy (Star Schema Optimization)
+    # ==========================================================================
+    # These columns enable efficient GROUP BY at any level without recursion
+    
+    - name: level_1_key
+      data_type: Int32
+      description: "Region/State key for direct join"
+    
+    - name: level_1_code
+      data_type: String
+      length: 30
+      description: "Region/State/Province code"
+    
+    - name: level_1_name
+      data_type: String
+      length: 100
+      description: "Region/State/Province name"
+    
+    - name: level_2_key
+      data_type: Int32
+      description: "District/County key for direct join"
+    
+    - name: level_2_code
+      data_type: String
+      length: 30
+      description: "District/County code"
+    
+    - name: level_2_name
+      data_type: String
+      length: 100
+      description: "District/County name"
+    
+    - name: level_3_key
+      data_type: Int32
+      description: "Municipality/City key for direct join"
+    
+    - name: level_3_code
+      data_type: String
+      length: 30
+      description: "Municipality/City code"
+    
+    - name: level_3_name
+      data_type: String
+      length: 100
+      description: "Municipality/City name"
+    
+    - name: level_4_key
+      data_type: Int32
+      description: "Locality/Ward key for direct join"
+    
+    - name: level_4_code
+      data_type: String
+      length: 30
+      description: "Locality/Ward code"
+    
+    - name: level_4_name
+      data_type: String
+      length: 100
+      description: "Locality/Ward name"
+    
+    # ==========================================================================
+    # Full Path (For Display and Search)
+    # ==========================================================================
+    - name: full_path
+      data_type: String
+      length: 500
+      description: |
+        Full hierarchy path for display:
+        "Malta > Southern Region > Southern District > Valletta"
+    
+    - name: full_path_codes
+      data_type: String
+      length: 200
+      description: |
+        Path of codes for programmatic use:
+        "MLT/MLT_SOUTH/MLT_SD/VLT"
+    
+    - name: depth
+      data_type: UInt8
+      description: "Number of levels from root (0 for country)"
+    
+    # ==========================================================================
+    # Geographic Attributes
+    # ==========================================================================
+    - name: postal_code_pattern
+      data_type: String
+      length: 50
+      description: "Postal code pattern for this area (e.g., 'VLT ****')"
+    
+    - name: postal_code_prefix
+      data_type: String
+      length: 10
+      description: "Postal code prefix"
+    
+    - name: timezone
+      data_type: String
+      length: 50
+      description: "Timezone if different from country default (IANA format)"
+    
+    - name: latitude
+      data_type: Float64
+      description: "Centroid latitude (WGS84)"
+    
+    - name: longitude
+      data_type: Float64
+      description: "Centroid longitude (WGS84)"
+    
+    - name: area_sq_km
+      data_type: Float64
+      description: "Area in square kilometers"
+    
+    - name: population
+      data_type: Int64
+      description: "Population count (census/estimate)"
+    
+    - name: population_year
+      data_type: UInt16
+      description: "Year of population data"
+    
+    # ==========================================================================
+    # Tax Administration Attributes
+    # ==========================================================================
+    - name: tax_office_code
+      data_type: String
+      length: 20
+      description: "Responsible tax office code"
+    
+    - name: tax_office_name
+      data_type: String
+      length: 100
+      description: "Tax office name"
+    
+    - name: tax_region_code
+      data_type: String
+      length: 20
+      description: "Tax region for regional analysis"
+    
+    - name: customs_office_code
+      data_type: String
+      length: 20
+      description: "Responsible customs office code (if applicable)"
+    
+    # ==========================================================================
+    # Classification Flags
+    # ==========================================================================
+    - name: is_capital
+      data_type: UInt8
+      default: 0
+      description: "Is this the national/regional capital"
+    
+    - name: is_urban
+      data_type: UInt8
+      default: 0
+      description: "Urban area classification"
+    
+    - name: is_free_zone
+      data_type: UInt8
+      default: 0
+      description: "Free trade zone / special economic zone"
+    
+    - name: is_port
+      data_type: UInt8
+      default: 0
+      description: "Has port facilities"
+    
+    - name: is_airport
+      data_type: UInt8
+      default: 0
+      description: "Has airport facilities"
+    
+    # ==========================================================================
+    # Status and ETL Metadata
+    # ==========================================================================
+    - name: is_active
+      data_type: UInt8
+      nullable: false
+      default: 1
+      description: "1 if currently active administrative division"
+    
+    - name: effective_from
+      data_type: Date
+      description: "Date this division became effective"
+    
+    - name: effective_to
+      data_type: Date
+      description: "Date this division was discontinued (NULL if active)"
+    
+    - name: replacement_geography_code
+      data_type: String
+      length: 30
+      description: "If discontinued, code of replacement geography"
+    
+    - name: notes
+      data_type: String
+      length: 500
+      description: "Additional notes"
+    
+    - name: etl_batch_id
+      data_type: Int64
+      nullable: false
+      description: "ETL batch identifier"
+    
+    - name: etl_load_timestamp
+      data_type: DateTime
+      nullable: false
+      description: "ETL load timestamp"
+    
+    - name: etl_source_system
+      data_type: String
+      length: 50
+      description: "Source system for this record"
+
+  # ============================================================================
+  # Indexes
+  # ============================================================================
+  indexes:
+    - name: idx_geography_natural_key
+      columns: [country_code, geography_code]
+      unique: true
+      description: "Natural key lookup"
+    
+    - name: idx_geography_country_level
+      columns: [country_key, hierarchy_level]
+      description: "Find all geographies at a level within country"
+    
+    - name: idx_geography_parent
+      columns: [parent_geography_key]
+      description: "Find children of a geography"
+    
+    - name: idx_geography_level1
+      columns: [country_key, level_1_code]
+      description: "Level 1 aggregation queries"
+    
+    - name: idx_geography_level2
+      columns: [country_key, level_2_code]
+      description: "Level 2 aggregation queries"
+    
+    - name: idx_geography_level3
+      columns: [country_key, level_3_code]
+      description: "Level 3 aggregation queries"
+    
+    - name: idx_geography_level4
+      columns: [country_key, level_4_code]
+      description: "Level 4 aggregation queries"
+    
+    - name: idx_geography_tax_office
+      columns: [country_key, tax_office_code]
+      description: "Tax office workload queries"
+    
+    - name: idx_geography_active
+      columns: [country_key, is_active]
+      description: "Active geography queries"
+
+# ==============================================================================
+# Business Rules
+# ==============================================================================
+business_rules:
+  - rule_id: BR_GEO_001
+    description: "Every geography must have a country_key"
+    severity: ERROR
+    validation_query: |
+      SELECT geography_key
+      FROM warehouse.dim_geography
+      WHERE country_key IS NULL OR country_key = 0
+
+  - rule_id: BR_GEO_002
+    description: "Hierarchy level must be between 0 and 4"
+    severity: ERROR
+    validation_query: |
+      SELECT geography_key, hierarchy_level
+      FROM warehouse.dim_geography
+      WHERE hierarchy_level < 0 OR hierarchy_level > 4
+
+  - rule_id: BR_GEO_003
+    description: "Country level (0) must not have a parent"
+    severity: ERROR
+    validation_query: |
+      SELECT geography_key
+      FROM warehouse.dim_geography
+      WHERE hierarchy_level = 0 AND parent_geography_key IS NOT NULL
+
+  - rule_id: BR_GEO_004
+    description: "Non-country levels must have a parent"
+    severity: ERROR
+    validation_query: |
+      SELECT geography_key, hierarchy_level
+      FROM warehouse.dim_geography
+      WHERE hierarchy_level > 0 AND parent_geography_key IS NULL
+
+  - rule_id: BR_GEO_005
+    description: "Parent must be in same country"
+    severity: ERROR
+    validation_query: |
+      SELECT g.geography_key, g.country_key, p.country_key AS parent_country
+      FROM warehouse.dim_geography g
+      JOIN warehouse.dim_geography p ON g.parent_geography_key = p.geography_key
+      WHERE g.country_key != p.country_key
+
+  - rule_id: BR_GEO_006
+    description: "Parent must be at higher level (lower level number)"
+    severity: ERROR
+    validation_query: |
+      SELECT g.geography_key, g.hierarchy_level, p.hierarchy_level AS parent_level
+      FROM warehouse.dim_geography g
+      JOIN warehouse.dim_geography p ON g.parent_geography_key = p.geography_key
+      WHERE g.hierarchy_level <= p.hierarchy_level
+
+  - rule_id: BR_GEO_007
+    description: "Natural key (country_code, geography_code) must be unique"
+    severity: ERROR
+    validation_query: |
+      SELECT country_code, geography_code, COUNT(*) AS cnt
+      FROM warehouse.dim_geography
+      GROUP BY country_code, geography_code
+      HAVING COUNT(*) > 1
+
+  - rule_id: BR_GEO_008
+    description: "Flattened level codes must be consistent with hierarchy"
+    severity: WARNING
+    validation_query: |
+      SELECT geography_key
+      FROM warehouse.dim_geography
+      WHERE hierarchy_level = 4 AND level_4_code IS NULL
+
+  - rule_id: BR_GEO_009
+    description: "Country code must be valid ISO 3166-1 alpha-3"
+    severity: ERROR
+    validation_query: |
+      SELECT g.geography_key, g.country_code
+      FROM warehouse.dim_geography g
+      LEFT JOIN warehouse.dim_country c ON g.country_code = c.country_code
+      WHERE c.country_key IS NULL
+
+  - rule_id: BR_GEO_010
+    description: "No circular references in parent hierarchy"
+    severity: ERROR
+    validation_query: |
+      -- ClickHouse recursive CTE to detect cycles
+      WITH RECURSIVE hierarchy AS (
+        SELECT geography_key, parent_geography_key, 1 AS depth
+        FROM warehouse.dim_geography
+        WHERE parent_geography_key IS NOT NULL
+        UNION ALL
+        SELECT h.geography_key, g.parent_geography_key, h.depth + 1
+        FROM hierarchy h
+        JOIN warehouse.dim_geography g ON h.parent_geography_key = g.geography_key
+        WHERE h.depth < 10 AND g.parent_geography_key IS NOT NULL
+      )
+      SELECT DISTINCT geography_key
+      FROM hierarchy
+      WHERE geography_key = parent_geography_key
+
+# ==============================================================================
+# Sample Data - Multi-Country
+# ==============================================================================
+sample_data:
+  # ---------------------------------------------------------------------------
+  # MALTA - Country Level (Level 0)
+  # ---------------------------------------------------------------------------
+  - geography_key: 100
+    geography_code: "MLT"
+    country_key: 1
+    country_code: "MLT"
+    country_name: "Malta"
+    hierarchy_level: 0
+    hierarchy_level_name: "Country"
+    geography_name: "Malta"
+    geography_name_local: "Malta"
+    geography_type: "COUNTRY"
+    full_path: "Malta"
+    full_path_codes: "MLT"
+    depth: 0
+    area_sq_km: 316.0
+    population: 519562
+    population_year: 2022
+    is_capital: 0
+    is_active: 1
+
+  # MALTA - Region Level (Level 1)
+  - geography_key: 110
+    geography_code: "MLT_SOUTH"
+    country_key: 1
+    country_code: "MLT"
+    hierarchy_level: 1
+    hierarchy_level_name: "Region"
+    geography_name: "Southern Region"
+    geography_name_local: "Reġjun tan-Nofsinhar"
+    geography_type: "REGION"
+    parent_geography_key: 100
+    parent_geography_code: "MLT"
+    parent_geography_name: "Malta"
+    level_1_key: 110
+    level_1_code: "MLT_SOUTH"
+    level_1_name: "Southern Region"
+    full_path: "Malta > Southern Region"
+    full_path_codes: "MLT/MLT_SOUTH"
+    depth: 1
+    is_active: 1
+
+  - geography_key: 111
+    geography_code: "MLT_NORTH"
+    country_key: 1
+    country_code: "MLT"
+    hierarchy_level: 1
+    hierarchy_level_name: "Region"
+    geography_name: "Northern Region"
+    geography_name_local: "Reġjun tat-Tramuntana"
+    geography_type: "REGION"
+    parent_geography_key: 100
+    level_1_key: 111
+    level_1_code: "MLT_NORTH"
+    level_1_name: "Northern Region"
+    full_path: "Malta > Northern Region"
+    depth: 1
+    is_active: 1
+
+  - geography_key: 112
+    geography_code: "MLT_HARBOUR"
+    country_key: 1
+    country_code: "MLT"
+    hierarchy_level: 1
+    hierarchy_level_name: "Region"
+    geography_name: "Harbour Region"
+    geography_name_local: "Reġjun tal-Port"
+    geography_type: "REGION"
+    parent_geography_key: 100
+    level_1_key: 112
+    level_1_code: "MLT_HARBOUR"
+    level_1_name: "Harbour Region"
+    full_path: "Malta > Harbour Region"
+    depth: 1
+    is_active: 1
+
+  - geography_key: 113
+    geography_code: "MLT_GOZO"
+    country_key: 1
+    country_code: "MLT"
+    hierarchy_level: 1
+    hierarchy_level_name: "Region"
+    geography_name: "Gozo"
+    geography_name_local: "Għawdex"
+    geography_type: "REGION"
+    parent_geography_key: 100
+    level_1_key: 113
+    level_1_code: "MLT_GOZO"
+    level_1_name: "Gozo"
+    full_path: "Malta > Gozo"
+    depth: 1
+    is_active: 1
+
+  # MALTA - District Level (Level 2)
+  - geography_key: 120
+    geography_code: "MLT_SD"
+    country_key: 1
+    country_code: "MLT"
+    hierarchy_level: 2
+    hierarchy_level_name: "District"
+    geography_name: "Southern District"
+    geography_name_local: "Distrett tan-Nofsinhar"
+    geography_type: "DISTRICT"
+    parent_geography_key: 110
+    level_1_key: 110
+    level_1_code: "MLT_SOUTH"
+    level_1_name: "Southern Region"
+    level_2_key: 120
+    level_2_code: "MLT_SD"
+    level_2_name: "Southern District"
+    full_path: "Malta > Southern Region > Southern District"
+    depth: 2
+    tax_office_code: "CFR_SOUTH"
+    is_active: 1
+
+  - geography_key: 121
+    geography_code: "MLT_SE"
+    country_key: 1
+    country_code: "MLT"
+    hierarchy_level: 2
+    hierarchy_level_name: "District"
+    geography_name: "South Eastern District"
+    geography_name_local: "Distrett tal-Lvant t'Isfel"
+    geography_type: "DISTRICT"
+    parent_geography_key: 112
+    level_1_key: 112
+    level_1_code: "MLT_HARBOUR"
+    level_1_name: "Harbour Region"
+    level_2_key: 121
+    level_2_code: "MLT_SE"
+    level_2_name: "South Eastern District"
+    full_path: "Malta > Harbour Region > South Eastern District"
+    depth: 2
+    tax_office_code: "CFR_HARBOUR"
+    is_active: 1
+
+  # MALTA - Locality Level (Level 4 - skipping Level 3 as Malta has no municipalities)
+  - geography_key: 130
+    geography_code: "VLT"
+    country_key: 1
+    country_code: "MLT"
+    hierarchy_level: 4
+    hierarchy_level_name: "Locality"
+    geography_name: "Valletta"
+    geography_name_local: "Il-Belt Valletta"
+    geography_type: "CITY"
+    parent_geography_key: 121
+    level_1_key: 112
+    level_1_code: "MLT_HARBOUR"
+    level_1_name: "Harbour Region"
+    level_2_key: 121
+    level_2_code: "MLT_SE"
+    level_2_name: "South Eastern District"
+    level_4_key: 130
+    level_4_code: "VLT"
+    level_4_name: "Valletta"
+    full_path: "Malta > Harbour Region > South Eastern District > Valletta"
+    depth: 3
+    postal_code_pattern: "VLT ****"
+    postal_code_prefix: "VLT"
+    population: 5827
+    population_year: 2022
+    is_capital: 1
+    is_urban: 1
+    is_port: 1
+    tax_office_code: "CFR_HARBOUR"
+    is_active: 1
+
+  - geography_key: 131
+    geography_code: "SLM"
+    country_key: 1
+    country_code: "MLT"
+    hierarchy_level: 4
+    hierarchy_level_name: "Locality"
+    geography_name: "Sliema"
+    geography_name_local: "Tas-Sliema"
+    geography_type: "TOWN"
+    parent_geography_key: 121
+    level_1_key: 112
+    level_1_code: "MLT_HARBOUR"
+    level_1_name: "Harbour Region"
+    level_2_key: 121
+    level_2_code: "MLT_SE"
+    level_2_name: "South Eastern District"
+    level_4_key: 131
+    level_4_code: "SLM"
+    level_4_name: "Sliema"
+    full_path: "Malta > Harbour Region > South Eastern District > Sliema"
+    depth: 3
+    postal_code_pattern: "SLM ****"
+    population: 19582
+    population_year: 2022
+    is_urban: 1
+    is_active: 1
+
+  - geography_key: 132
+    geography_code: "VCT"
+    country_key: 1
+    country_code: "MLT"
+    hierarchy_level: 4
+    hierarchy_level_name: "Locality"
+    geography_name: "Victoria"
+    geography_name_local: "Ir-Rabat Għawdex"
+    geography_type: "CITY"
+    parent_geography_key: 113
+    level_1_key: 113
+    level_1_code: "MLT_GOZO"
+    level_1_name: "Gozo"
+    level_4_key: 132
+    level_4_code: "VCT"
+    level_4_name: "Victoria"
+    full_path: "Malta > Gozo > Victoria"
+    depth: 2
+    postal_code_pattern: "VCT ****"
+    is_capital: 1  # Regional capital
+    is_urban: 1
+    tax_office_code: "CFR_GOZO"
+    is_active: 1
+
+  # ---------------------------------------------------------------------------
+  # SRI LANKA - Province Level (Level 1)
+  # ---------------------------------------------------------------------------
+  - geography_key: 200
+    geography_code: "LKA"
+    country_key: 2
+    country_code: "LKA"
+    country_name: "Sri Lanka"
+    hierarchy_level: 0
+    hierarchy_level_name: "Country"
+    geography_name: "Sri Lanka"
+    geography_type: "COUNTRY"
+    full_path: "Sri Lanka"
+    depth: 0
+    is_active: 1
+
+  - geography_key: 210
+    geography_code: "LKA_WESTERN"
+    country_key: 2
+    country_code: "LKA"
+    hierarchy_level: 1
+    hierarchy_level_name: "Province"
+    geography_name: "Western Province"
+    geography_name_local: "බස්නාහිර පළාත"
+    geography_type: "PROVINCE"
+    parent_geography_key: 200
+    level_1_key: 210
+    level_1_code: "LKA_WESTERN"
+    level_1_name: "Western Province"
+    full_path: "Sri Lanka > Western Province"
+    depth: 1
+    is_active: 1
+
+  # SRI LANKA - District Level (Level 2)
+  - geography_key: 220
+    geography_code: "LKA_COLOMBO"
+    country_key: 2
+    country_code: "LKA"
+    hierarchy_level: 2
+    hierarchy_level_name: "District"
+    geography_name: "Colombo District"
+    geography_name_local: "කොළඹ දිස්ත්‍රික්කය"
+    geography_type: "DISTRICT"
+    parent_geography_key: 210
+    level_1_key: 210
+    level_1_code: "LKA_WESTERN"
+    level_1_name: "Western Province"
+    level_2_key: 220
+    level_2_code: "LKA_COLOMBO"
+    level_2_name: "Colombo District"
+    full_path: "Sri Lanka > Western Province > Colombo District"
+    depth: 2
+    tax_office_code: "IRD_COLOMBO"
+    is_active: 1
+
+  # SRI LANKA - Divisional Secretariat (Level 3)
+  - geography_key: 230
+    geography_code: "LKA_DS_CMB"
+    country_key: 2
+    country_code: "LKA"
+    hierarchy_level: 3
+    hierarchy_level_name: "Divisional Secretariat"
+    geography_name: "Colombo"
+    geography_type: "MUNICIPALITY"
+    parent_geography_key: 220
+    level_1_key: 210
+    level_1_code: "LKA_WESTERN"
+    level_1_name: "Western Province"
+    level_2_key: 220
+    level_2_code: "LKA_COLOMBO"
+    level_2_name: "Colombo District"
+    level_3_key: 230
+    level_3_code: "LKA_DS_CMB"
+    level_3_name: "Colombo"
+    full_path: "Sri Lanka > Western Province > Colombo District > Colombo"
+    depth: 3
+    is_capital: 1
+    is_urban: 1
+    is_port: 1
+    is_airport: 1
+    tax_office_code: "IRD_COLOMBO_CENTRAL"
+    is_active: 1
+
+  # ---------------------------------------------------------------------------
+  # MOLDOVA - Region (Raion) Level
+  # ---------------------------------------------------------------------------
+  - geography_key: 300
+    geography_code: "MDA"
+    country_key: 3
+    country_code: "MDA"
+    country_name: "Moldova"
+    hierarchy_level: 0
+    hierarchy_level_name: "Country"
+    geography_name: "Moldova"
+    geography_name_local: "Republica Moldova"
+    geography_type: "COUNTRY"
+    full_path: "Moldova"
+    depth: 0
+    is_active: 1
+
+  - geography_key: 310
+    geography_code: "MDA_CHISINAU"
+    country_key: 3
+    country_code: "MDA"
+    hierarchy_level: 1
+    hierarchy_level_name: "Municipality"
+    geography_name: "Chișinău Municipality"
+    geography_name_local: "Municipiul Chișinău"
+    geography_type: "MUNICIPALITY"
+    parent_geography_key: 300
+    level_1_key: 310
+    level_1_code: "MDA_CHISINAU"
+    level_1_name: "Chișinău Municipality"
+    full_path: "Moldova > Chișinău Municipality"
+    depth: 1
+    is_capital: 1
+    is_urban: 1
+    is_airport: 1
+    tax_office_code: "SFS_CHISINAU"
+    is_active: 1
+
+  - geography_key: 320
+    geography_code: "MDA_ORHEI"
+    country_key: 3
+    country_code: "MDA"
+    hierarchy_level: 1
+    hierarchy_level_name: "Raion"
+    geography_name: "Orhei Raion"
+    geography_name_local: "Raionul Orhei"
+    geography_type: "DISTRICT"
+    parent_geography_key: 300
+    level_1_key: 320
+    level_1_code: "MDA_ORHEI"
+    level_1_name: "Orhei Raion"
+    full_path: "Moldova > Orhei Raion"
+    depth: 1
+    tax_office_code: "SFS_ORHEI"
+    is_active: 1
+
+  # ---------------------------------------------------------------------------
+  # UKRAINE - Oblast Level
+  # ---------------------------------------------------------------------------
+  - geography_key: 400
+    geography_code: "UKR"
+    country_key: 4
+    country_code: "UKR"
+    country_name: "Ukraine"
+    hierarchy_level: 0
+    hierarchy_level_name: "Country"
+    geography_name: "Ukraine"
+    geography_name_local: "Україна"
+    geography_type: "COUNTRY"
+    full_path: "Ukraine"
+    depth: 0
+    is_active: 1
+
+  - geography_key: 410
+    geography_code: "UKR_KYIV_CITY"
+    country_key: 4
+    country_code: "UKR"
+    hierarchy_level: 1
+    hierarchy_level_name: "City with Special Status"
+    geography_name: "Kyiv City"
+    geography_name_local: "місто Київ"
+    geography_type: "CITY"
+    parent_geography_key: 400
+    level_1_key: 410
+    level_1_code: "UKR_KYIV_CITY"
+    level_1_name: "Kyiv City"
+    full_path: "Ukraine > Kyiv City"
+    depth: 1
+    is_capital: 1
+    is_urban: 1
+    is_airport: 1
+    tax_office_code: "STS_KYIV"
+    is_active: 1
+
+  - geography_key: 420
+    geography_code: "UKR_LVIV_OBL"
+    country_key: 4
+    country_code: "UKR"
+    hierarchy_level: 1
+    hierarchy_level_name: "Oblast"
+    geography_name: "Lviv Oblast"
+    geography_name_local: "Львівська область"
+    geography_type: "REGION"
+    parent_geography_key: 400
+    level_1_key: 420
+    level_1_code: "UKR_LVIV_OBL"
+    level_1_name: "Lviv Oblast"
+    full_path: "Ukraine > Lviv Oblast"
+    depth: 1
+    tax_office_code: "STS_LVIV"
+    is_active: 1
+
+  # ---------------------------------------------------------------------------
+  # LEBANON - Governorate Level
+  # ---------------------------------------------------------------------------
+  - geography_key: 500
+    geography_code: "LBN"
+    country_key: 5
+    country_code: "LBN"
+    country_name: "Lebanon"
+    hierarchy_level: 0
+    hierarchy_level_name: "Country"
+    geography_name: "Lebanon"
+    geography_name_local: "لبنان"
+    geography_type: "COUNTRY"
+    full_path: "Lebanon"
+    depth: 0
+    is_active: 1
+
+  - geography_key: 510
+    geography_code: "LBN_BEIRUT"
+    country_key: 5
+    country_code: "LBN"
+    hierarchy_level: 1
+    hierarchy_level_name: "Governorate"
+    geography_name: "Beirut Governorate"
+    geography_name_local: "محافظة بيروت"
+    geography_type: "REGION"
+    parent_geography_key: 500
+    level_1_key: 510
+    level_1_code: "LBN_BEIRUT"
+    level_1_name: "Beirut Governorate"
+    full_path: "Lebanon > Beirut Governorate"
+    depth: 1
+    is_capital: 1
+    is_urban: 1
+    is_port: 1
+    is_airport: 1
+    tax_office_code: "MOF_BEIRUT"
+    is_active: 1
+
+# ==============================================================================
+# Country-Specific Level Mappings
+# ==============================================================================
+country_level_mappings:
+  description: |
+    Each country has different administrative structures. This mapping
+    shows how each country's levels map to the generic hierarchy.
+  
+  mappings:
+    - country_code: MLT
+      country_name: Malta
+      structure: |
+        Level 0: Country (Malta)
+        Level 1: Region (Southern, Northern, Harbour, Gozo)
+        Level 2: District (SD, ND, SE, CD, NH, GZ)
+        Level 3: (Not used - Malta has no municipalities)
+        Level 4: Locality (68 local councils)
+      notes: "Malta skips Level 3; localities report directly to districts"
+    
+    - country_code: LKA
+      country_name: Sri Lanka
+      structure: |
+        Level 0: Country (Sri Lanka)
+        Level 1: Province (9 provinces)
+        Level 2: District (25 districts)
+        Level 3: Divisional Secretariat (331 DS divisions)
+        Level 4: Grama Niladhari Division (14,022 GN divisions)
+      notes: "Full 4-level hierarchy; GN divisions optional for tax purposes"
+    
+    - country_code: MDA
+      country_name: Moldova
+      structure: |
+        Level 0: Country (Moldova)
+        Level 1: Region/Municipality (32 raions + 5 municipalities + 2 autonomous units)
+        Level 2: City/Town/Commune (within raions)
+        Level 3: Village (within communes)
+        Level 4: (Not commonly used)
+      notes: "Municipalities like Chișinău are Level 1; raions contain communes"
+    
+    - country_code: UKR
+      country_name: Ukraine
+      structure: |
+        Level 0: Country (Ukraine)
+        Level 1: Oblast / City with Special Status (24 oblasts + Kyiv + Sevastopol)
+        Level 2: Raion (136 raions after 2020 reform)
+        Level 3: Hromada (1,469 territorial communities)
+        Level 4: Settlement (cities, towns, villages)
+      notes: "2020 administrative reform consolidated raions"
+    
+    - country_code: LBN
+      country_name: Lebanon
+      structure: |
+        Level 0: Country (Lebanon)
+        Level 1: Governorate (Muhafazah) (8 governorates)
+        Level 2: District (Caza) (25 districts)
+        Level 3: Municipality (varies by district)
+        Level 4: (Not commonly used)
+      notes: "Beirut is both governorate and single district"
+
+# ==============================================================================
+# ETL Mapping
+# ==============================================================================
+etl_mapping:
+  description: |
+    Country-specific source tables map to the generic geography dimension.
+    The ETL process must handle different source structures per country.
+  
+  source_tables:
+    malta:
+      tables:
+        - schema: reference
+          table: ref_malta_locality
+          columns: [locality_code, locality_name_en, locality_name_mt, district_code, post_code]
+        - schema: reference
+          table: ref_malta_district
+          columns: [district_code, district_name_en, district_name_mt, region_code]
+      join_logic: "locality.district_code = district.district_code"
+      target_level: 4
+    
+    sri_lanka:
+      tables:
+        - schema: reference
+          table: ref_province
+          columns: [province_code, province_name_en, province_name_si]
+        - schema: reference
+          table: ref_district
+          columns: [district_code, district_name_en, province_code]
+        - schema: reference
+          table: ref_divisional_secretariat
+          columns: [ds_code, ds_name_en, district_code]
+      join_logic: "ds.district_code = district.district_code; district.province_code = province.province_code"
+      target_level: 3
+    
+    moldova:
+      tables:
+        - schema: reference
+          table: ref_raion
+          columns: [raion_code, raion_name_ro, raion_name_ru]
+        - schema: reference
+          table: ref_municipality
+          columns: [municipality_code, municipality_name_ro]
+      target_level: 1
+  
+  transformations:
+    - name: derive_full_path
+      logic: |
+        CONCAT_WS(' > ', 
+          country_name, 
+          NULLIF(level_1_name, ''),
+          NULLIF(level_2_name, ''),
+          NULLIF(level_3_name, ''),
+          NULLIF(level_4_name, '')
+        )
+    
+    - name: derive_full_path_codes
+      logic: |
+        CONCAT_WS('/', 
+          country_code, 
+          NULLIF(level_1_code, ''),
+          NULLIF(level_2_code, ''),
+          NULLIF(level_3_code, ''),
+          NULLIF(level_4_code, '')
+        )
+    
+    - name: derive_depth
+      logic: |
+        CASE 
+          WHEN level_4_code IS NOT NULL THEN 4
+          WHEN level_3_code IS NOT NULL THEN 3
+          WHEN level_2_code IS NOT NULL THEN 2
+          WHEN level_1_code IS NOT NULL THEN 1
+          ELSE 0
+        END
+
+# ==============================================================================
+# ClickHouse DDL
+# ==============================================================================
+clickhouse_ddl:
+  database: malta_warehouse
+  engine: MergeTree()
+  order_by: [geography_key]
+  primary_key: geography_key
+  
+  ddl: |
+    CREATE TABLE IF NOT EXISTS malta_warehouse.dim_geography
+    (
+        -- Keys
+        geography_key Int32,
+        geography_code String,
+        
+        -- Country Context
+        country_key Int32,
+        country_code FixedString(3),
+        country_name Nullable(String),
+        
+        -- Hierarchy Level
+        hierarchy_level UInt8,
+        hierarchy_level_name Nullable(String),
+        
+        -- Current Level
+        geography_name String,
+        geography_name_local Nullable(String),
+        geography_name_short Nullable(String),
+        geography_type Nullable(String),
+        geography_type_local Nullable(String),
+        
+        -- Parent Reference
+        parent_geography_key Nullable(Int32),
+        parent_geography_code Nullable(String),
+        parent_geography_name Nullable(String),
+        
+        -- Flattened Hierarchy
+        level_1_key Nullable(Int32),
+        level_1_code Nullable(String),
+        level_1_name Nullable(String),
+        level_2_key Nullable(Int32),
+        level_2_code Nullable(String),
+        level_2_name Nullable(String),
+        level_3_key Nullable(Int32),
+        level_3_code Nullable(String),
+        level_3_name Nullable(String),
+        level_4_key Nullable(Int32),
+        level_4_code Nullable(String),
+        level_4_name Nullable(String),
+        
+        -- Full Path
+        full_path Nullable(String),
+        full_path_codes Nullable(String),
+        depth Nullable(UInt8),
+        
+        -- Geographic Attributes
+        postal_code_pattern Nullable(String),
+        postal_code_prefix Nullable(String),
+        timezone Nullable(String),
+        latitude Nullable(Float64),
+        longitude Nullable(Float64),
+        area_sq_km Nullable(Float64),
+        population Nullable(Int64),
+        population_year Nullable(UInt16),
+        
+        -- Tax Administration
+        tax_office_code Nullable(String),
+        tax_office_name Nullable(String),
+        tax_region_code Nullable(String),
+        customs_office_code Nullable(String),
+        
+        -- Flags
+        is_capital UInt8 DEFAULT 0,
+        is_urban UInt8 DEFAULT 0,
+        is_free_zone UInt8 DEFAULT 0,
+        is_port UInt8 DEFAULT 0,
+        is_airport UInt8 DEFAULT 0,
+        
+        -- Status
+        is_active UInt8 DEFAULT 1,
+        effective_from Nullable(Date),
+        effective_to Nullable(Date),
+        replacement_geography_code Nullable(String),
+        notes Nullable(String),
+        
+        -- ETL Metadata
+        etl_batch_id Int64,
+        etl_load_timestamp DateTime DEFAULT now(),
+        etl_source_system Nullable(String)
+    )
+    ENGINE = MergeTree()
+    ORDER BY (geography_key)
+    SETTINGS index_granularity = 8192;
+
+    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_geography_natural_key 
+    ON malta_warehouse.dim_geography (country_code, geography_code) 
+    TYPE minmax GRANULARITY 4;
+    
+    CREATE INDEX IF NOT EXISTS idx_geography_country_level 
+    ON malta_warehouse.dim_geography (country_key, hierarchy_level) 
+    TYPE minmax GRANULARITY 4;
+    
+    CREATE INDEX IF NOT EXISTS idx_geography_parent 
+    ON malta_warehouse.dim_geography (parent_geography_key) 
+    TYPE minmax GRANULARITY 4;
+    
+    CREATE INDEX IF NOT EXISTS idx_geography_level1 
+    ON malta_warehouse.dim_geography (country_key, level_1_code) 
+    TYPE bloom_filter GRANULARITY 4;
+
+# ==============================================================================
+# Query Examples
+# ==============================================================================
+query_examples:
+  - name: "Get all localities in Malta"
+    description: "Retrieve all level 4 geographies for Malta"
+    sql: |
+      SELECT geography_key, geography_code, geography_name, geography_name_local
+      FROM warehouse.dim_geography
+      WHERE country_key = 1 
+        AND hierarchy_level = 4
+        AND is_active = 1
+      ORDER BY geography_name
+
+  - name: "Get geography hierarchy for a locality"
+    description: "Get full hierarchy path for Valletta"
+    sql: |
+      SELECT 
+        geography_name,
+        full_path,
+        level_1_name AS region,
+        level_2_name AS district,
+        level_4_name AS locality
+      FROM warehouse.dim_geography
+      WHERE geography_code = 'VLT'
+
+  - name: "Taxpayer distribution by region"
+    description: "Count taxpayers by Level 1 geography"
+    sql: |
+      SELECT 
+        g.level_1_name AS region,
+        COUNT(DISTINCT p.party_key) AS taxpayer_count
+      FROM fact_filing f
+      JOIN dim_party p ON f.party_key = p.party_key
+      JOIN dim_geography g ON p.geography_key = g.geography_key
+      WHERE g.country_key = 1  -- Malta
+        AND g.is_active = 1
+      GROUP BY g.level_1_name
+      ORDER BY taxpayer_count DESC
+
+  - name: "Get children of a geography"
+    description: "Find all direct children of a parent geography"
+    sql: |
+      SELECT geography_key, geography_name, hierarchy_level, geography_type
+      FROM warehouse.dim_geography
+      WHERE parent_geography_key = 110  -- Southern Region
+        AND is_active = 1
+      ORDER BY geography_name
+
+  - name: "Cross-country geography comparison"
+    description: "Compare administrative structure counts by country"
+    sql: |
+      SELECT 
+        c.country_name,
+        g.hierarchy_level,
+        g.hierarchy_level_name,
+        COUNT(*) AS division_count
+      FROM warehouse.dim_geography g
+      JOIN warehouse.dim_country c ON g.country_key = c.country_key
+      WHERE g.is_active = 1
+      GROUP BY c.country_name, g.hierarchy_level, g.hierarchy_level_name
+      ORDER BY c.country_name, g.hierarchy_level
+
+  - name: "Tax office workload by geography"
+    description: "Analyze tax office coverage across geographies"
+    sql: |
+      SELECT 
+        g.tax_office_code,
+        g.tax_office_name,
+        COUNT(DISTINCT g.geography_key) AS localities_covered,
+        SUM(g.population) AS total_population
+      FROM warehouse.dim_geography g
+      WHERE g.country_key = 1
+        AND g.hierarchy_level = 4
+        AND g.is_active = 1
+      GROUP BY g.tax_office_code, g.tax_office_name
+      ORDER BY total_population DESC
+
+# ==============================================================================
+# Integration Guide
+# ==============================================================================
+integration:
+  description: |
+    dim_geography provides location context for taxpayer analysis. It integrates
+    with dim_party via geography_key and provides rollup capabilities for
+    regional compliance analysis.
+  
+  relationships:
+    - from: dim_party
+      to: dim_geography
+      column: geography_key
+      description: "Party's registered/residence location"
+    
+    - from: dim_geography
+      to: dim_country
+      column: country_key
+      description: "Country context for geography"
+    
+    - from: dim_geography
+      to: dim_geography
+      column: parent_geography_key
+      description: "Self-reference for hierarchy"
+  
+  usage_notes:
+    - "Use flattened level_N columns for star schema GROUP BY operations"
+    - "Use parent_geography_key for recursive tree traversal"
+    - "Always filter by is_active = 1 for current geographies"
+    - "Join to dim_country for country configuration (fiscal year, currency)"
+    - "geography_key should replace locality_code/district_code in dim_party"
+
+# ==============================================================================
+# Migration from v1.0.0 (Malta-specific)
+# ==============================================================================
+migration:
+  description: |
+    Migration path from Malta-specific dim_geography v1.0.0 to generalized v2.0.0
+  
+  steps:
+    - step: 1
+      action: "Create new table structure"
+      sql: |
+        -- Create new generalized table
+        CREATE TABLE warehouse.dim_geography_v2 (...)
+    
+    - step: 2
+      action: "Insert Malta country level"
+      sql: |
+        INSERT INTO warehouse.dim_geography_v2 (geography_key, geography_code, country_key, ...)
+        VALUES (100, 'MLT', 1, 0, 'Country', 'Malta', ...)
+    
+    - step: 3
+      action: "Migrate Malta localities"
+      sql: |
+        INSERT INTO warehouse.dim_geography_v2 
+        SELECT 
+          geography_key + 30 AS geography_key,  -- Offset for new key space
+          locality_code AS geography_code,
+          1 AS country_key,
+          'MLT' AS country_code,
+          4 AS hierarchy_level,
+          'Locality' AS hierarchy_level_name,
+          locality_name_en AS geography_name,
+          locality_name_mt AS geography_name_local,
+          -- Map district_code to parent_geography_key
+          CASE district_code
+            WHEN 'SD' THEN 120
+            WHEN 'SE' THEN 121
+            -- ... etc
+          END AS parent_geography_key,
+          -- Flatten hierarchy
+          level_1_code, level_1_name,
+          level_2_code, level_2_name,
+          locality_code AS level_4_code,
+          locality_name_en AS level_4_name,
+          ...
+        FROM warehouse.dim_geography_v1
+    
+    - step: 4
+      action: "Update dim_party references"
+      sql: |
+        -- Update party geography_key to new keys
+        UPDATE warehouse.dim_party p
+        SET geography_key = g2.geography_key
+        FROM warehouse.dim_geography_v1 g1
+        JOIN warehouse.dim_geography_v2 g2 
+          ON g1.locality_code = g2.geography_code 
+          AND g2.country_code = 'MLT'
+        WHERE p.geography_key = g1.geography_key
+    
+    - step: 5
+      action: "Swap tables"
+      sql: |
+        ALTER TABLE warehouse.dim_geography RENAME TO dim_geography_v1_backup;
+        ALTER TABLE warehouse.dim_geography_v2 RENAME TO dim_geography;
+    
+    - step: 6
+      action: "Validate migration"
+      sql: |
+        -- Verify all parties have valid geography_key
+        SELECT COUNT(*) 
+        FROM warehouse.dim_party p
+        LEFT JOIN warehouse.dim_geography g ON p.geography_key = g.geography_key
+        WHERE g.geography_key IS NULL AND p.geography_key IS NOT NULL
+
+# ==============================================================================
+# Validation Criteria
+# ==============================================================================
+# | Check                          | Expected                                |
+# |--------------------------------|-----------------------------------------|
+# | Surrogate key                  | geography_key (Int32)                   |
+# | Natural key                    | country_code + geography_code           |
+# | Country FK                     | country_key → dim_country               |
+# | SCD Type                       | Type 1 (overwrite)                      |
+# | Hierarchy levels               | 0-4 (Country to Locality)               |
+# | Self-reference                 | parent_geography_key                    |
+# | Flattened columns              | level_1 through level_4 _code/_name     |
+# | Full path                      | full_path, full_path_codes              |
+# | Geographic attributes          | lat, long, area, population             |
+# | Tax administration             | tax_office_code, customs_office_code    |
+# | Classification flags           | is_capital, is_urban, etc.              |
+# | Sample data countries          | MLT, LKA, MDA, UKR, LBN                 |
+# | Business rules                 | 10 rules defined                        |
+# | ClickHouse DDL                 | Complete with indexes                   |
+# | Query examples                 | 6 patterns provided                     |
+# | Migration guide                | 6-step migration path                   |
+# ==============================================================================
